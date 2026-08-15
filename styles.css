@@ -2,3 +2,6 @@
 @media(max-width:850px){.concept-grid,.principles,.results{grid-template-columns:1fr 1fr}.toolbar{grid-template-columns:1fr 1fr}.category-layout{grid-template-columns:1fr}.category-tree{position:static;display:flex;overflow-x:auto}.category-tree button{width:auto;white-space:nowrap}}
 @media(max-width:580px){.site-header{align-items:flex-start;flex-wrap:wrap}.site-header nav{justify-content:flex-start;width:100%;overflow-x:auto;padding-bottom:.15rem}.site-header nav .ghost{font-size:.77rem;padding:.4rem;white-space:nowrap}main{padding-top:1rem}.hero{padding-top:2rem}.concept-grid,.principles,.results,.toolbar,.form-grid,.evidence{grid-template-columns:1fr}.app-head{display:block}.mode-switch{margin-top:1rem;width:max-content}.toolbar{position:static}.tool-card{padding:.9rem}.results-meta{align-items:flex-start;flex-direction:column}.compare-dock{bottom:.5rem}.skeleton{grid-template-columns:1fr}.form-grid .full{grid-column:auto}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+.nav-link{display:inline-flex;align-items:center;text-decoration:none}.link-button{display:inline-block;text-align:center;text-decoration:none}.concept-card-d{border-color:#8d7bdd}.concept-card-d .letter{color:#00725d}
+@media(min-width:851px){.concept-grid{grid-template-columns:repeat(4,1fr)}}

@@ -1,22 +1,5 @@
-/* nosmaps static UI mock — all records and observations are fictional mock data. */
-const categories = [
-  ['clients','クライアント','📱'],['relay','リレー運用','📡'],['identity','ID・鍵管理','🔑'],
-  ['media','画像・動画','🎞️'],['analytics','観測・分析','📊'],['dev','開発者向け','🧰']
-];
-const purposes = ['まず読む','仲間と話す','作品を公開','コミュニティ運営','自分の鍵を守る','リレーを管理','データを観測','アプリを作る'];
-const statuses = ['active','stale','dead','unknown'];
-const statusJa = {active:'active',stale:'stale',dead:'dead',unknown:'unknown'};
-const names = ['LumaPost','ZapNest','RelayHarbor','KeySprout','NoteCanvas','OrbitDeck','SignalMoss','ThreadKite','NsecVault','PurpleDock','KindLens','EventForge','MizuChat','RelayPebble','AmberScope','TagTrail','PocketNostr','WotGarden','MediaBloom','NipBench','FireflyFeed','QuietSigner','RelayAtlas','NoteBridge','Kindleaves','SatStream','MeshReader','EchoBoard','BadgeMint','EventSketch','NostrCamp','RelayPulse','ProfilePatch','ZapLedger','ThreadMap','KeyCompass'];
-const descByCat = {
-  clients:'タイムラインと投稿を、迷わない導線で試せるクライアント。',relay:'リレーの設定・接続状況を手元で確認する運用ツール。',identity:'鍵とプロフィールの扱いを学びながら管理する補助ツール。',media:'Nostr上で作品やメディアを公開するための制作ツール。',analytics:'イベントや接続傾向を可視化する観測ツール。',dev:'NIPやイベントを試し、実装を検証する開発ツール。'};
-const purposeByCat={clients:['まず読む','仲間と話す'],relay:['リレーを管理','コミュニティ運営'],identity:['自分の鍵を守る'],media:['作品を公開'],analytics:['データを観測','コミュニティ運営'],dev:['アプリを作る','データを観測']};
-const tools = names.map((name,i)=>{
-  const [category,categoryLabel,icon]=categories[i%categories.length];
-  const status=statuses[i%4];
-  const day=String(14-(i%10)).padStart(2,'0');
-  return {id:`tool-${i+1}`,name,category,categoryLabel,icon,status,description:descByCat[category],purposes:purposeByCat[category],platform:['Web','Desktop','Mobile'][i%3],license:['MIT','AGPL-3.0','不明（モック）'][i%3],tags:[categoryLabel,['軽量','セルフホスト','初心者向け','実験的'][i%4]],observed:`2026-08-${day} ${String(8+i%10).padStart(2,'0')}:20 UTC`,basis:{active:'直近7日以内にモック観測が3回成功',stale:'最終モック観測から35日相当が経過',dead:'直近3回のモック疎通がすべて失敗',unknown:'判定に必要なモック観測が不足'}[status],observations:[`2026-08-${day}: ${status==='dead'?'接続失敗':'応答を確認'}（モック）`,`2026-08-${String(Math.max(1,Number(day)-2)).padStart(2,'0')}: メタデータ取得（モック）`],url:'https://example.invalid/',mock:true};
-});
-
+/* nosmaps static UI mock — shared records are loaded from data.js. */
+const {categories,purposes,statuses,statusJa,tools}=window.NOSMAPS_DATA;
 const state={screen:'home',mode:'A',query:'',category:'all',status:'all',platform:'all',purpose:'',compare:[],uiState:'normal',sort:'name'};
 const main=document.querySelector('#main');
 const detailDialog=document.querySelector('#detail-dialog');
@@ -26,12 +9,13 @@ function esc(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;',
 function statusBadge(t){return `<span class="status ${t.status}">${statusJa[t.status]}</span>`}
 function routeHash(){history.replaceState(null,'',state.screen==='home'?'#home':`#concept-${state.mode.toLowerCase()}`)}
 function renderHome(){state.screen='home';routeHash();main.innerHTML=`
-  <section class="hero"><div class="eyebrow">Static prototype · 36 shared mock records</div><h1>Nostrの道具を、<br>どう見つけたい？</h1><p class="lead">同じ架空データを使った3つのUI案です。情報設計ではなく、まず触って比較するためのモック。</p><p class="mock-note">⚠ すべての状態・観測値はモック。Nostr未接続・送信なし。</p></section>
+  <section class="hero"><div class="eyebrow">Static prototype · 36 shared mock records</div><h1>Nostrの道具を、<br>どう見つけたい？</h1><p class="lead">同じ架空データを使った4つのUI案です。情報設計ではなく、まず触って比較するためのモック。</p><p class="mock-note">⚠ すべての状態・観測値はモック。Nostr未接続・送信なし。</p></section>
   <section class="compare-prompt"><strong>何を比較してほしいか</strong><br>① 初見で次の操作が分かるか　② 欲しいツールへ早く着けるか　③ 状態の根拠を信頼できそうか　④ また探索したくなるか</section>
   <section class="concept-grid" aria-label="UI案を選ぶ">
     ${conceptCard('A','目的から探す','初心者・Nostrを始めたばかりの人','やりたいことを言葉で選べば、用語を知らなくても候補に着ける。',['目的カードから開始','おすすめ順の短いリスト','次の一歩を明示'])}
     ${conceptCard('B','一覧・絞り込み・比較','候補を効率よく評価したい人','高密度な一覧と2〜3件比較で、判断に必要な差分を早く掴める。',['複数条件で絞り込み','最大3件を横比較','観測根拠を一覧で確認'])}
     ${conceptCard('C','カテゴリを辿る探索','周辺領域も含めて発見したい人','分類を歩くことで、検索語を決めずに意外な道具と出会える。',['カテゴリツリー','関連領域への寄り道','発見を促すカード'])}
+    <article class="concept-card concept-card-d"><span class="letter">D</span><h2>NIP探索・比較</h2><p><strong>対象：</strong>既存Nostr利用者・開発者</p><p>NIPを起点に架空ツールを逆引きし、対応状況と根拠を比較する。</p><ul><li>NIP番号・名称・用途検索</li><li>対応ツールの逆引き</li><li>最大3件のNIPマトリクス</li></ul><a class="primary link-button" href="nip-explorer.html">D案を操作する</a></article>
   </section>
   <section class="principles"><div class="principle"><strong>同じ36件</strong><br><span>全案で共通の架空データ。</span></div><div class="principle"><strong>根拠を隠さない</strong><br><span>状態と観測日時を詳細・比較に表示。</span></div><div class="principle"><strong>静的で完結</strong><br><span>バックエンド・API・DB・中央インデクサなし。</span></div></section>`;}
 function conceptCard(letter,title,user,hypothesis,points){return `<article class="concept-card"><span class="letter">${letter}</span><h2>${title}</h2><p><strong>対象：</strong>${user}</p><p>${hypothesis}</p><ul>${points.map(x=>`<li>${x}</li>`).join('')}</ul><button class="primary" data-action="open-mode" data-mode="${letter}">${letter}案を操作する</button></article>`}
