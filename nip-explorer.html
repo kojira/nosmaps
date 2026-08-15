@@ -3,45 +3,43 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="使いたい機能から架空のNostrツールを逆引きし、NIPの裏付けと機能差を比較する静的UIモック">
-  <title>機能探索・比較（NIP裏付け）— nosmaps concept D</title>
+  <meta name="description" content="使いたい機能からNostrツール候補を逆引きし、NIPの裏付けと機能差を比較する静的UI">
+  <title>Nosmaps — 機能から探す</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="nip-explorer.css">
 </head>
-<body>
+<body class="nip-explorer-page">
   <a class="skip" href="#main">本文へスキップ</a>
-  <header class="site-header nip-site-header">
-    <a class="brand" href="index.html" aria-label="nosmaps 4案トップ"><span class="brand-mark">N</span><span>nosmaps</span><small>CONCEPT D</small></a>
-    <nav aria-label="主要メニュー">
-      <a class="ghost nav-link" href="index.html">4案トップ</a>
-      <a class="ghost nav-link" href="#feature-search">機能を探す</a>
-      <a class="ghost nav-link" href="#results">候補</a>
-      <button class="ghost" id="open-state-lab" type="button">状態確認</button>
-    </nav>
-  </header>
-  <div id="offline-banner" class="offline-banner" hidden role="status">offline モック：同梱した架空データを表示中。外部通信・同期はありません。</div>
+  <div id="offline-banner" class="offline-banner" hidden role="status">オフライン：保存済みデータを表示しています。外部通信はありません。</div>
 
   <main id="main" tabindex="-1">
-    <header class="feature-hero">
-      <div class="hero-copy">
-        <div class="eyebrow">CONCEPT D · FEATURE EXPLORER</div>
-        <h1>欲しい機能から、<br>次の道具を探す。</h1>
-        <p class="lead">今のツールの代替や、「この機能が使える別ツール」を機能名・利用場面から逆引き。違いは機能で比べ、NIPは技術的な裏付けとして確認できます。</p>
-        <p class="mock-badge">⚠ 36件のツール・機能対応・OSS・根拠・観測はすべて架空</p>
-      </div>
-      <section id="feature-search" class="feature-search-card" aria-labelledby="search-title">
-        <label class="feature-main-search" for="feature-query"><span id="search-title">機能名・利用場面・代替したいこと</span><input id="feature-query" type="search" placeholder="例: DM / zapを送りたい / 長文を書きたい" autocomplete="off"></label>
-        <div id="feature-chips" class="feature-chips" role="listbox" aria-label="主要機能"></div>
-        <div id="feature-preview" class="feature-preview" aria-live="polite"></div>
-      </section>
-    </header>
+    <div class="compact-identity" aria-label="現在位置">
+      <a href="index.html" aria-label="Nosmaps 4案トップへ戻る"><span class="identity-mark" aria-hidden="true">N</span><span>Nosmaps</span></a>
+      <span aria-hidden="true">/</span>
+      <span>機能から探す</span>
+    </div>
+
+    <section id="feature-search" class="feature-search" aria-labelledby="search-title">
+      <label class="feature-main-search" for="feature-query">
+        <span id="search-title">機能名・利用場面・代替したいこと</span>
+        <input id="feature-query" type="search" placeholder="DM / zapを送りたい / 長文" autocomplete="off">
+      </label>
+      <div id="feature-chips" class="feature-chips" role="listbox" aria-label="主要機能"></div>
+    </section>
 
     <section id="results" class="results-section" aria-labelledby="results-title">
-      <div class="section-head results-heading"><div><span class="step">MATCHED TOOLS</span><h2 id="results-title">この機能を使える候補</h2><p id="selected-feature-summary" class="selected-summary" aria-live="polite"></p></div><button class="secondary" id="clear-filters" type="button">条件をリセット</button></div>
+      <div class="results-bar">
+        <div>
+          <h1 id="results-title">候補</h1>
+          <p id="selected-feature-summary" class="selected-summary" aria-live="polite"></p>
+        </div>
+        <strong id="result-count"></strong>
+      </div>
+
       <div class="mobile-condition-summary" id="condition-summary" aria-live="polite"></div>
       <details class="feature-filter-details" id="filter-details">
-        <summary>詳細フィルター <span id="active-filter-count">0</span></summary>
+        <summary>絞り込み <span id="active-filter-count">0</span></summary>
         <div class="feature-filter-grid">
           <label class="field">OS<select id="platform-filter"><option value="all">すべて</option><option>Web</option><option>Desktop</option><option>Mobile</option></select></label>
           <label class="field">カテゴリ<select id="category-filter"><option value="all">すべて</option></select></label>
@@ -50,38 +48,50 @@
           <label class="field">提供形態<select id="delivery-filter"><option value="all">すべて</option><option value="Webアプリ">Webアプリ</option><option value="インストール型">インストール型</option><option value="モバイルアプリ">モバイルアプリ</option></select></label>
           <label class="field">OSS<select id="oss-filter"><option value="all">すべて</option><option value="yes">OSS</option><option value="unknown">不明</option></select></label>
           <label class="include-dead"><input id="include-dead" type="checkbox"> 終了／到達不能も含める</label>
-          <label class="field advanced-nip">NIP番号・名称で高度な絞り込み<input id="nip-query" type="search" placeholder="例: 46 / remote signing"></label>
+          <label class="field advanced-nip">NIP番号・名称<input id="nip-query" type="search" placeholder="46 / remote signing"></label>
+          <div class="filter-help">
+            <details><summary>「不明」について</summary><p>材料不足で判定を保留した状態です。非対応を意味しません。終了／到達不能は明示的に選んだ場合だけ表示します。</p></details>
+            <button class="text-button" id="clear-filters" type="button">条件をリセット</button>
+          </div>
         </div>
       </details>
 
-      <div class="unknown-note"><strong>「不明」は否定評価ではありません。</strong> 材料不足で判定を保留した状態です。deadは初期結果から除外し、上の明示条件を選んだ時だけ表示します。</div>
       <div id="ui-state-view" aria-live="polite"></div>
-      <div class="results-meta"><strong id="result-count"></strong><span>最大3件を機能マトリクスで比較</span></div>
+      <div id="compare-actions" class="compare-actions" hidden>
+        <span id="compare-summary"></span>
+        <div>
+          <button id="open-compare" class="primary" type="button" disabled>機能で比較</button>
+          <button id="clear-compare" class="ghost" type="button">選択解除</button>
+        </div>
+      </div>
       <div id="tool-results" class="feature-tool-results"></div>
     </section>
 
     <section id="nip-reference" class="nip-reference" aria-labelledby="nip-reference-title">
-      <div class="section-head"><div><span class="step">TECHNICAL BASIS</span><h2 id="nip-reference-title">機能を支えるNIP</h2><p>主要探索軸は機能。NIP番号・公式名称・用途は、機能詳細と高度な絞り込みから辿れます。</p></div><span id="nip-count" class="count-pill"></span></div>
+      <div class="section-head">
+        <div><span class="step">NIP</span><h2 id="nip-reference-title">技術的な裏付け</h2></div>
+        <span id="nip-count" class="count-pill"></span>
+      </div>
       <div id="nip-list" class="nip-list" aria-live="polite"></div>
     </section>
 
-    <details class="mock-details">
-      <summary>モック範囲と公式NIP情報について</summary>
-      <p>36件の掲載ツール名、機能対応、OSS、根拠、観測日時、観測主体はUI確認用の架空データです。実在ツールの実装・品質・稼働状況を示しません。NIP番号・英語見出し・短い用途は公式 <a href="https://github.com/nostr-protocol/nips/tree/656cecc7c0a815b6a2b218d3b5d6f078b3f4dbab" target="_blank" rel="noreferrer">nostr-protocol/nips（確認commit: 656cecc）</a>を参照しています。</p>
+    <details id="state-lab" class="state-lab nip-state-lab">
+      <summary>表示状態を確認</summary>
+      <div class="state-buttons" role="group" aria-label="表示状態">
+        <button class="secondary" data-ui-state="normal">normal</button>
+        <button class="secondary" data-ui-state="loading">loading</button>
+        <button class="secondary" data-ui-state="empty">empty</button>
+        <button class="secondary" data-ui-state="error">error</button>
+        <button class="secondary" data-ui-state="partial">partial</button>
+        <button class="secondary" data-ui-state="offline">offline</button>
+      </div>
     </details>
-
-    <section id="state-lab" class="state-lab nip-state-lab" aria-labelledby="state-title">
-      <h2 id="state-title">UI STATE LAB</h2><p>静的モック上で、通信・データ取得時に必要になる表示状態を確認できます。</p>
-      <div class="state-buttons" role="group" aria-label="表示状態"><button class="secondary" data-ui-state="normal">normal</button><button class="secondary" data-ui-state="loading">loading</button><button class="secondary" data-ui-state="empty">empty</button><button class="secondary" data-ui-state="error">error</button><button class="secondary" data-ui-state="partial">partial</button><button class="secondary" data-ui-state="offline">offline</button></div>
-    </section>
-    <p class="footer-note">純粋な静的サイトです。バックエンド・専用API・永続DB・中央インデクサはありません。Nostr接続・署名・送信も行いません。</p>
+    <p class="footer-note">静的サイトです。バックエンド・専用API・永続DB・中央インデクサはありません。Nostr接続・署名・送信も行いません。</p>
   </main>
 
-  <div id="compare-dock" class="compare-dock nip-compare-dock" hidden><span id="compare-summary">0件を選択</span><button id="open-compare" class="primary" type="button" disabled>機能で比較</button></div>
   <dialog id="evidence-dialog" aria-labelledby="evidence-title"><div id="evidence-content"></div></dialog>
-  <dialog id="compare-dialog" class="matrix-dialog" aria-labelledby="compare-title"><div id="compare-content"></div></dialog>
+  <dialog id="compare-dialog" class="comparison-dialog" aria-labelledby="compare-title"><div id="compare-content"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <div id="mock-source-anchor" hidden></div>
 
   <script src="data.js"></script>
   <script src="nip-explorer.js"></script>
