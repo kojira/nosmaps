@@ -203,10 +203,16 @@
 
   function reviewSeed(tool) {
     const number = tool.id.replace('tool-', '').padStart(2, '0');
-    return [
+    const reviews = [
       {id: `${tool.id}-a`, profile: 'a', author: reviewerProfiles.a.name, npub: reviewerProfiles.a.npub, date: '2026-08-14 12:20 UTC', body: '主要導線を短時間で確認できました。', os: tool.platform, version: `v${1 + Number(tool.id.replace('tool-', '')) % 4}.${Number(tool.id.replace('tool-', '')) % 10}`, rating: 4, use: '日常利用', helpful: 14 + Number(number), unhelpful: 2, image: Number(number) % 2 ? screenshots[0] : null},
       {id: `${tool.id}-b`, profile: 'b', author: reviewerProfiles.b.name, npub: reviewerProfiles.b.npub, date: '2026-08-12 07:45 UTC', body: '不明項目が明示され、判断材料を分けて読めます。', os: '未入力', version: '未入力', rating: null, use: '比較検証', helpful: 8 + Number(number), unhelpful: 1, image: Number(number) % 3 === 0 ? screenshots[2] : null}
     ];
+    if (tool.id === 'tool-1') reviews.push(
+      {id: `${tool.id}-c`, profile: 'a', author: reviewerProfiles.a.name, npub: reviewerProfiles.a.npub, date: '2026-08-10 18:05 UTC', body: '', os: 'Mobile', version: 'v2.4', rating: 4, use: '画像記録', helpful: 9, unhelpful: 1, image: screenshots[1]},
+      {id: `${tool.id}-d`, profile: 'b', author: reviewerProfiles.b.name, npub: reviewerProfiles.b.npub, date: '2026-08-09 09:30 UTC', body: '設定画面の導線を確認しました。', os: 'Desktop', version: 'v2.4', rating: 3, use: '設定確認', helpful: 6, unhelpful: 0, image: screenshots[2]},
+      {id: `${tool.id}-e`, profile: 'a', author: reviewerProfiles.a.name, npub: reviewerProfiles.a.npub, date: '2026-08-08 14:10 UTC', body: '投稿画面の余白を確認しました。', os: 'Web', version: 'v2.4', rating: 4, use: '投稿確認', helpful: 7, unhelpful: 1, image: screenshots[1]}
+    );
+    return reviews;
   }
 
   function allReviews(tool) {
@@ -240,6 +246,17 @@
     return 12 + Number(tool.id.replace('tool-', '')) * 3 + (state.likes[tool.id] ? 1 : 0);
   }
 
+  function cardReviewThumbnails(tool) {
+    const images = allReviews(tool).filter(review => review.image);
+    if (!images.length) return '';
+    const shown = images.slice(0, 3);
+    const remaining = images.length - shown.length;
+    return `<div class="card-review-thumbnails" aria-label="レビュー添付画像 ${images.length}件">${shown.map(review => {
+      const label = `${review.author}・${review.date}のレビュー画像を拡大`;
+      return `<button type="button" class="card-review-thumbnail" data-open-image="${esc(tool.id)}" data-image-review="${esc(review.id)}" aria-label="${esc(label)}" title="${esc(label)}">${screenshotMarkup(review.image, true)}</button>`;
+    }).join('')}${remaining ? `<button type="button" class="card-review-more" data-gallery-tool="${esc(tool.id)}" aria-label="残り${remaining}件を含む画像ギャラリーを開く" title="画像ギャラリーを開く">+${remaining}</button>` : ''}</div>`;
+  }
+
   function featureCard(tool) {
     const feature = featureById[state.feature];
     const support = featureSupport(tool, feature);
@@ -262,6 +279,7 @@
       <section class="card-layer evaluation-layer" aria-labelledby="ratings-${tool.id}">
         <h3 id="ratings-${tool.id}">利用者評価</h3>
         <p class="local-only">この端末の表示だけ更新・未署名・未送信</p>
+        ${cardReviewThumbnails(tool)}
         <div class="evaluation-actions">
           <button type="button" class="like-button" data-like-tool="${tool.id}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCount(tool)}</button>
           <button type="button" data-bookmark-tool="${tool.id}" aria-pressed="${Boolean(bookmark)}">${bookmark ? '保存済み' : '非公開で保存'}</button>

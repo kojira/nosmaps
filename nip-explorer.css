@@ -1161,3 +1161,39 @@
   .gallery-card dl div { grid-template-columns: 76px minmax(0,1fr); }
   .mock-shot { min-height: 145px; }
 }
+
+/* Primary feature choices stay visible directly below full-text search. */
+.feature-chips-always { margin-top: 10px; }
+
+/* Prevent iOS Safari focus zoom without disabling user zoom. */
+@media (max-width: 760px) {
+  input, select, textarea { font-size: 16px !important; }
+}
+
+.card-review-thumbnails {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: .35rem;
+  align-items: stretch;
+  margin: .45rem 0;
+}
+.card-review-thumbnail { min-width: 0; padding: 0; overflow: hidden; border: 1px solid #aaa2ca; border-radius: .5rem; background: #fff; }
+.card-review-thumbnail .mock-shot.compact { min-height: 54px; height: 54px; border: 0; border-radius: 0; padding: .25rem; }
+.card-review-thumbnail .mock-shot span { display: none; }
+.card-review-thumbnail .mock-shot strong { font-size: .58rem; line-height: 1.1; }
+.card-review-more { min-width: 42px; padding: .35rem; border: 1px solid #887ab6; border-radius: .5rem; background: #f1edff; color: #35217e; font-weight: 900; }
+@media (max-width: 420px) {
+  .card-review-thumbnails { gap: .25rem; }
+  .card-review-thumbnail .mock-shot.compact { min-height: 48px; height: 48px; }
+}
+
+/* Keep the always-visible ten-feature row compact enough for a search-first first view. */
+@media (min-width: 951px) {
+  .feature-chips-always .feature-chip { min-height: 2.25rem; flex-direction: row; gap: .2rem; padding: .25rem .15rem; }
+  .feature-chips-always .feature-icon { width: 1rem; height: 1rem; }
+  .feature-chips-always .feature-chip-label { font-size: .61rem; }
+}
+@media (min-width: 951px) {
+  .feature-chips-always { margin-top: 4px; }
+  .feature-chips-always .feature-chip { min-height: 2rem; padding-block: .15rem; }
+}

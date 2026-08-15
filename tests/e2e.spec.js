@@ -382,3 +382,58 @@ test.describe('task 74 mobile dialogs at 375px', () => {
     });
   }
 });
+
+test('latest review: persistent feature choices, iOS-safe forms, card thumbnails', async ({ browser }) => {
+  const context = await browser.newContext({
+    viewport: { width: 375, height: 812 },
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'
+  });
+  const page = await context.newPage();
+  await page.goto(`${base}/nip-explorer.html`);
+
+  const chips = page.locator('#feature-search #feature-chips .feature-chip');
+  await expect(chips).toHaveCount(10);
+  await expect(chips.first()).toBeVisible();
+  await expect(page.locator('#filter-details')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#filter-details #feature-chips')).toHaveCount(0);
+  await expect(page.locator('#filter-details #platform-filter')).toHaveCount(1);
+
+  await page.locator('#feature-query').fill('LumaPost');
+  await chips.nth(1).click();
+  const cards = page.locator('.feature-tool-card');
+  await expect(cards).toHaveCount(0);
+  await chips.first().click();
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText('LumaPost');
+
+  await page.locator('#feature-query').fill('');
+  const thumbs = page.locator('.feature-tool-card[data-tool-id="tool-1"] .card-review-thumbnail');
+  await expect(thumbs).toHaveCount(3);
+  await expect(page.locator('.feature-tool-card[data-tool-id="tool-1"] .card-review-more')).toHaveText('+1');
+  const label = await thumbs.first().getAttribute('aria-label');
+  expect(label).toContain('2026-08-14');
+  await page.locator('.feature-tool-card[data-tool-id="tool-1"] .card-review-more').click();
+  await expect(page.locator('#gallery-dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await thumbs.first().click();
+  await expect(page.locator('#image-dialog')).toBeVisible();
+  const originalReview = page.locator('#image-dialog [data-review-tool]');
+  await expect(originalReview).toBeVisible();
+  await originalReview.click();
+  await expect(page.locator('#review-dialog')).toBeVisible();
+  await expect(page.locator('#review-dialog .review-form textarea[name="body"]')).toBeVisible();
+
+  const emptyCard = page.locator('.feature-tool-card[data-tool-id="tool-2"]');
+  await expect(emptyCard.locator('.card-review-thumbnails')).toHaveCount(0);
+
+  const formAudit = await page.locator('input, select, textarea').evaluateAll(nodes => nodes.map(node => ({
+    id: node.id || node.getAttribute('name') || node.tagName,
+    size: Number.parseFloat(getComputedStyle(node).fontSize)
+  })));
+  expect(formAudit.length).toBeGreaterThan(0);
+  expect(formAudit.filter(item => item.size < 16)).toEqual([]);
+  const viewport = await page.locator('meta[name="viewport"]').getAttribute('content');
+  expect(viewport || '').not.toMatch(/user-scalable\s*=\s*no|maximum-scale\s*=\s*1/i);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+  await context.close();
+});
