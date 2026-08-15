@@ -37,6 +37,7 @@
     likes: {},
     bookmarks: {},
     reviews: {},
+    reviewVotes: {},
     uiState: 'normal'
   };
 
@@ -70,6 +71,12 @@
     compareContent: $('#compare-content'),
     reviewDialog: $('#review-dialog'),
     reviewContent: $('#review-content'),
+    profileDialog: $('#profile-dialog'),
+    profileContent: $('#profile-content'),
+    galleryDialog: $('#gallery-dialog'),
+    galleryContent: $('#gallery-content'),
+    imageDialog: $('#image-dialog'),
+    imageContent: $('#image-content'),
     toast: $('#toast'),
     filterDetails: $('#filter-details'),
     nipList: $('#nip-list'),
@@ -182,11 +189,51 @@
     return mockLinks(tool).map(([type, label]) => `<button class="resource-link" type="button" data-safe-link="${tool.id}" data-link-type="${type}">${esc(label)}</button>`).join('');
   }
 
+  const reviewerProfiles = {
+    a: {name: 'Mina / relay walker', npub: 'npub1mina7q3fakereviewer9x2m0ck', bio: '複数OSでNostrクライアントの導線とアクセシビリティを試す架空レビュアー。', created: '2023-04（モック）', spread: '28か月・11カテゴリ・Web/Desktop/Mobile', posts: '月2〜9件。短文、画像、検証メモに分散', useful: 31, notUseful: 4},
+    b: {name: 'Tao / quiet tester', npub: 'npub1tao8r5fakereviewer7k4m0ck', bio: '初見利用と比較検証を中心に記録する架空レビュアー。', created: '2024-11（モック）', spread: '9か月・6カテゴリ・Web中心', posts: '月1〜4件。比較レビューと返信に分散', useful: 18, notUseful: 3},
+    local: {name: '未署名のあなた', npub: 'npub1unsignedpreview000000000mock', bio: 'この表示中だけ存在する未署名プロフィール。リロードで消えます。', created: '未作成', spread: 'このページ内の未送信プレビューのみ', posts: 'Nostr投稿履歴なし', useful: 0, notUseful: 0}
+  };
+
+  const screenshots = [
+    {id: 'timeline', label: 'タイムライン画面', color: '#6752b8'},
+    {id: 'composer', label: '投稿画面', color: '#247c79'},
+    {id: 'settings', label: '設定画面', color: '#9a5d2e'}
+  ];
+
   function reviewSeed(tool) {
+    const number = tool.id.replace('tool-', '').padStart(2, '0');
     return [
-      {author: `npub1review${tool.id.replace('tool-', '').padStart(2, '0')}a`, date: '2026-08-14 12:20 UTC', body: '主要導線を短時間で確認できました。', os: tool.platform, version: `v${1 + Number(tool.id.replace('tool-', '')) % 4}.${Number(tool.id.replace('tool-', '')) % 10}`, rating: 4, use: '日常利用'},
-      {author: `npub1review${tool.id.replace('tool-', '').padStart(2, '0')}b`, date: '2026-08-12 07:45 UTC', body: '不明項目が明示され、判断材料を分けて読めます。', os: 'Web', version: '未記入', rating: null, use: '比較検証'}
+      {id: `${tool.id}-a`, profile: 'a', author: reviewerProfiles.a.name, npub: reviewerProfiles.a.npub, date: '2026-08-14 12:20 UTC', body: '主要導線を短時間で確認できました。', os: tool.platform, version: `v${1 + Number(tool.id.replace('tool-', '')) % 4}.${Number(tool.id.replace('tool-', '')) % 10}`, rating: 4, use: '日常利用', helpful: 14 + Number(number), unhelpful: 2, image: Number(number) % 2 ? screenshots[0] : null},
+      {id: `${tool.id}-b`, profile: 'b', author: reviewerProfiles.b.name, npub: reviewerProfiles.b.npub, date: '2026-08-12 07:45 UTC', body: '不明項目が明示され、判断材料を分けて読めます。', os: '未入力', version: '未入力', rating: null, use: '比較検証', helpful: 8 + Number(number), unhelpful: 1, image: Number(number) % 3 === 0 ? screenshots[2] : null}
     ];
+  }
+
+  function allReviews(tool) {
+    return [...reviewSeed(tool), ...(state.reviews[tool.id] || [])];
+  }
+
+  function screenshotMarkup(image, compact = false) {
+    if (!image) return '';
+    if (image.dataUrl) return `<div class="mock-shot local-shot ${compact ? 'compact' : ''}"><img src="${image.dataUrl}" alt="${esc(image.label)}"><span>端末内だけのプレビュー</span></div>`;
+    return `<div class="mock-shot ${compact ? 'compact' : ''}" style="--shot:${esc(image.color)}" role="img" aria-label="${esc(image.label)}の架空スクリーンショット"><span>架空スクリーンショット</span><strong>${esc(image.label)}</strong><i aria-hidden="true"></i></div>`;
+  }
+
+  function voteCounts(review) {
+    const vote = state.reviewVotes[review.id];
+    return {helpful: review.helpful + (vote === 'helpful' ? 1 : 0), unhelpful: review.unhelpful + (vote === 'unhelpful' ? 1 : 0), vote};
+  }
+
+  function reviewMarkup(review, toolId) {
+    const counts = voteCounts(review);
+    return `<article class="review-item" id="review-${esc(review.id)}" data-review-id="${esc(review.id)}">
+      <header class="review-author"><button type="button" class="reviewer-link" data-reviewer="${esc(review.profile)}"><strong>${esc(review.author)}</strong><small>${esc(review.npub)}</small></button><time>${esc(review.date)}</time></header>
+      ${review.body ? `<p>${esc(review.body)}</p>` : '<p class="muted">本文なし（画像レビュー）</p>'}
+      ${review.image ? `<button class="review-image-button" type="button" data-open-image="${esc(toolId)}" data-image-review="${esc(review.id)}">${screenshotMarkup(review.image, true)}<span>画像を拡大</span></button>` : ''}
+      <dl><div><dt>対象OS</dt><dd>${esc(review.os || '未入力')}</dd></div><div><dt>アプリversion</dt><dd>${esc(review.version || '未入力')}</dd></div><div><dt>評価</dt><dd>${review.rating ? `${review.rating}/5` : '任意・未評価'}</dd></div><div><dt>用途</dt><dd>${esc(review.use || '未入力')}</dd></div></dl>
+      <div class="helpful-actions" aria-label="レビューへの役立ち評価"><button type="button" data-review-vote="helpful" data-review-id="${esc(review.id)}" data-review-tool-id="${esc(toolId)}" aria-pressed="${counts.vote === 'helpful'}">役に立った ${counts.helpful}</button><button type="button" data-review-vote="unhelpful" data-review-id="${esc(review.id)}" data-review-tool-id="${esc(toolId)}" aria-pressed="${counts.vote === 'unhelpful'}">立たなかった ${counts.unhelpful}</button><button class="text-button" type="button" data-vote-basis="${esc(review.id)}">評価者${counts.helpful + counts.unhelpful}人・内訳</button></div>
+      ${counts.vote ? '<p class="vote-preview-state">あなたの選択をローカル反映中（未署名・未送信・リロードで消去）</p>' : ''}
+    </article>`;
   }
 
   function likeCount(tool) {
@@ -229,7 +276,7 @@
 
   function renderConditions() {
     const feature = featureById[state.feature];
-    const active = [state.platform, state.category, state.toolStatus, state.support, state.delivery, state.oss].filter(value => value !== 'all').length + (state.includeDead ? 1 : 0) + (state.savedOnly ? 1 : 0) + (state.nipQuery ? 1 : 0) + (state.query ? 1 : 0);
+    const active = [state.platform, state.category, state.toolStatus, state.support, state.delivery, state.oss].filter(value => value !== 'all').length + (state.includeDead ? 1 : 0) + (state.savedOnly ? 1 : 0) + (state.nipQuery ? 1 : 0);
     els.activeFilterCount.textContent = active;
     els.selected.innerHTML = `<strong>${feature.icon}${esc(feature.name)}</strong> <button class="text-button" type="button" data-show-feature-basis>NIPを見る</button>`;
     const category = categoryOptions.find(([value]) => value === state.category)?.[1] || '全カテゴリ';
@@ -369,7 +416,7 @@
     const records = supportRecords(tool, feature);
     els.evidenceContent.innerHTML = `${dialogHead('Feature basis', `${esc(tool.name)}の「${esc(feature.name)}」`, feature.scene)}
       <section class="dialog-layer fact-layer" aria-labelledby="detail-fact-title"><h3 id="detail-fact-title">事実・観測</h3><nav class="resource-links" aria-label="${esc(tool.name)}の公式導線">${linkMarkup(tool)}</nav><div class="feature-basis-list">${records.map(record => `<button class="basis-row" type="button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}"><span><strong>NIP-${record.nip}</strong> ${esc(nipByNumber[record.nip].title)}</span>${supportBadge(record.status)}<small>根拠・観測詳細へ</small></button>`).join('')}</div></section>
-      <section class="dialog-layer evaluation-layer" aria-labelledby="detail-evaluation-title"><h3 id="detail-evaluation-title">利用者評価</h3><p class="local-only">いいね・保存・レビューはカードから操作できます。ローカル表示のみ、未署名・未送信です。</p></section>`;
+      <section class="dialog-layer evaluation-layer" aria-labelledby="detail-evaluation-title"><h3 id="detail-evaluation-title">利用者評価</h3><p class="local-only">いいね・保存・レビュー・添付画像はローカル操作モックです。事実・観測の根拠には含めません。</p><div class="evaluation-actions"><button type="button" data-review-tool="${tool.id}">レビューを見る</button><button type="button" data-gallery-tool="${tool.id}">レビュー画像ギャラリー</button></div></section>`;
     openEvidenceDialog();
   }
 
@@ -395,14 +442,86 @@
     openEvidenceDialog();
   }
 
-  function showReviewDialog(toolId) {
+  function closeDialog(dialog) {
+    if (dialog?.open) dialog.close();
+  }
+
+  function showReviewDialog(toolId, focusReviewId = '') {
     const tool = tools.find(item => item.id === toolId);
     if (!tool) return;
-    const reviews = [...reviewSeed(tool), ...(state.reviews[tool.id] || [])];
-    els.reviewContent.innerHTML = `${dialogHead('Evaluation layer', `${esc(tool.name)}のレビュー`, '以下は架空署名者による評価モックです。事実・観測とは分離して表示します。')}
-      <section class="review-list" aria-labelledby="review-list-title"><h3 id="review-list-title">レビュー一覧</h3>${reviews.map(review => `<article class="review-item"><strong>${esc(review.author)}</strong><time>${esc(review.date)}</time><p>${esc(review.body)}</p><dl><div><dt>対象OS</dt><dd>${esc(review.os)}</dd></div><div><dt>アプリversion</dt><dd>${esc(review.version)}</dd></div><div><dt>評価</dt><dd>${review.rating ? `${review.rating}/5` : '任意・未評価'}</dd></div><div><dt>用途</dt><dd>${esc(review.use || '未記入')}</dd></div></dl></article>`).join('')}</section>
-      <form class="review-form" data-review-form="${tool.id}"><h3>レビュー投稿モック</h3><label>本文<textarea name="body" required placeholder="使った感想"></textarea></label><label>対象OS<select name="os"><option>Web</option><option>Desktop</option><option>Mobile</option></select></label><label>アプリversion<input name="version" placeholder="例: v2.4.1"></label><label>任意評価<select name="rating"><option value="">未評価</option><option value="5">5</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option></select></label><label>用途<input name="use" placeholder="例: 日常利用"></label><button class="primary" type="submit">未送信プレビューを作る</button><div class="review-preview" aria-live="polite">未署名・未送信。Nostr接続はありません。</div></form>`;
-    els.reviewDialog.showModal();
+    [els.evidenceDialog, els.profileDialog, els.galleryDialog, els.imageDialog].forEach(closeDialog);
+    const reviews = allReviews(tool);
+    const imageOptions = screenshots.map((shot, index) => `<label class="shot-choice"><input type="radio" name="mockImage" value="${esc(shot.id)}"><span>${screenshotMarkup(shot, true)}${esc(shot.label)}</span></label>`).join('');
+    els.reviewContent.innerHTML = `${dialogHead('Evaluation layer', `${esc(tool.name)}のレビュー`, '評価・プロフィール・画像は架空の操作モックです。事実・観測とは分離しています。')}
+      <div class="review-toolbar"><button type="button" class="secondary" data-gallery-tool="${tool.id}">添付画像だけ見る</button><span>${reviews.filter(item => item.image).length}枚</span></div>
+      <section class="review-list" aria-labelledby="review-list-title"><h3 id="review-list-title">レビュー一覧</h3>${reviews.map(review => reviewMarkup(review, tool.id)).join('')}</section>
+      <form class="review-form" data-review-form="${tool.id}"><h3>レビュー投稿モック</h3>
+        <p class="form-automation-note">署名者と投稿日時は送信時に自動付与する想定のため、入力欄はありません。ここでは署名も送信も行いません。</p>
+        <label class="review-body">本文（任意）<textarea name="body" placeholder="本文なしで画像だけでも作成できます"></textarea></label>
+        <label>対象OS（任意）<input name="os" placeholder="例: iOS / Android / Linux"></label>
+        <label>アプリversion（任意）<input name="version" placeholder="例: v2.4.1"></label>
+        <label>任意評価<select name="rating"><option value="">未評価</option><option value="5">5</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option></select></label>
+        <label>用途（任意）<input name="use" placeholder="例: 日常利用"></label>
+        <fieldset class="image-picker"><legend>画像添付（任意・外部アップロードなし）</legend><div class="shot-choices">${imageOptions}</div><label class="local-file">または端末内画像を安全にプレビュー<input type="file" name="localImage" accept="image/*"><small>ブラウザ内だけで読み込み、送信・保存しません。</small></label><div class="local-image-preview" aria-live="polite"></div><button class="text-button" type="button" data-clear-image>画像選択を解除</button></fieldset>
+        <button class="primary" type="submit">未送信プレビューを作る</button><div class="review-preview" aria-live="polite">本文のみ・画像のみ・本文＋画像に対応。未署名・未送信です。</div>
+      </form>`;
+    if (!els.reviewDialog.open) els.reviewDialog.showModal();
+    if (focusReviewId) requestAnimationFrame(() => document.getElementById(`review-${focusReviewId}`)?.scrollIntoView({block: 'center'}));
+  }
+
+  function findReview(reviewId) {
+    for (const tool of tools) {
+      const review = allReviews(tool).find(item => item.id === reviewId);
+      if (review) return {tool, review};
+    }
+    return null;
+  }
+
+  function reviewsByProfile(profileId) {
+    return tools.flatMap(tool => allReviews(tool).filter(review => review.profile === profileId).map(review => ({tool, review})));
+  }
+
+  function showReviewerProfile(profileId) {
+    const profile = reviewerProfiles[profileId];
+    if (!profile) return;
+    [els.reviewDialog, els.evidenceDialog, els.galleryDialog, els.imageDialog].forEach(closeDialog);
+    const historyItems = reviewsByProfile(profileId);
+    const helpful = profile.useful + historyItems.reduce((sum, item) => sum + (state.reviewVotes[item.review.id] === 'helpful' ? 1 : 0), 0);
+    const notUseful = profile.notUseful + historyItems.reduce((sum, item) => sum + (state.reviewVotes[item.review.id] === 'unhelpful' ? 1 : 0), 0);
+    els.profileContent.innerHTML = `${dialogHead('Reviewer profile mock', profile.name, '単一の信頼スコアでは断定せず、判断材料を並べます。')}
+      <section class="profile-summary"><p class="profile-npub">${esc(profile.npub)}</p><p>${esc(profile.bio)}</p><dl class="profile-facts"><div><dt>レビュー件数</dt><dd>${historyItems.length}</dd></div><div><dt>役に立った</dt><dd>${helpful}</dd></div><div><dt>立たなかった</dt><dd>${notUseful}</dd></div><div><dt>作成時期</dt><dd>${esc(profile.created)}</dd></div></dl></section>
+      <section class="profile-signals" aria-labelledby="profile-signals-title"><h3 id="profile-signals-title">botかどうかを考える材料</h3><dl><div><dt>投稿履歴の広がり</dt><dd>${esc(profile.spread)}</dd></div><div><dt>投稿頻度・種類</dt><dd>${esc(profile.posts)}</dd></div><div><dt>注意</dt><dd>すべて架空データ。自動判定や本人確認はしていません。</dd></div></dl></section>
+      <section class="profile-history" aria-labelledby="profile-history-title"><h3 id="profile-history-title">過去レビューと役立ち内訳</h3>${historyItems.length ? historyItems.slice(0, 12).map(({tool, review}) => { const counts = voteCounts(review); return `<article><div><strong>${esc(tool.name)}</strong><span>${esc(review.date)}</span></div><p>${esc(review.body || '画像レビュー')}</p><span>役に立った ${counts.helpful} / 立たなかった ${counts.unhelpful}</span><button type="button" class="text-button" data-review-jump="${esc(review.id)}" data-review-tool="${esc(tool.id)}">対応レビューへ</button></article>`; }).join('') : '<p>未送信プレビュー以外の履歴はありません。</p>'}</section>`;
+    els.profileDialog.showModal();
+  }
+
+  function showVoteBasis(reviewId) {
+    const found = findReview(reviewId);
+    if (!found) return;
+    const counts = voteCounts(found.review);
+    [els.reviewDialog, els.profileDialog].forEach(closeDialog);
+    els.evidenceContent.innerHTML = `${dialogHead('Helpfulness basis mock', '役立ち評価の内訳', '評価者の実在確認や署名検証は行わない静的モックです。')}
+      <section class="dialog-layer evaluation-layer"><h3>利用者評価</h3><dl class="nip-evidence-grid"><div><dt>役に立った</dt><dd>${counts.helpful}人</dd></div><div><dt>立たなかった</dt><dd>${counts.unhelpful}人</dd></div><div><dt>評価者の広がり</dt><dd>架空npub ${counts.helpful + counts.unhelpful}件 / 作成時期3区分 / 投稿履歴5カテゴリ</dd></div><div><dt>あなたの操作</dt><dd>${counts.vote ? `${counts.vote === 'helpful' ? '役に立った' : '立たなかった'}（未署名・未送信）` : '未評価'}</dd></div></dl><button type="button" class="secondary" data-reviewer="${esc(found.review.profile)}">投稿者プロフィールを見る</button></section>`;
+    openEvidenceDialog();
+  }
+
+  function showGallery(toolId) {
+    const tool = tools.find(item => item.id === toolId);
+    if (!tool) return;
+    [els.evidenceDialog, els.reviewDialog, els.profileDialog, els.imageDialog].forEach(closeDialog);
+    const images = allReviews(tool).filter(review => review.image);
+    els.galleryContent.innerHTML = `${dialogHead('Evaluation image layer', `${esc(tool.name)}のレビュー画像`, 'レビュー添付だけを走査します。機能対応や観測根拠の画像ではありません。')}
+      <section class="gallery-grid" aria-label="レビュー添付画像一覧">${images.length ? images.map(review => `<article class="gallery-card">${screenshotMarkup(review.image)}<dl><div><dt>投稿者</dt><dd><button class="reviewer-link compact-link" type="button" data-reviewer="${esc(review.profile)}">${esc(review.author)}</button></dd></div><div><dt>投稿日時</dt><dd>${esc(review.date)}</dd></div><div><dt>OS / version</dt><dd>${esc(review.os || '未入力')} / ${esc(review.version || '未入力')}</dd></div></dl><div><button type="button" class="primary" data-open-image="${esc(tool.id)}" data-image-review="${esc(review.id)}">拡大</button><button type="button" class="secondary" data-review-tool="${esc(tool.id)}" data-review-jump="${esc(review.id)}">元レビュー</button></div></article>`).join('') : '<p class="unknown-note">添付画像はまだありません。レビュー投稿モックで追加できます。</p>'}</section>`;
+    els.galleryDialog.showModal();
+  }
+
+  function showImage(toolId, reviewId) {
+    const tool = tools.find(item => item.id === toolId);
+    const review = tool && allReviews(tool).find(item => item.id === reviewId);
+    if (!tool || !review?.image) return;
+    closeDialog(els.galleryDialog);
+    els.imageContent.innerHTML = `${dialogHead('Image preview', review.image.label, 'Escapeキーでも閉じられます。外部画像アップロードはありません。')}<div class="image-stage">${screenshotMarkup(review.image)}</div><dl class="nip-evidence-grid"><div><dt>投稿者</dt><dd><button type="button" class="reviewer-link compact-link" data-reviewer="${esc(review.profile)}">${esc(review.author)}</button></dd></div><div><dt>投稿日時</dt><dd>${esc(review.date)}</dd></div><div><dt>OS / version</dt><dd>${esc(review.os || '未入力')} / ${esc(review.version || '未入力')}</dd></div></dl><button type="button" class="primary" data-review-tool="${esc(tool.id)}" data-review-jump="${esc(review.id)}">元レビューへ</button>`;
+    els.imageDialog.showModal();
   }
 
   function comparisonItem(label, values, contents, iconMarkup = '') {
@@ -522,9 +641,46 @@
       toast(state.bookmarks[id] ? '非公開で保存しました（この表示中のみ）' : '保存を解除しました');
       return;
     }
+    const reviewer = event.target.closest('[data-reviewer]');
+    if (reviewer) {
+      showReviewerProfile(reviewer.dataset.reviewer);
+      return;
+    }
+    const vote = event.target.closest('[data-review-vote]');
+    if (vote) {
+      const current = state.reviewVotes[vote.dataset.reviewId];
+      state.reviewVotes[vote.dataset.reviewId] = current === vote.dataset.reviewVote ? null : vote.dataset.reviewVote;
+      showReviewDialog(vote.dataset.reviewToolId, vote.dataset.reviewId);
+      toast('ローカル評価を反映しました（未署名・未送信）');
+      return;
+    }
+    const basis = event.target.closest('[data-vote-basis]');
+    if (basis) {
+      showVoteBasis(basis.dataset.voteBasis);
+      return;
+    }
+    const gallery = event.target.closest('[data-gallery-tool]');
+    if (gallery) {
+      showGallery(gallery.dataset.galleryTool);
+      return;
+    }
+    const image = event.target.closest('[data-open-image]');
+    if (image) {
+      showImage(image.dataset.openImage, image.dataset.imageReview);
+      return;
+    }
+    const clearImage = event.target.closest('[data-clear-image]');
+    if (clearImage) {
+      const form = clearImage.closest('form');
+      form.querySelectorAll('input[name="mockImage"]').forEach(input => { input.checked = false; });
+      form.querySelector('input[name="localImage"]').value = '';
+      form.dataset.localImage = '';
+      form.querySelector('.local-image-preview').innerHTML = '';
+      return;
+    }
     const review = event.target.closest('[data-review-tool]');
     if (review) {
-      showReviewDialog(review.dataset.reviewTool);
+      showReviewDialog(review.dataset.reviewTool, review.dataset.reviewJump || '');
       return;
     }
     const close = event.target.closest('[data-close-dialog]');
@@ -562,14 +718,39 @@
     event.preventDefault();
     const data = new FormData(form);
     const body = String(data.get('body') || '').trim();
-    if (!body) return;
+    const selectedShot = screenshots.find(shot => shot.id === data.get('mockImage'));
+    const localImage = form.dataset.localImage ? {id: 'local', label: '端末内画像（ローカル）', color: '#38425b', dataUrl: form.dataset.localImage} : null;
+    const image = localImage || selectedShot || null;
+    if (!body && !image) {
+      form.querySelector('.review-preview').innerHTML = '<strong>本文か画像を選んでください。</strong><p>本文のみ、画像のみ、本文＋画像のいずれでも作成できます。</p>';
+      return;
+    }
     const id = form.dataset.reviewForm;
-    const preview = {author: 'npub1unsignedpreview', date: '未送信プレビュー', body, os: data.get('os'), version: data.get('version') || '未記入', rating: data.get('rating') ? Number(data.get('rating')) : null, use: data.get('use') || '未記入'};
+    const preview = {id: `${id}-local-${Date.now()}`, profile: 'local', author: reviewerProfiles.local.name, npub: reviewerProfiles.local.npub, date: '自動付与予定・未送信', body, os: String(data.get('os') || '').trim() || '未入力', version: String(data.get('version') || '').trim() || '未入力', rating: data.get('rating') ? Number(data.get('rating')) : null, use: String(data.get('use') || '').trim() || '未入力', helpful: 0, unhelpful: 0, image};
     state.reviews[id] = [...(state.reviews[id] || []), preview];
-    form.querySelector('.review-preview').innerHTML = `<strong>未送信プレビュー</strong><p>${esc(body)}</p><p>対象OS: ${esc(preview.os)} / アプリversion: ${esc(preview.version)} / 評価: ${preview.rating || '任意・未評価'} / 用途: ${esc(preview.use)}</p><p>未署名・未送信。Nostrには送信していません。</p>`;
+    form.querySelector('.review-preview').innerHTML = `<strong>未送信プレビューを作成しました</strong>${body ? `<p>${esc(body)}</p>` : '<p>本文なし（画像のみ）</p>'}${image ? screenshotMarkup(image, true) : ''}<p>対象OS: ${esc(preview.os)} / アプリversion: ${esc(preview.version)} / 評価: ${preview.rating || '任意・未評価'} / 用途: ${esc(preview.use)}</p><p>署名者・日時は自動付与予定。現在は未署名・未送信で、リロードすると消えます。</p>`;
   });
 
-  [els.evidenceDialog, els.compareDialog, els.reviewDialog].forEach(dialog => {
+  document.addEventListener('change', event => {
+    const fileInput = event.target.closest('input[name="localImage"]');
+    if (!fileInput) return;
+    const form = fileInput.closest('form');
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      form.querySelector('.local-image-preview').textContent = '画像ファイルを選択してください。';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      form.dataset.localImage = String(reader.result);
+      form.querySelectorAll('input[name="mockImage"]').forEach(input => { input.checked = false; });
+      form.querySelector('.local-image-preview').innerHTML = `<img src="${reader.result}" alt="端末内画像のローカルプレビュー"><span>外部アップロードなし・未送信</span>`;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  [els.evidenceDialog, els.compareDialog, els.reviewDialog, els.profileDialog, els.galleryDialog, els.imageDialog].forEach(dialog => {
     dialog.addEventListener('click', event => {
       if (event.target === dialog) dialog.close();
     });

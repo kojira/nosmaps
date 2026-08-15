@@ -23,10 +23,8 @@
     <section id="feature-search" class="feature-search" aria-labelledby="search-title">
       <label class="feature-main-search" for="feature-query">
         <span id="search-title">アプリ／サービスを全文検索</span>
-        <input id="feature-query" type="search" placeholder="名称・概要・カテゴリ・OS・提供形態・別名" autocomplete="off" aria-describedby="search-help">
-        <small id="search-help">機能は下の10個から選択。全文検索と機能選択はANDで絞り込みます。</small>
+        <input id="feature-query" type="search" placeholder="名称・概要・カテゴリ・OS・提供形態・別名" autocomplete="off">
       </label>
-      <div id="feature-chips" class="feature-chips" role="listbox" aria-label="主要機能"></div>
     </section>
 
     <section id="results" class="results-section" aria-labelledby="results-title">
@@ -40,8 +38,9 @@
 
       <div class="mobile-condition-summary" id="condition-summary" aria-live="polite"></div>
       <details class="feature-filter-details" id="filter-details">
-        <summary>絞り込み <span id="active-filter-count">0</span></summary>
+        <summary>詳細設定 <span id="active-filter-count">0</span></summary>
         <div class="feature-filter-grid">
+          <div class="feature-chip-setting"><span class="field-label">機能</span><div id="feature-chips" class="feature-chips" role="listbox" aria-label="主要機能"></div></div>
           <label class="field">OS<select id="platform-filter"><option value="all">すべて</option><option>Web</option><option>Desktop</option><option>Mobile</option></select></label>
           <label class="field">カテゴリ<select id="category-filter"><option value="all">すべて</option></select></label>
           <label class="field">更新状態<select id="tool-status-filter"><option value="all">稼働・停滞・不明</option><option value="active">active</option><option value="stale">stale</option><option value="unknown">unknown</option></select></label>
@@ -91,9 +90,12 @@
     <p class="footer-note">静的サイトです。バックエンド・専用API・永続DB・中央インデクサはありません。Nostr接続・署名・送信も行いません。</p>
   </main>
 
-  <dialog id="evidence-dialog" aria-labelledby="evidence-title"><div id="evidence-content"></div></dialog>
-  <dialog id="compare-dialog" class="comparison-dialog" aria-labelledby="compare-title"><div id="compare-content"></div></dialog>
-  <dialog id="review-dialog" class="review-dialog" aria-labelledby="review-title"><div id="review-content"></div></dialog>
+  <dialog id="evidence-dialog" aria-label="根拠・安全導線ダイアログ"><div id="evidence-content"></div></dialog>
+  <dialog id="compare-dialog" class="comparison-dialog" aria-label="比較ダイアログ"><div id="compare-content"></div></dialog>
+  <dialog id="review-dialog" class="review-dialog" aria-label="レビューダイアログ"><div id="review-content"></div></dialog>
+  <dialog id="profile-dialog" class="review-dialog profile-dialog" aria-label="レビュアープロフィールダイアログ"><div id="profile-content"></div></dialog>
+  <dialog id="gallery-dialog" class="review-dialog gallery-dialog" aria-label="レビュー画像ギャラリー"><div id="gallery-content"></div></dialog>
+  <dialog id="image-dialog" class="image-dialog" aria-label="画像拡大ダイアログ"><div id="image-content"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="data.js"></script>
