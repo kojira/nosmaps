@@ -22,8 +22,9 @@
 
     <section id="feature-search" class="feature-search" aria-labelledby="search-title">
       <label class="feature-main-search" for="feature-query">
-        <span id="search-title">機能名・利用場面・代替したいこと</span>
-        <input id="feature-query" type="search" placeholder="DM / zapを送りたい / 長文" autocomplete="off">
+        <span id="search-title">アプリ／サービスを全文検索</span>
+        <input id="feature-query" type="search" placeholder="名称・概要・カテゴリ・OS・提供形態・別名" autocomplete="off" aria-describedby="search-help">
+        <small id="search-help">機能は下の10個から選択。全文検索と機能選択はANDで絞り込みます。</small>
       </label>
       <div id="feature-chips" class="feature-chips" role="listbox" aria-label="主要機能"></div>
     </section>
@@ -48,6 +49,7 @@
           <label class="field">提供形態<select id="delivery-filter"><option value="all">すべて</option><option value="Webアプリ">Webアプリ</option><option value="インストール型">インストール型</option><option value="モバイルアプリ">モバイルアプリ</option></select></label>
           <label class="field">OSS<select id="oss-filter"><option value="all">すべて</option><option value="yes">OSS</option><option value="unknown">不明</option></select></label>
           <label class="include-dead"><input id="include-dead" type="checkbox"> 終了／到達不能も含める</label>
+          <label class="include-dead"><input id="saved-only" type="checkbox"> 保存済みだけ</label>
           <label class="field advanced-nip">NIP番号・名称<input id="nip-query" type="search" placeholder="46 / remote signing"></label>
           <div class="filter-help">
             <details><summary>「不明」について</summary><p>材料不足で判定を保留した状態です。非対応を意味しません。終了／到達不能は明示的に選んだ場合だけ表示します。</p></details>
@@ -91,6 +93,7 @@
 
   <dialog id="evidence-dialog" aria-labelledby="evidence-title"><div id="evidence-content"></div></dialog>
   <dialog id="compare-dialog" class="comparison-dialog" aria-labelledby="compare-title"><div id="compare-content"></div></dialog>
+  <dialog id="review-dialog" class="review-dialog" aria-labelledby="review-title"><div id="review-content"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="data.js"></script>

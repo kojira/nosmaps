@@ -80,9 +80,10 @@ test('D compact structure, icon-only chips, and early results', async ({page}, t
   expect(positions.resultsTop).toBeLessThan(220);
   expect(positions.firstCardTop).toBeLessThan(340);
   expect(await page.locator('body').innerText()).not.toMatch(/mock|モック|架空/i);
-  for (const query of ['マルチアカウント', '外部署名・リモート署名', 'チャンネル・コミュニティ']) {
+  for (const query of ['LumaPost', 'タイムライン', 'クライアント', 'Webアプリ']) {
     await page.locator('#feature-query').fill(query);
-    await expect(page.locator('.feature-chip')).toHaveCount(1);
+    expect(await page.locator('.feature-tool-card').count()).toBeGreaterThan(0);
+    await expect(page.locator('.feature-chip')).toHaveCount(10);
   }
   await page.locator('#feature-query').fill('');
   await page.screenshot({path: 'screenshots/nip-explorer-desktop.png', fullPage: true});
@@ -92,7 +93,7 @@ test('D compact structure, icon-only chips, and early results', async ({page}, t
 test('feature reverse lookup and dead explicit opt-in', async ({page}) => {
   const errors = collectErrors(page);
   await page.goto(`${base}/nip-explorer.html`);
-  await page.getByRole('searchbox', {name: '機能名・利用場面・代替したいこと'}).fill('zapを送りたい');
+  await page.getByRole('searchbox', {name: 'アプリ／サービスを全文検索'}).fill('');
   await page.getByRole('option', {name: /Wallet・Zap/}).click();
   await expect(page.locator('#selected-feature-summary')).toContainText('Wallet・Zap');
   expect(await page.locator('.feature-tool-card').count()).toBeGreaterThan(0);
@@ -107,16 +108,16 @@ test('feature reverse lookup and dead explicit opt-in', async ({page}) => {
 test('safe OSS source action and evidence/NIP details', async ({page}) => {
   const errors = collectErrors(page);
   await page.goto(`${base}/nip-explorer.html`);
-  const source = page.getByRole('button', {name: /ソース情報/}).first();
+  const source = page.getByRole('button', {name: 'ソース', exact: true}).first();
   await expect(source).toBeVisible();
   await source.click();
-  await expect(page.getByRole('heading', {name: /ソース情報/})).toBeVisible();
-  await expect(page.locator('#evidence-content')).toContainText('外部リポジトリへの移動は行いません');
-  expect(await page.locator('#evidence-content').innerText()).not.toMatch(/mock|モック|架空/i);
+  await expect(page.getByRole('heading', {name: /ソース/})).toBeVisible();
+  await expect(page.locator('#evidence-content')).toContainText('ページ内安全モック');
+  await expect(page.locator('#evidence-content')).toContainText('.invalid');
   await page.keyboard.press('Escape');
   await expect(page.locator('#evidence-dialog')).toBeHidden();
 
-  await page.getByRole('button', {name: '機能の根拠詳細'}).first().click();
+  await page.getByRole('button', {name: '詳細・根拠'}).first().click();
   await expect(page.locator('#evidence-content')).toContainText('NIP-');
   await page.locator('.basis-row').first().click();
   await expect(page.locator('#evidence-content')).toContainText('観測主体');
@@ -180,8 +181,8 @@ test.describe('mobile 375px', () => {
     expect(metrics.scroll, JSON.stringify(metrics)).toBeLessThanOrEqual(metrics.client);
     expect(metrics.searchTop).toBeLessThan(85);
     expect(metrics.featuresTop).toBeLessThan(140);
-    expect(metrics.resultsTop).toBeLessThan(255);
-    expect(metrics.firstCardTop).toBeLessThan(390);
+    expect(metrics.resultsTop).toBeLessThan(270);
+    expect(metrics.firstCardTop).toBeLessThan(410);
     await page.locator('#filter-details summary').first().click();
     await page.locator('#platform-filter').selectOption('Web');
     await expect(page.locator('#condition-summary')).toContainText('Web');
@@ -237,4 +238,66 @@ test.describe('mobile 375px', () => {
       expect(errors).toEqual([]);
     });
   }
+});
+
+test('D task 74 full-text, links, evaluation layers and local interactions', async ({page}) => {
+  const errors = collectErrors(page);
+  await page.goto(`${base}/nip-explorer.html`);
+  await expect(page.locator('.feature-chip')).toHaveCount(10);
+  await expect(page.getByRole('searchbox', {name: 'アプリ／サービスを全文検索'})).toBeVisible();
+  await expect(page.getByRole('searchbox', {name: /機能名/})).toHaveCount(0);
+
+  for (const query of ['LumaPost', 'タイムライン', 'クライアント', 'Web', 'Webアプリ', '軽量']) {
+    await page.locator('#feature-query').fill(query);
+    expect(await page.locator('.feature-tool-card').count(), query).toBeGreaterThan(0);
+  }
+  await page.locator('#feature-query').fill('LumaPost');
+  await page.getByRole('option', {name: /長文/}).click();
+  await expect(page.locator('.feature-tool-card')).toHaveCount(1);
+  await page.getByRole('option', {name: /DM/}).click();
+  await expect(page.locator('.feature-tool-card')).toHaveCount(0);
+  await page.locator('#feature-query').fill('');
+  await page.getByRole('option', {name: /投稿・返信/}).click();
+
+  const card = page.locator('.feature-tool-card').first();
+  await expect(card.getByRole('heading', {name: '事実・観測'})).toBeVisible();
+  await expect(card.getByRole('heading', {name: '利用者評価'})).toBeVisible();
+  for (const label of ['公式サイト', 'アプリ配布', '公式Docs', 'ソース']) {
+    const button = card.getByRole('button', {name: label, exact: true});
+    await expect(button).toBeVisible();
+    await button.click();
+    await expect(page.locator('#evidence-content')).toContainText(label);
+    await expect(page.locator('#evidence-content')).toContainText('.invalid');
+    await expect(page.locator('#evidence-content')).toContainText('最終確認日時');
+    await page.keyboard.press('Escape');
+  }
+
+  const like = card.locator('[data-like-tool]');
+  const before = await like.textContent();
+  await like.click();
+  const after = await page.locator('.feature-tool-card').first().locator('[data-like-tool]').textContent();
+  expect(after).not.toBe(before);
+  await expect(page.locator('#toast')).toContainText('未署名・未送信');
+
+  await page.locator('.feature-tool-card').first().locator('[data-bookmark-tool]').click();
+  await expect(page.locator('.feature-tool-card').first()).toContainText('非公開（既定）');
+  await page.locator('.feature-tool-card').first().locator('[data-public-bookmark]').check();
+  await expect(page.locator('.feature-tool-card').first()).toContainText('公開プレビュー・未送信');
+  await page.locator('#filter-details > summary').click();
+  await page.locator('#saved-only').check();
+  await expect(page.locator('.feature-tool-card')).toHaveCount(1);
+
+  await page.locator('.feature-tool-card').first().locator('[data-review-tool]').click();
+  await expect(page.getByRole('heading', {name: 'レビュー一覧'})).toBeVisible();
+  await expect(page.locator('#review-content')).toContainText('対象OS');
+  await expect(page.locator('#review-content')).toContainText('アプリversion');
+  await page.locator('[data-review-form] textarea[name="body"]').fill('キーボード操作を確認しました。');
+  await page.locator('[data-review-form] select[name="os"]').selectOption('Desktop');
+  await page.locator('[data-review-form] input[name="version"]').fill('v9.1.0');
+  await page.locator('[data-review-form] button[type="submit"]').click();
+  await expect(page.locator('.review-preview')).toContainText('未送信プレビュー');
+  await expect(page.locator('.review-preview')).toContainText('v9.1.0');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#review-dialog')).toBeHidden();
+  expect(errors).toEqual([]);
 });
