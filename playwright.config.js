@@ -1,5 +1,8 @@
 const {defineConfig, devices} = require('@playwright/test');
 
+const configuredBaseURL = process.env.NOSMAPS_BASE_URL || 'http://127.0.0.1:4173/';
+const baseURL = configuredBaseURL.endsWith('/') ? configuredBaseURL : `${configuredBaseURL}/`;
+
 module.exports = defineConfig({
   testDir: './tests',
   timeout: 30_000,
@@ -7,7 +10,7 @@ module.exports = defineConfig({
   fullyParallel: false,
   workers: 1,
   use: {
-    baseURL: process.env.NOSMAPS_BASE_URL || 'http://127.0.0.1:4173',
+    baseURL,
     locale: 'en-US',
     viewport: {width: 1280, height: 900},
     trace: 'retain-on-failure'

@@ -42,7 +42,7 @@ async function expectDialogTrap(page, selector) {
 test('browser language detection, visible switch, session memory, and no localStorage', async ({browser}) => {
   const jaContext = await browser.newContext({locale: 'ja-JP'});
   const page = await jaContext.newPage();
-  await page.goto('/index.html');
+  await page.goto('index.html');
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
   await expect(page.getByRole('heading', {name: /Nostrの道具/})).toBeVisible();
   await page.getByRole('button', {name: 'English'}).click();
@@ -55,7 +55,7 @@ test('browser language detection, visible switch, session memory, and no localSt
 
   const enContext = await browser.newContext({locale: 'en-GB'});
   const enPage = await enContext.newPage();
-  await enPage.goto('/nip-explorer.html');
+  await enPage.goto('nip-explorer.html');
   await expect(enPage.locator('html')).toHaveAttribute('lang', 'en');
   await expect(enPage.locator('#search-title')).toHaveText('Search apps and services');
   await enContext.close();
@@ -63,7 +63,7 @@ test('browser language detection, visible switch, session memory, and no localSt
 
 test('all four concepts and canonical URLs remain available with icon-only category controls', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/index.html');
+  await page.goto('index.html');
   expect(await page.evaluate(() => window.NOSMAPS_DATA.tools.length)).toBe(36);
   for (const mode of ['A', 'B', 'C']) await expect(page.getByRole('button', {name: `Open ${mode}`})).toBeVisible();
   await expect(page.getByRole('link', {name: 'Open D'})).toHaveAttribute('href', 'nip-explorer.html');
@@ -76,7 +76,7 @@ test('all four concepts and canonical URLs remain available with icon-only categ
 
 test('A/B/C common dialogs trap focus, restore opener, and translate dynamic copy', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/index.html');
+  await page.goto('index.html');
   const opener = page.getByRole('button', {name: 'Suggest a tool'});
   await opener.click();
   await expect(page.locator('#contribute-dialog')).toBeVisible();
@@ -96,7 +96,7 @@ test('A/B/C common dialogs trap focus, restore opener, and translate dynamic cop
 
 test('A/B/C and explorer search record descriptions and tags in either UI language, and A/B/C use tool basis', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/index.html');
+  await page.goto('index.html');
   await page.getByRole('button', {name: 'Open A'}).click();
   for (const language of ['en', 'ja']) {
     if (language === 'ja') await page.getByRole('button', {name: '日本語'}).click();
@@ -120,7 +120,7 @@ test('A/B/C and explorer search record descriptions and tags in either UI langua
   await page.getByRole('button', {name: '比較する'}).click();
   await expect(page.locator('#detail-dialog')).toContainText(basis);
 
-  await page.goto('/nip-explorer.html');
+  await page.goto('nip-explorer.html');
   for (const [language, switchName] of [['ja', null], ['en', 'English']]) {
     if (switchName) await page.getByRole('button', {name: switchName}).click();
     await page.locator('#feature-query').fill('迷わない導線');
@@ -133,7 +133,7 @@ test('A/B/C and explorer search record descriptions and tags in either UI langua
 
 test('nested correction keeps its draft and rerenders the underlying detail in one language', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/index.html');
+  await page.goto('index.html');
   await page.getByRole('button', {name: 'Open A'}).click();
   await page.locator('[data-tool-id="tool-1"] [data-action="detail"]').click();
   await page.locator('#detail-dialog').getByRole('button', {name: 'Correct information'}).click();
@@ -157,7 +157,7 @@ test('nested correction keeps its draft and rerenders the underlying detail in o
 
 test('feature controls are icon-only, multi-select uses AND, search covers ja/en and Android/iOS', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/nip-explorer.html');
+  await page.goto('nip-explorer.html');
   await expect(page.locator('.feature-chip')).toHaveCount(10);
   await expect(page.locator('.feature-chip')).toHaveText(['✎', '✉', '⌕', '▧', '♢', '♙', '⚿', '⚡', '▤', '◉']);
   await expect(page.locator('.feature-chip[aria-pressed="true"]')).toHaveCount(0);
@@ -184,7 +184,7 @@ test('feature controls are icon-only, multi-select uses AND, search covers ja/en
 
 test('feature rerender retains keyboard focus and support/reset/zero-result relaxation work', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/nip-explorer.html');
+  await page.goto('nip-explorer.html');
   const media = page.locator('[data-select-feature="media"]');
   await media.focus();
   await page.keyboard.press('Space');
@@ -205,7 +205,7 @@ test('feature rerender retains keyboard focus and support/reset/zero-result rela
 
 test('language rerender preserves selected features, comparison, and open dialog context', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/nip-explorer.html');
+  await page.goto('nip-explorer.html');
   await page.locator('[data-select-feature="media"]').click();
   await chooseComparisons(page, 2);
   await page.locator('[data-review-tool]').first().click();
@@ -221,7 +221,7 @@ test('language rerender preserves selected features, comparison, and open dialog
 
 test('dead opt-in, in-page official information, fact/evaluation split, and evidence', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/nip-explorer.html');
+  await page.goto('nip-explorer.html');
   await page.locator('[data-select-feature="wallet"]').click();
   await expect(page.locator('.dead-tool')).toHaveCount(0);
   await page.locator('#filter-details > summary').click();
@@ -249,7 +249,7 @@ test('dead opt-in, in-page official information, fact/evaluation split, and evid
 
 test('three-way compare supports remove/add/replace and NIP evidence returns to position', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/nip-explorer.html');
+  await page.goto('nip-explorer.html');
   await chooseComparisons(page, 3);
   await page.locator('[data-compare-tool]').nth(3).click();
   await expect(page.locator('[data-compare-tool]').nth(3)).not.toBeChecked();
@@ -286,7 +286,7 @@ test('three-way compare supports remove/add/replace and NIP evidence returns to 
 
 test('comparison distinguishes no record from explicit unknown and evidence follows the aggregate record', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/nip-explorer.html');
+  await page.goto('nip-explorer.html');
   await page.locator('[data-compare-tool="tool-2"]').check();
   await page.locator('[data-compare-tool="tool-4"]').check();
   await page.getByRole('button', {name: 'Compare features'}).click();
@@ -311,7 +311,7 @@ test('comparison distinguishes no record from explicit unknown and evidence foll
 
 test('review language rerenders preserve draft fields and images, and a seeded image overrides a local image', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/nip-explorer.html');
+  await page.goto('nip-explorer.html');
   await page.locator('[data-tool-id="tool-1"] [data-review-tool]').click();
   const form = page.locator('[data-review-form="tool-1"]');
   await form.locator('textarea[name="body"]').fill('Keep this review draft');
@@ -350,7 +350,7 @@ test('review language rerenders preserve draft fields and images, and a seeded i
 
 test('reviewer history gathers reviews from every tool before applying its display limit', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/nip-explorer.html');
+  await page.goto('nip-explorer.html');
   await page.locator('#feature-query').fill('NsecVault');
   await page.locator('[data-tool-id="tool-9"] [data-review-tool]').click();
   const form = page.locator('[data-review-form="tool-9"]');
@@ -365,7 +365,7 @@ test('reviewer history gathers reviews from every tool before applying its displ
 
 test('likes, bookmarks, text/image reviews, profiles, history, gallery, and image return work', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('/nip-explorer.html');
+  await page.goto('nip-explorer.html');
   const card = page.locator('[data-tool-id="tool-1"]');
   const like = card.locator('[data-like-tool]');
   const before = await like.textContent();
@@ -400,7 +400,7 @@ test('likes, bookmarks, text/image reviews, profiles, history, gallery, and imag
 test('loading, empty, error, partial, and offline remain reachable without visible evaluation controls', async ({page}) => {
   const errors = collectErrors(page);
   for (const [name, text] of [['loading', 'Loading feature support'], ['empty', 'There are no candidates'], ['error', 'could not be loaded'], ['partial', 'Showing part'], ['offline', 'Showing saved']]) {
-    await page.goto(`/nip-explorer.html?state=${name}`);
+    await page.goto(`nip-explorer.html?state=${name}`);
     await expect(page.locator('#ui-state-view')).toContainText(text);
     await expect(page.locator('[data-set-state], #tool-results')).toHaveCount(name === 'error' ? 2 : 1);
   }
@@ -410,7 +410,7 @@ test('loading, empty, error, partial, and offline remain reachable without visib
 
 test('rendered text and attributes contain none of the forbidden presentation language', async ({page}) => {
   const forbidden = /(モック|操作イメージ|未署名|未送信|未永続|リロードで消える|架空データ|外部遷移なし|安全プレビュー|SAFE LINK PREVIEW|ページ内確認用|表示状態ラボ|レビュー用デモ|\bmock\b|\bdemo\b|safe preview|no external navigation|not persisted|reload clears|unsigned|unsent|test lab)/i;
-  for (const path of ['/index.html', '/nip-explorer.html']) {
+  for (const path of ['index.html', 'nip-explorer.html']) {
     await page.goto(path);
     for (const language of ['English', '日本語']) {
       await page.getByRole('button', {name: language}).last().click();
@@ -428,7 +428,7 @@ test.describe('375x812 responsive presentation', () => {
 
   test('pages, controls, inputs, and thumbnail occupancy remain compact with no overflow', async ({page}) => {
     const errors = collectErrors(page);
-    for (const path of ['/index.html', '/nip-explorer.html']) {
+    for (const path of ['index.html', 'nip-explorer.html']) {
       await page.goto(path);
       await expectNoOverflow(page);
       const undersized = await page.locator('input,select,textarea').evaluateAll(nodes => nodes.filter(node => Number.parseFloat(getComputedStyle(node).fontSize) < 16).map(node => node.id || node.name));
@@ -446,7 +446,7 @@ test.describe('375x812 responsive presentation', () => {
 
   test('three-way comparison and review/gallery dialogs have no horizontal overflow', async ({page}) => {
     const errors = collectErrors(page);
-    await page.goto('/nip-explorer.html');
+    await page.goto('nip-explorer.html');
     await chooseComparisons(page, 3);
     await page.getByRole('button', {name: 'Compare features'}).click();
     await expectNoOverflow(page);
