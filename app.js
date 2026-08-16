@@ -3,7 +3,9 @@
 
   const {tools, statuses} = window.NOSMAPS_DATA;
   const i18n = window.NOSMAPS_I18N;
+  const icons = window.NOSMAPS_ICONS;
   const t = (key, variables) => i18n.t(key, variables);
+  const iconSvg = name => icons.svg(name);
   const categories = ['clients', 'relay', 'identity', 'media', 'analytics', 'dev'];
   const state = {
     screen: location.hash.startsWith('#concept-') ? 'app' : 'home',
@@ -64,12 +66,12 @@
   }
 
   function categoryButtons() {
-    const button = (id, icon, name, description) => {
+    const button = (id, iconName, name, description) => {
       const selected = state.category === id;
       const accessibleName = `${name}: ${description}`;
-      return `<button class="category-icon ${selected ? 'selected' : ''}" data-action="category" data-category="${id}" aria-pressed="${selected}" aria-label="${esc(accessibleName)}" title="${esc(accessibleName)}"><span class="category-symbol" aria-hidden="true">${icon}</span><span class="category-copy"><span class="category-title">${esc(name)}</span><span class="category-description">${esc(description)}</span></span></button>`;
+      return `<button class="category-icon ${selected ? 'selected' : ''}" data-action="category" data-category="${id}" aria-pressed="${selected}" aria-label="${esc(accessibleName)}" title="${esc(accessibleName)}"><span class="category-symbol" aria-hidden="true">${iconSvg(iconName)}</span><span class="category-copy"><span class="category-title">${esc(name)}</span><span class="category-description">${esc(description)}</span></span></button>`;
     };
-    return `<div class="category-icon-group" role="group" aria-label="${esc(t('concepts.categoryFilter'))}">${button('all', '🗺️', t('all'), t('concepts.allCategoriesDescription'))}${categories.map(id => { const item = category(id); return button(id, item.icon, item.name, item.description); }).join('')}</div>`;
+    return `<div class="category-icon-group" role="group" aria-label="${esc(t('concepts.categoryFilter'))}">${button('all', 'apps', t('all'), t('concepts.allCategoriesDescription'))}${categories.map(id => { const item = category(id); return button(id, item.icon, item.name, item.description); }).join('')}</div>`;
   }
 
   function purposeMatches(tool) {
@@ -95,7 +97,7 @@
 
   function toolCard(tool) {
     const checked = state.compare.includes(tool.id);
-    return `<article class="tool-card" data-tool-id="${tool.id}"><div class="card-top"><span class="tool-icon" aria-hidden="true">${category(tool.category).icon}</span>${statusBadge(tool)}</div><h3>${esc(tool.name)}</h3><p>${esc(toolDescription(tool))}</p><div class="tags"><span class="tag">${esc(category(tool.category).name)}</span><span class="tag">${tool.platform}</span></div><p class="status-line"><small>${esc(t('concepts.observed', {date: tool.observed.split(' ')[0]}))}</small></p><div class="card-actions"><button class="secondary" data-action="detail" data-id="${tool.id}">${esc(t('concepts.detail'))}</button><label class="compare-check"><input type="checkbox" data-action="compare" data-id="${tool.id}" ${checked ? 'checked' : ''}> ${esc(t('concepts.compare'))}</label></div></article>`;
+    return `<article class="tool-card" data-tool-id="${tool.id}"><div class="card-top"><span class="tool-icon" aria-hidden="true">${iconSvg(category(tool.category).icon)}</span>${statusBadge(tool)}</div><h3>${esc(tool.name)}</h3><p>${esc(toolDescription(tool))}</p><div class="tags"><span class="tag">${esc(category(tool.category).name)}</span><span class="tag">${tool.platform}</span></div><p class="status-line"><small>${esc(t('concepts.observed', {date: tool.observed.split(' ')[0]}))}</small></p><div class="card-actions"><button class="secondary" data-action="detail" data-id="${tool.id}">${esc(t('concepts.detail'))}</button><label class="compare-check"><input type="checkbox" data-action="compare" data-id="${tool.id}" ${checked ? 'checked' : ''}> ${esc(t('concepts.compare'))}</label></div></article>`;
   }
 
   function stateView() {

@@ -23,3 +23,9 @@
 .category-tree .category-icon{width:100%;margin:0;text-align:left;white-space:normal}
 @media(max-width:850px){.category-tree{display:block;overflow:visible}.category-tree .category-icon-group{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:580px){.category-icon-group,.category-tree .category-icon-group{grid-template-columns:repeat(2,minmax(0,1fr))}.category-icon{min-height:5.25rem;padding:.55rem;gap:.42rem}.category-title{font-size:.78rem}.category-description{font-size:.68rem}}
+
+
+/* Environment-stable local Material Design SVG icons. */
+.material-icon{display:block;width:1em;height:1em;fill:currentColor;pointer-events:none}
+.category-symbol .material-icon,.tool-icon .material-icon{width:1.25em;height:1.25em}
+.feature-symbol .material-icon{width:1.1em;height:1.1em}

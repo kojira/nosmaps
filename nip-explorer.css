@@ -1352,3 +1352,9 @@
 .category-filter .category-title{font-size:.76rem;font-weight:850;line-height:1.3}
 .category-filter .category-description{color:var(--muted);font-size:.66rem;font-weight:500;line-height:1.35}
 @media(max-width:700px){.category-filter .category-icon-group{grid-template-columns:repeat(2,minmax(0,1fr))}.category-filter .category-icon{height:auto;min-height:5rem;padding:.5rem;gap:.4rem}.category-filter .category-title{font-size:.74rem}.category-filter .category-description{font-size:.65rem}}
+
+
+/* Environment-stable local Material Design SVG icons. */
+.material-icon{display:block;width:1em;height:1em;fill:currentColor;pointer-events:none}
+.category-symbol .material-icon,.tool-icon .material-icon{width:1.25em;height:1.25em}
+.feature-symbol .material-icon{width:1.1em;height:1.1em}

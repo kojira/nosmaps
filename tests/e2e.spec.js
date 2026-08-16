@@ -70,6 +70,7 @@ test('all four concepts and canonical URLs remain available with visible localiz
   await page.getByRole('button', {name: 'Open C'}).click();
   const categories = page.locator('.category-tree .category-icon');
   await expect(categories).toHaveCount(7);
+  await expect(categories.locator('.material-icon')).toHaveCount(7);
   await expect(categories.first().locator('.category-title')).toHaveText('All');
   await expect(categories.first().locator('.category-description')).toHaveText('Browse tools from every category.');
   await expect(categories.nth(1).locator('.category-title')).toHaveText('Clients');
@@ -217,7 +218,9 @@ test('feature controls are icon-only, multi-select uses AND, search covers ja/en
   const errors = collectErrors(page);
   await page.goto('nip-explorer.html');
   await expect(page.locator('.feature-chip')).toHaveCount(10);
-  await expect(page.locator('.feature-chip')).toHaveText(['✎', '✉', '⌕', '▧', '♢', '♙', '⚿', '⚡', '▤', '◉']);
+  await expect(page.locator('.feature-chip .material-icon')).toHaveCount(10);
+  expect(await page.locator('.feature-chip svg').evaluateAll(elements => elements.every(element => element.getAttribute('aria-hidden') === 'true' && element.getAttribute('focusable') === 'false'))).toBe(true);
+  await expect(page.locator('.feature-chip')).toHaveText(['', '', '', '', '', '', '', '', '', '']);
   await expect(page.locator('.feature-chip[aria-pressed="true"]')).toHaveCount(0);
   await expect(page.locator('.feature-chip').first()).toHaveAttribute('title', /Posts & replies/);
   const initial = await page.evaluate(() => window.NOSMAPS_DATA.tools.filter(tool => tool.status !== 'dead').length);

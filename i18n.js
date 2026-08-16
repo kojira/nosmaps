@@ -9,12 +9,12 @@
       title: 'nosmaps — Nostrツールを見つける', description: '目的・カテゴリ・機能からNostr周辺ツールを探して比較できます。',
       nav: {home: '4つの探し方', explorer: '機能から探す', submit: '候補を提案', curate: '推薦コメント', correction: '情報を訂正'},
       categories: {
-        clients: {name: 'クライアント', icon: '📱', description: 'タイムラインや投稿を扱うクライアント。'},
-        relay: {name: 'リレー運用', icon: '📡', description: 'リレーの設定や接続状況を確認する運用ツール。'},
-        identity: {name: 'ID・鍵管理', icon: '🔑', description: '鍵とプロフィールを管理する補助ツール。'},
-        media: {name: '画像・動画', icon: '🎞️', description: '作品やメディアを公開する制作ツール。'},
-        analytics: {name: '観測・分析', icon: '📊', description: 'イベントや接続傾向を可視化する観測ツール。'},
-        dev: {name: '開発者向け', icon: '🧰', description: 'NIPやイベントを確認する開発ツール。'}
+        clients: {name: 'クライアント', icon: 'smartphone', description: 'タイムラインや投稿を扱うクライアント。'},
+        relay: {name: 'リレー運用', icon: 'dns', description: 'リレーの設定や接続状況を確認する運用ツール。'},
+        identity: {name: 'ID・鍵管理', icon: 'key', description: '鍵とプロフィールを管理する補助ツール。'},
+        media: {name: '画像・動画', icon: 'movie', description: '作品やメディアを公開する制作ツール。'},
+        analytics: {name: '観測・分析', icon: 'analytics', description: 'イベントや接続傾向を可視化する観測ツール。'},
+        dev: {name: '開発者向け', icon: 'code', description: 'NIPやイベントを確認する開発ツール。'}
       },
       purposes: [
         {id: 'read', label: 'まず読む'}, {id: 'talk', label: '仲間と話す'}, {id: 'publish', label: '作品を公開'},
@@ -81,7 +81,7 @@
       title: 'nosmaps — Find Nostr tools', description: 'Discover and compare Nostr tools by goal, category, and feature.',
       nav: {home: 'Four ways to explore', explorer: 'Explore features', submit: 'Suggest a tool', curate: 'Recommendation', correction: 'Correct information'},
       categories: {
-        clients: {name: 'Clients', icon: '📱', description: 'Clients for timelines and publishing.'}, relay: {name: 'Relay operations', icon: '📡', description: 'Tools for relay configuration and connectivity.'}, identity: {name: 'Identity & keys', icon: '🔑', description: 'Tools for keys and profiles.'}, media: {name: 'Media', icon: '🎞️', description: 'Tools for publishing creative media.'}, analytics: {name: 'Analytics', icon: '📊', description: 'Tools for observing events and connections.'}, dev: {name: 'Developer tools', icon: '🧰', description: 'Tools for inspecting NIPs and events.'}
+        clients: {name: 'Clients', icon: 'smartphone', description: 'Clients for timelines and publishing.'}, relay: {name: 'Relay operations', icon: 'dns', description: 'Tools for relay configuration and connectivity.'}, identity: {name: 'Identity & keys', icon: 'key', description: 'Tools for keys and profiles.'}, media: {name: 'Media', icon: 'movie', description: 'Tools for publishing creative media.'}, analytics: {name: 'Analytics', icon: 'analytics', description: 'Tools for observing events and connections.'}, dev: {name: 'Developer tools', icon: 'code', description: 'Tools for inspecting NIPs and events.'}
       },
       purposes: [{id: 'read', label: 'Read first'}, {id: 'talk', label: 'Talk with others'}, {id: 'publish', label: 'Publish work'}, {id: 'community', label: 'Run a community'}, {id: 'keys', label: 'Protect my keys'}, {id: 'relay', label: 'Manage relays'}, {id: 'observe', label: 'Observe data'}, {id: 'build', label: 'Build an app'}],
       statuses: {active: 'Active', stale: 'Stale', dead: 'Ended / unreachable', unknown: 'Unknown'},

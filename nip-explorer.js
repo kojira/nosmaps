@@ -3,14 +3,16 @@
 
   const {tools, nipCatalog} = window.NOSMAPS_DATA;
   const i18n = window.NOSMAPS_I18N;
+  const icons = window.NOSMAPS_ICONS;
   const t = (key, variables) => i18n.t(key, variables);
+  const iconSvg = name => icons.svg(name);
   const categories = ['clients', 'relay', 'identity', 'media', 'analytics', 'dev'];
   const nipByNumber = Object.fromEntries(nipCatalog.map(nip => [nip.number, nip]));
   const featureDefinitions = [
-    ['posts', '✎', ['01', '09', '25']], ['dm', '✉', ['44']], ['search', '⌕', ['01', '19', '21']], ['media', '▧', ['01', '19']],
-    ['notifications', '♢', ['25', '57']], ['accounts', '♙', ['19', '46']], ['signing', '⚿', ['46']], ['wallet', '⚡', ['47', '57']],
-    ['longform', '▤', ['23']], ['community', '◉', ['01', '42', '78']]
-  ].map(([id, symbol, nips]) => ({id, symbol, nips}));
+    ['posts', 'edit', ['01', '09', '25']], ['dm', 'mail', ['44']], ['search', 'search', ['01', '19', '21']], ['media', 'image', ['01', '19']],
+    ['notifications', 'notifications', ['25', '57']], ['accounts', 'account', ['19', '46']], ['signing', 'key', ['46']], ['wallet', 'wallet', ['47', '57']],
+    ['longform', 'article', ['23']], ['community', 'groups', ['01', '42', '78']]
+  ].map(([id, icon, nips]) => ({id, icon, nips}));
   const featureById = Object.fromEntries(featureDefinitions.map(feature => [feature.id, feature]));
   const validStates = ['normal', 'loading', 'empty', 'error', 'partial', 'offline'];
   const requestedState = new URLSearchParams(location.search).get('state');
@@ -115,20 +117,20 @@
     els.chips.innerHTML = featureDefinitions.map(definition => {
       const feature = localizedFeature(definition.id);
       const label = `${feature.name} — ${feature.scene}`;
-      return `<button class="feature-chip" type="button" aria-pressed="${state.features.includes(feature.id)}" aria-label="${esc(label)}" title="${esc(label)}" data-select-feature="${feature.id}"><span class="feature-symbol" aria-hidden="true">${feature.symbol}</span></button>`;
+      return `<button class="feature-chip" type="button" aria-pressed="${state.features.includes(feature.id)}" aria-label="${esc(label)}" title="${esc(label)}" data-select-feature="${feature.id}"><span class="feature-symbol" aria-hidden="true">${iconSvg(feature.icon)}</span></button>`;
     }).join('');
   }
 
   function option(value, label, selected) { return `<option value="${esc(value)}" ${selected === value ? 'selected' : ''}>${esc(label)}</option>`; }
-  function categoryFilterButton(id, icon, name, description) {
+  function categoryFilterButton(id, iconName, name, description) {
     const selected = state.category === id;
     const accessibleName = `${name}: ${description}`;
-    return `<button type="button" class="category-icon ${selected ? 'selected' : ''}" data-category-filter="${id}" aria-pressed="${selected}" aria-label="${esc(accessibleName)}" title="${esc(accessibleName)}"><span class="category-symbol" aria-hidden="true">${icon}</span><span class="category-copy"><span class="category-title">${esc(name)}</span><span class="category-description">${esc(description)}</span></span></button>`;
+    return `<button type="button" class="category-icon ${selected ? 'selected' : ''}" data-category-filter="${id}" aria-pressed="${selected}" aria-label="${esc(accessibleName)}" title="${esc(accessibleName)}"><span class="category-symbol" aria-hidden="true">${iconSvg(iconName)}</span><span class="category-copy"><span class="category-title">${esc(name)}</span><span class="category-description">${esc(description)}</span></span></button>`;
   }
   function renderFilterPanel() {
     const wasOpen = els.filterDetails.open;
     $('#feature-filter-grid').innerHTML = `<label class="field">${esc(t('explorer.platform'))}<select id="platform-filter">${option('all', t('all'), state.platform)}${['Web', 'Desktop', 'Mobile', 'Android', 'iOS'].map(value => option(value, value, state.platform)).join('')}</select></label>
-      <fieldset class="category-filter"><legend>${esc(t('explorer.categoryGroup'))}</legend><div class="category-icon-group" role="group" aria-label="${esc(t('explorer.categoryGroup'))}">${categoryFilterButton('all', '🗺️', t('all'), t('explorer.allCategoriesDescription'))}${categories.map(id => { const item = category(id); return categoryFilterButton(id, item.icon, item.name, item.description); }).join('')}</div></fieldset>
+      <fieldset class="category-filter"><legend>${esc(t('explorer.categoryGroup'))}</legend><div class="category-icon-group" role="group" aria-label="${esc(t('explorer.categoryGroup'))}">${categoryFilterButton('all', 'apps', t('all'), t('explorer.allCategoriesDescription'))}${categories.map(id => { const item = category(id); return categoryFilterButton(id, item.icon, item.name, item.description); }).join('')}</div></fieldset>
       <label class="field">${esc(t('explorer.updateStatus'))}<select id="tool-status-filter">${option('all', t('explorer.activeStatus'), state.toolStatus)}${['active', 'stale', 'unknown'].map(value => option(value, t(`statuses.${value}`), state.toolStatus)).join('')}</select></label>
       <label class="field">${esc(t('explorer.support'))}<select id="support-filter" aria-describedby="support-filter-help" ${state.features.length ? '' : 'disabled'}>${option('all', t('all'), state.support)}${['implemented', 'partial', 'planned', 'unknown'].map(value => option(value, statusLabel(value), state.support)).join('')}</select><small id="support-filter-help" class="filter-prerequisite">${esc(t('explorer.featureNeeded'))}</small></label>
       <label class="field">${esc(t('explorer.delivery'))}<select id="delivery-filter">${option('all', t('all'), state.delivery)}${['web', 'installed', 'mobile'].map(value => option(value, deliveryLabel(value), state.delivery)).join('')}</select></label>
@@ -193,7 +195,7 @@
     const supports = selected.map(feature => ({feature, support: featureSupport(tool, feature)}));
     const records = [...new Map(selected.flatMap(feature => supportRecords(tool, feature)).map(record => [record.nip, record])).values()];
     const bookmark = state.bookmarks[tool.id];
-    return `<article class="feature-tool-card ${tool.status === 'dead' ? 'dead-tool' : ''}" data-tool-id="${tool.id}"><div class="nip-card-top"><span class="tool-icon" aria-hidden="true">${category(tool.category).icon}</span><span class="status ${tool.status}">${esc(t(`statuses.${tool.status}`))}</span></div><h2>${esc(tool.name)}</h2><p>${esc(toolDescription(tool))}</p>
+    return `<article class="feature-tool-card ${tool.status === 'dead' ? 'dead-tool' : ''}" data-tool-id="${tool.id}"><div class="nip-card-top"><span class="tool-icon" aria-hidden="true">${iconSvg(category(tool.category).icon)}</span><span class="status ${tool.status}">${esc(t(`statuses.${tool.status}`))}</span></div><h2>${esc(tool.name)}</h2><p>${esc(toolDescription(tool))}</p>
       <section class="card-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><div class="support-line">${supports.length ? supports.map(item => `<span class="feature-support-summary">${esc(item.feature.name)} ${supportBadge(item.support)}</span>`).join('') : `<span class="tag">${esc(t('explorer.noFeatureCondition'))}</span>`}<span class="tag">${tool.platform}</span><span class="tag">${esc((tool.os || []).filter(value => value !== tool.platform).join(' / ') || deliveryLabel(delivery(tool)))}</span></div><dl class="tool-facts"><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(category(tool.category).name)}</dd></div><div><dt>OSS</dt><dd>${esc(displayLicense(tool))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(tool.observed.split(' ')[0])}</dd></div></dl><nav class="resource-links" aria-label="${esc(t('explorer.officialLinks', {name: tool.name}))}">${resourceLinks(tool)}</nav>${records.length ? `<div class="basis-nips">${records.map(record => `<button type="button" class="nip-tag-button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}">NIP-${record.nip} · ${esc(statusLabel(record.status))}</button>`).join('')}</div>` : ''}</section>
       <section class="card-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${tool.id}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCount(tool)}</button><button type="button" data-bookmark-tool="${tool.id}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${tool.id}">${esc(t('explorer.reviews', {count: allReviews(tool).length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${tool.id}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}</section>
       ${tool.status === 'dead' ? `<p class="replacement-note">${esc(t('explorer.endedRecord'))} <button type="button" class="text-button" data-find-alternative>${esc(t('explorer.alternatives'))}</button></p>` : ''}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${tool.id}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${tool.id}">${esc(t('explorer.details'))}</button></div></article>`;
@@ -218,7 +220,7 @@
     const selected = selectedFeatures();
     const conditions = activeConditions();
     els.activeFilterCount.textContent = conditions.filter(item => !item.key.startsWith('feature:') && item.key !== 'query').length;
-    els.selected.innerHTML = selected.length ? `<strong>${esc(t('explorer.featureAnd'))}:</strong> ${selected.map(feature => `<button class="selected-condition" type="button" data-remove-condition="feature:${feature.id}" aria-label="${esc(t('explorer.conditionRemove', {label: feature.name}))}"><span class="feature-symbol" aria-hidden="true">${feature.symbol}</span><span class="visually-hidden">${esc(feature.name)}</span><span aria-hidden="true">×</span></button>`).join('<span class="and-mark">AND</span>')} <button class="text-button" type="button" data-show-feature-basis>${esc(t('explorer.viewNips'))}</button>` : `<strong>${esc(t('explorer.noFeature'))}</strong>`;
+    els.selected.innerHTML = selected.length ? `<strong>${esc(t('explorer.featureAnd'))}:</strong> ${selected.map(feature => `<button class="selected-condition" type="button" data-remove-condition="feature:${feature.id}" aria-label="${esc(t('explorer.conditionRemove', {label: feature.name}))}"><span class="feature-symbol" aria-hidden="true">${iconSvg(feature.icon)}</span><span class="visually-hidden">${esc(feature.name)}</span><span aria-hidden="true">×</span></button>`).join('<span class="and-mark">AND</span>')} <button class="text-button" type="button" data-show-feature-basis>${esc(t('explorer.viewNips'))}</button>` : `<strong>${esc(t('explorer.noFeature'))}</strong>`;
     els.condition.innerHTML = conditions.length ? `<span class="condition-logic">${esc(t('explorer.activeAnd'))}</span>${conditions.map(item => `<button type="button" class="condition-pill" data-remove-condition="${esc(item.key)}" aria-label="${esc(t('explorer.conditionRemove', {label: item.label}))}">${esc(item.label)} <span aria-hidden="true">×</span></button>`).join('')}` : `<span class="condition-logic">${esc(t('explorer.noExtra'))}</span>`;
   }
 
@@ -319,7 +321,7 @@
       return comparisonItem(featureName(definition.id), values, selected.map((tool, index) => {
         const record = records[index];
         return `<div class="comparison-value">${record ? `${supportBadge(record.status)}<button class="comparison-evidence" type="button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}" data-evidence-feature="${definition.id}">${esc(t('explorer.nipEvidence'))}</button>` : `<span class="no-support-record" aria-label="${esc(t('none'))}" title="${esc(t('none'))}">—</span>`}</div>`;
-      }), `<span class="feature-symbol" aria-hidden="true">${definition.symbol}</span>`);
+      }), `<span class="feature-symbol" aria-hidden="true">${iconSvg(definition.icon)}</span>`);
     });
     const basics = [
       comparisonItem(t('explorer.os'), selected.map(tool => (tool.os || [tool.platform]).join('/')), selected.map(tool => `<div class="comparison-value">${esc((tool.os || [tool.platform]).join(' / '))}</div>`)),
