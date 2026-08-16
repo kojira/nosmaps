@@ -214,15 +214,29 @@ test('nested correction keeps its draft and rerenders the underlying detail in o
   expect(errors).toEqual([]);
 });
 
-test('feature controls are icon-only, multi-select uses AND, search covers ja/en and Android/iOS', async ({page}) => {
+test('feature controls show localized labels below SVG icons, multi-select uses AND, search covers ja/en and Android/iOS', async ({page}) => {
   const errors = collectErrors(page);
   await page.goto('nip-explorer.html');
-  await expect(page.locator('.feature-chip')).toHaveCount(10);
-  await expect(page.locator('.feature-chip .material-icon')).toHaveCount(10);
-  expect(await page.locator('.feature-chip svg').evaluateAll(elements => elements.every(element => element.getAttribute('aria-hidden') === 'true' && element.getAttribute('focusable') === 'false'))).toBe(true);
-  await expect(page.locator('.feature-chip')).toHaveText(['', '', '', '', '', '', '', '', '', '']);
+  const chips = page.locator('.feature-chip');
+  const labels = chips.locator('.feature-chip-label');
+  await expect(chips).toHaveCount(10);
+  await expect(chips.locator('.material-icon')).toHaveCount(10);
+  await expect(labels).toHaveCount(10);
+  expect(await chips.locator('svg').evaluateAll(elements => elements.every(element => element.getAttribute('aria-hidden') === 'true' && element.getAttribute('focusable') === 'false'))).toBe(true);
+  await page.locator('[data-language="ja"]').click();
+  await expect(labels).toHaveText(['投稿・返信', 'DM', '検索', '画像・動画', '通知', '複数アカウント', '外部署名', 'Wallet・Zap', '長文', 'チャンネル']);
+  expect(await labels.evaluateAll(elements => elements.every(element => {
+    const style = getComputedStyle(element);
+    const box = element.getBoundingClientRect();
+    return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0 && box.width > 0 && box.height > 0 && element.scrollWidth <= element.clientWidth && element.scrollHeight <= element.clientHeight;
+  }))).toBe(true);
+  await expect(chips.first()).toHaveAttribute('aria-label', /投稿・返信.+タイムライン/);
+  await expect(chips.first()).toHaveAttribute('title', /投稿・返信.+タイムライン/);
+  await page.locator('[data-language="en"]').click();
+  await expect(labels).toHaveText(['Posts & replies', 'DM', 'Search', 'Images & video', 'Notifications', 'Multiple accounts', 'External signing', 'Wallet & Zap', 'Long-form', 'Channels']);
+  await expect(chips.first()).toHaveAttribute('aria-label', /Posts & replies.+timeline/);
+  await expect(chips.first()).toHaveAttribute('title', /Posts & replies.+timeline/);
   await expect(page.locator('.feature-chip[aria-pressed="true"]')).toHaveCount(0);
-  await expect(page.locator('.feature-chip').first()).toHaveAttribute('title', /Posts & replies/);
   const initial = await page.evaluate(() => window.NOSMAPS_DATA.tools.filter(tool => tool.status !== 'dead').length);
   await expect(page.locator('.feature-tool-card')).toHaveCount(initial);
   for (const query of ['LumaPost', 'timeline', 'クライアント', 'Web app', 'Android', 'iOS', 'OSS', 'MIT', '暗号化DM', 'image video', 'NIP-44', 'Basic protocol flow description']) {
@@ -495,6 +509,14 @@ test.describe('375x812 responsive presentation', () => {
       const undersized = await page.locator('input,select,textarea').evaluateAll(nodes => nodes.filter(node => Number.parseFloat(getComputedStyle(node).fontSize) < 16).map(node => node.id || node.name));
       expect(undersized).toEqual([]);
     }
+    const featureLabels = page.locator('.feature-chip-label');
+    await expect(featureLabels).toHaveCount(10);
+    expect(await featureLabels.evaluateAll(elements => elements.every(element => {
+      const style = getComputedStyle(element);
+      const box = element.getBoundingClientRect();
+      return element.textContent.trim().length > 0 && style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0 && box.width > 0 && box.height > 0 && element.scrollWidth <= element.clientWidth && element.scrollHeight <= element.clientHeight;
+    }))).toBe(true);
+    await expectNoOverflow(page);
     const thumbs = page.locator('[data-tool-id="tool-1"] .card-review-thumbnail');
     await expect(thumbs).toHaveCount(3);
     await expect(page.locator('[data-tool-id="tool-1"] .card-review-more')).toHaveText('+1');

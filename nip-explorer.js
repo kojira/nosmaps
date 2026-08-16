@@ -117,7 +117,7 @@
     els.chips.innerHTML = featureDefinitions.map(definition => {
       const feature = localizedFeature(definition.id);
       const label = `${feature.name} — ${feature.scene}`;
-      return `<button class="feature-chip" type="button" aria-pressed="${state.features.includes(feature.id)}" aria-label="${esc(label)}" title="${esc(label)}" data-select-feature="${feature.id}"><span class="feature-symbol" aria-hidden="true">${iconSvg(feature.icon)}</span></button>`;
+      return `<button class="feature-chip" type="button" aria-pressed="${state.features.includes(feature.id)}" aria-label="${esc(label)}" title="${esc(label)}" data-select-feature="${feature.id}"><span class="feature-symbol" aria-hidden="true">${iconSvg(feature.icon)}</span><span class="feature-chip-label">${esc(feature.name)}</span></button>`;
     }).join('');
   }
 
