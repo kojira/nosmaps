@@ -61,16 +61,74 @@ test('browser language detection, visible switch, session memory, and no localSt
   await enContext.close();
 });
 
-test('all four concepts and canonical URLs remain available with icon-only category controls', async ({page}) => {
+test('all four concepts and canonical URLs remain available with visible localized category choices', async ({page}) => {
   const errors = collectErrors(page);
   await page.goto('index.html');
   expect(await page.evaluate(() => window.NOSMAPS_DATA.tools.length)).toBe(36);
   for (const mode of ['A', 'B', 'C']) await expect(page.getByRole('button', {name: `Open ${mode}`})).toBeVisible();
   await expect(page.getByRole('link', {name: 'Open D'})).toHaveAttribute('href', 'nip-explorer.html');
   await page.getByRole('button', {name: 'Open C'}).click();
-  await expect(page.locator('.category-icon')).toHaveCount(14);
-  await expect(page.locator('.category-icon').first()).toHaveText('🗺️');
-  await expect(page.locator('.category-icon').first()).toHaveAttribute('title', 'All');
+  const categories = page.locator('.category-tree .category-icon');
+  await expect(categories).toHaveCount(7);
+  await expect(categories.first().locator('.category-title')).toHaveText('All');
+  await expect(categories.first().locator('.category-description')).toHaveText('Browse tools from every category.');
+  await expect(categories.nth(1).locator('.category-title')).toHaveText('Clients');
+  await expect(categories.nth(1).locator('.category-description')).toHaveText('Clients for timelines and publishing.');
+  await expect(categories.nth(1)).toHaveAttribute('aria-label', 'Clients: Clients for timelines and publishing.');
+  await expect(categories.nth(1)).toHaveAttribute('title', 'Clients: Clients for timelines and publishing.');
+  await categories.nth(2).click();
+  await expect(categories.nth(2)).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', {name: '日本語'}).click();
+  const localized = page.locator('.category-tree .category-icon');
+  await expect(localized.first().locator('.category-title')).toHaveText('すべて');
+  await expect(localized.first().locator('.category-description')).toHaveText('すべてのカテゴリから探します。');
+  await expect(localized.nth(1).locator('.category-title')).toHaveText('クライアント');
+  await expect(localized.nth(1).locator('.category-description')).toHaveText('タイムラインや投稿を扱うクライアント。');
+  await expect(localized.nth(1)).toHaveAttribute('aria-label', 'クライアント: タイムラインや投稿を扱うクライアント。');
+  await expect(localized.nth(2)).toHaveAttribute('aria-pressed', 'true');
+  expect(errors).toEqual([]);
+});
+
+test('category titles and descriptions wrap without clipping or overflow on desktop and 375x812', async ({page}) => {
+  const errors = collectErrors(page);
+  for (const viewport of [{width: 1280, height: 900}, {width: 375, height: 812}]) {
+    await page.setViewportSize(viewport);
+    await page.goto('index.html#concept-c');
+    for (const language of ['en', 'ja']) {
+      const switchName = language === 'ja' ? '日本語' : 'English';
+      await page.getByRole('button', {name: switchName}).click();
+      const choices = page.locator('.category-tree .category-icon');
+      await expect(choices).toHaveCount(7);
+      const layout = await choices.evaluateAll(elements => elements.map(element => {
+        const title = element.querySelector('.category-title');
+        const description = element.querySelector('.category-description');
+        const fits = node => node.scrollHeight <= node.clientHeight && node.scrollWidth <= node.clientWidth;
+        return {button: fits(element), title: fits(title), description: fits(description), titleText: title.textContent.trim(), descriptionText: description.textContent.trim()};
+      }));
+      expect(layout.every(item => item.button && item.title && item.description && item.titleText && item.descriptionText), `${viewport.width}/${language}`).toBe(true);
+      await expectNoOverflow(page);
+    }
+    await page.goto('nip-explorer.html');
+    await page.locator('#filter-details > summary').click();
+    for (const language of ['en', 'ja']) {
+      const switchName = language === 'ja' ? '日本語' : 'English';
+      await page.getByRole('button', {name: switchName}).click();
+      const choices = page.locator('.category-filter .category-icon');
+      await expect(choices).toHaveCount(7);
+      const layout = await choices.evaluateAll(elements => elements.map(element => {
+        const title = element.querySelector('.category-title');
+        const description = element.querySelector('.category-description');
+        const fits = node => node.scrollHeight <= node.clientHeight && node.scrollWidth <= node.clientWidth;
+        return {button: fits(element), title: fits(title), description: fits(description), titleText: title.textContent.trim(), descriptionText: description.textContent.trim()};
+      }));
+      expect(layout.every(item => item.button && item.title && item.description && item.titleText && item.descriptionText), `explorer ${viewport.width}/${language}`).toBe(true);
+      await expectNoOverflow(page);
+      if (viewport.width === 375) {
+        const fontSizes = await page.locator('input, select, textarea').evaluateAll(elements => elements.filter(element => element.getClientRects().length).map(element => parseFloat(getComputedStyle(element).fontSize)));
+        expect(fontSizes.every(size => size >= 16)).toBe(true);
+      }
+    }
+  }
   expect(errors).toEqual([]);
 });
 

@@ -120,10 +120,15 @@
   }
 
   function option(value, label, selected) { return `<option value="${esc(value)}" ${selected === value ? 'selected' : ''}>${esc(label)}</option>`; }
+  function categoryFilterButton(id, icon, name, description) {
+    const selected = state.category === id;
+    const accessibleName = `${name}: ${description}`;
+    return `<button type="button" class="category-icon ${selected ? 'selected' : ''}" data-category-filter="${id}" aria-pressed="${selected}" aria-label="${esc(accessibleName)}" title="${esc(accessibleName)}"><span class="category-symbol" aria-hidden="true">${icon}</span><span class="category-copy"><span class="category-title">${esc(name)}</span><span class="category-description">${esc(description)}</span></span></button>`;
+  }
   function renderFilterPanel() {
     const wasOpen = els.filterDetails.open;
     $('#feature-filter-grid').innerHTML = `<label class="field">${esc(t('explorer.platform'))}<select id="platform-filter">${option('all', t('all'), state.platform)}${['Web', 'Desktop', 'Mobile', 'Android', 'iOS'].map(value => option(value, value, state.platform)).join('')}</select></label>
-      <fieldset class="category-filter"><legend>${esc(t('explorer.categoryGroup'))}</legend><div class="category-icon-group" role="group" aria-label="${esc(t('explorer.categoryGroup'))}"><button type="button" class="category-icon ${state.category === 'all' ? 'selected' : ''}" data-category-filter="all" aria-pressed="${state.category === 'all'}" aria-label="${esc(t('all'))}" title="${esc(t('all'))}">🗺️</button>${categories.map(id => `<button type="button" class="category-icon ${state.category === id ? 'selected' : ''}" data-category-filter="${id}" aria-pressed="${state.category === id}" aria-label="${esc(category(id).name)}" title="${esc(category(id).name)}">${category(id).icon}</button>`).join('')}</div></fieldset>
+      <fieldset class="category-filter"><legend>${esc(t('explorer.categoryGroup'))}</legend><div class="category-icon-group" role="group" aria-label="${esc(t('explorer.categoryGroup'))}">${categoryFilterButton('all', '🗺️', t('all'), t('explorer.allCategoriesDescription'))}${categories.map(id => { const item = category(id); return categoryFilterButton(id, item.icon, item.name, item.description); }).join('')}</div></fieldset>
       <label class="field">${esc(t('explorer.updateStatus'))}<select id="tool-status-filter">${option('all', t('explorer.activeStatus'), state.toolStatus)}${['active', 'stale', 'unknown'].map(value => option(value, t(`statuses.${value}`), state.toolStatus)).join('')}</select></label>
       <label class="field">${esc(t('explorer.support'))}<select id="support-filter" aria-describedby="support-filter-help" ${state.features.length ? '' : 'disabled'}>${option('all', t('all'), state.support)}${['implemented', 'partial', 'planned', 'unknown'].map(value => option(value, statusLabel(value), state.support)).join('')}</select><small id="support-filter-help" class="filter-prerequisite">${esc(t('explorer.featureNeeded'))}</small></label>
       <label class="field">${esc(t('explorer.delivery'))}<select id="delivery-filter">${option('all', t('all'), state.delivery)}${['web', 'installed', 'mobile'].map(value => option(value, deliveryLabel(value), state.delivery)).join('')}</select></label>
