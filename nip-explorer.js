@@ -9,9 +9,9 @@
   const icon = paths => `<svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths}</svg>`;
   const features = [
     {id: 'posts', name: '投稿・返信', scene: 'タイムラインで読み書きし、返信したい', icon: icon('<path d="M5 5h14v10H9l-4 4V5Z"/><path d="m15 9 2 2-2 2M17 11h-6"/>'), nips: ['01', '09', '25']},
-    {id: 'dm', name: 'DM', scene: '暗号化した個別メッセージを送りたい', icon: icon('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/><path d="M16 4V2m-2 2V2"/>'), nips: ['44']},
+    {id: 'dm', name: 'DM', aliases: '暗号化DM 暗号化メッセージ 個別メッセージ', scene: '暗号化した個別メッセージを送りたい', icon: icon('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/><path d="M16 4V2m-2 2V2"/>'), nips: ['44']},
     {id: 'search', name: '検索', scene: '投稿や人、識別子を探したい', icon: icon('<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>'), nips: ['01', '19', '21']},
-    {id: 'media', name: '画像・動画', aliases: 'メディア', scene: '画像や動画を見たり公開したい', icon: icon('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="10" r="1.5"/><path d="m4 17 5-5 4 4 3-3 4 4"/><path d="m15 8 3 2-3 2V8Z"/>'), nips: ['01', '19']},
+    {id: 'media', name: '画像・動画', aliases: 'メディア 画像投稿 動画投稿', scene: '画像や動画を見たり公開したい', icon: icon('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="10" r="1.5"/><path d="m4 17 5-5 4 4 3-3 4 4"/><path d="m15 8 3 2-3 2V8Z"/>'), nips: ['01', '19']},
     {id: 'notifications', name: '通知', scene: '返信・リアクション・zapに気づきたい', icon: icon('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>'), nips: ['25', '57']},
     {id: 'accounts', name: '複数アカウント', aliases: 'マルチアカウント', scene: '複数の鍵やプロフィールを切り替えたい', icon: icon('<circle cx="9" cy="8" r="3"/><path d="M3 19c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2"/><path d="M16 14c3 0 5 1.8 5 4"/>'), nips: ['19', '46']},
     {id: 'signing', name: '外部署名', aliases: '外部署名・リモート署名 リモート署名', scene: '秘密鍵をアプリから分離してリモート署名したい', icon: icon('<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3M18 4h3m-1.5-1.5v3"/>'), nips: ['46']},
@@ -22,7 +22,7 @@
 
   const featureById = Object.fromEntries(features.map(feature => [feature.id, feature]));
   const state = {
-    feature: 'posts',
+    features: [],
     query: '',
     platform: 'all',
     category: 'all',
@@ -115,11 +115,12 @@
     return cleanEvidence(value);
   }
 
-  function supportRecords(tool, feature = featureById[state.feature]) {
+  function supportRecords(tool, feature) {
+    if (!feature) return [];
     return feature.nips.map(number => tool.nips.find(record => record.nip === number)).filter(Boolean);
   }
 
-  function featureSupport(tool, feature = featureById[state.feature]) {
+  function featureSupport(tool, feature) {
     const records = supportRecords(tool, feature);
     if (!records.length) return null;
     const rank = {implemented: 4, partial: 3, planned: 2, unknown: 1};
@@ -127,34 +128,52 @@
   }
 
   function toolAliases(tool) {
-    return [...tool.tags, ...tool.purposes, `${tool.name} app`, `${tool.categoryLabel}ツール`];
+    const aliases = Array.isArray(tool.aliases) ? tool.aliases : tool.aliases ? [tool.aliases] : [];
+    return [...aliases, ...tool.tags, ...tool.purposes, `${tool.name} app`, `${tool.categoryLabel}ツール`];
   }
 
-  function toolMatchesQuery(tool) {
-    const query = state.query.trim().toLowerCase();
-    const haystack = [tool.name, tool.description, tool.category, tool.categoryLabel, tool.platform, delivery(tool), ...toolAliases(tool)].join(' ').toLowerCase();
+  function selectedFeatures(source = state) {
+    return source.features.map(id => featureById[id]).filter(Boolean);
+  }
+
+  function toolMatchesQuery(tool, source = state) {
+    const query = source.query.trim().toLowerCase();
+    const supportedFeatures = features.filter(feature => featureSupport(tool, feature));
+    const nipTerms = tool.nips.flatMap(record => {
+      const nip = nipByNumber[record.nip];
+      return [`NIP-${record.nip}`, `NIP ${record.nip}`, record.nip, nip?.title || '', nip?.purpose || ''];
+    });
+    const haystack = [
+      tool.name, tool.summary || tool.description, tool.description, tool.category, tool.categoryLabel, tool.platform, ...(tool.os || []), delivery(tool),
+      ...toolAliases(tool), tool.license, isOss(tool) ? 'OSS open source オープンソース' : '',
+      ...supportedFeatures.flatMap(feature => [feature.name, feature.scene, feature.aliases || '']), ...nipTerms
+    ].join(' ').toLowerCase();
     return !query || haystack.includes(query);
   }
 
-  function filteredTools() {
-    const feature = featureById[state.feature];
-    const query = state.nipQuery.trim().toLowerCase().replace(/^nip[- ]?/, '');
+  function filteredTools(overrides = {}) {
+    const source = {...state, ...overrides};
+    const selected = selectedFeatures(source);
+    const query = source.nipQuery.trim().toLowerCase().replace(/^nip[- ]?/, '');
     return tools.filter(tool => {
-      const support = featureSupport(tool, feature);
-      if (!support) return false;
-      const nipMatch = !query || supportRecords(tool, feature).some(record => {
+      const supports = selected.map(feature => featureSupport(tool, feature));
+      if (supports.some(support => !support)) return false;
+      const relevantRecords = selected.length
+        ? selected.flatMap(feature => supportRecords(tool, feature))
+        : tool.nips;
+      const nipMatch = !query || relevantRecords.some(record => {
         const nip = nipByNumber[record.nip];
-        return `${record.nip} ${nip.title} ${nip.purpose}`.toLowerCase().includes(query);
+        return `${record.nip} NIP-${record.nip} ${nip.title} ${nip.purpose}`.toLowerCase().includes(query);
       });
-      return toolMatchesQuery(tool) &&
-        (state.includeDead || tool.status !== 'dead') &&
-        (!state.savedOnly || Boolean(state.bookmarks[tool.id])) &&
-        (state.platform === 'all' || tool.platform === state.platform) &&
-        (state.category === 'all' || tool.category === state.category) &&
-        (state.toolStatus === 'all' || tool.status === state.toolStatus) &&
-        (state.support === 'all' || support === state.support) &&
-        (state.delivery === 'all' || delivery(tool) === state.delivery) &&
-        (state.oss === 'all' || (state.oss === 'yes' ? isOss(tool) : !isOss(tool))) &&
+      return toolMatchesQuery(tool, source) &&
+        (source.includeDead || tool.status !== 'dead') &&
+        (!source.savedOnly || Boolean(source.bookmarks[tool.id])) &&
+        (source.platform === 'all' || tool.platform === source.platform || (tool.os || []).includes(source.platform)) &&
+        (source.category === 'all' || tool.category === source.category) &&
+        (source.toolStatus === 'all' || tool.status === source.toolStatus) &&
+        (source.support === 'all' || (supports.length > 0 && supports.every(support => support === source.support))) &&
+        (source.delivery === 'all' || delivery(tool) === source.delivery) &&
+        (source.oss === 'all' || (source.oss === 'yes' ? isOss(tool) : !isOss(tool))) &&
         nipMatch;
     });
   }
@@ -170,7 +189,8 @@
   function renderFeatures() {
     els.chips.innerHTML = features.map(feature => {
       const label = `${feature.name} — ${feature.scene}`;
-      return `<button class="feature-chip" type="button" role="option" aria-selected="${feature.id === state.feature}" aria-label="${esc(label)}" title="${esc(label)}" data-select-feature="${feature.id}">${feature.icon}<span class="feature-chip-label">${esc(feature.name)}</span></button>`;
+      const selected = state.features.includes(feature.id);
+      return `<button class="feature-chip" type="button" aria-pressed="${selected}" aria-label="${esc(label)}" title="${esc(label)}" data-select-feature="${feature.id}">${feature.icon}<span class="feature-chip-label">${esc(feature.name)}</span><span class="feature-description">${esc(feature.scene)}</span></button>`;
     }).join('');
   }
 
@@ -186,7 +206,7 @@
   }
 
   function linkMarkup(tool) {
-    return mockLinks(tool).map(([type, label]) => `<button class="resource-link" type="button" data-safe-link="${tool.id}" data-link-type="${type}">${esc(label)}</button>`).join('');
+    return `<span class="safe-link-note">SAFE LINK PREVIEW · 外部遷移なし</span>${mockLinks(tool).map(([type, label]) => `<button class="resource-link" type="button" data-safe-link="${tool.id}" data-link-type="${type}" aria-label="${esc(label)}（安全プレビュー・外部遷移なし）">${esc(label)}<small>安全プレビュー</small></button>`).join('')}`;
   }
 
   const reviewerProfiles = {
@@ -258,11 +278,11 @@
   }
 
   function featureCard(tool) {
-    const feature = featureById[state.feature];
-    const support = featureSupport(tool, feature);
+    const selected = selectedFeatures();
+    const supports = selected.map(feature => ({feature, support: featureSupport(tool, feature)}));
     const checked = state.compare.includes(tool.id);
     const dead = tool.status === 'dead';
-    const records = supportRecords(tool, feature);
+    const records = [...new Map(selected.flatMap(feature => supportRecords(tool, feature)).map(record => [record.nip, record])).values()];
     const bookmark = state.bookmarks[tool.id];
     const reviewCount = reviewSeed(tool).length + (state.reviews[tool.id]?.length || 0);
     return `<article class="feature-tool-card ${dead ? 'dead-tool' : ''}" data-tool-id="${tool.id}">
@@ -271,10 +291,10 @@
       <p>${esc(tool.description)}</p>
       <section class="card-layer fact-layer" aria-labelledby="facts-${tool.id}">
         <h3 id="facts-${tool.id}">事実・観測</h3>
-        <div class="support-line">${supportBadge(support)}<span class="tag">${esc(tool.platform)}</span><span class="tag">${esc(delivery(tool))}</span></div>
+        <div class="support-line">${supports.length ? supports.map(({feature, support}) => `<span class="feature-support-summary">${esc(feature.name)} ${supportBadge(support)}</span>`).join('') : '<span class="tag">機能条件なし</span>'}<span class="tag">${esc(tool.platform)}</span><span class="tag">${esc((tool.os || []).filter(os => os !== tool.platform).join(' / ') || delivery(tool))}</span></div>
         <dl class="tool-facts"><div><dt>カテゴリ</dt><dd>${esc(tool.categoryLabel)}</dd></div><div><dt>OSS</dt><dd>${esc(displayLicense(tool))}</dd></div><div><dt>最終観測</dt><dd>${esc(tool.observed.split(' ')[0])}</dd></div></dl>
         <nav class="resource-links" aria-label="${esc(tool.name)}の公式導線">${linkMarkup(tool)}</nav>
-        <div class="basis-nips" aria-label="この機能のNIP裏付け">${records.map(record => `<button type="button" class="nip-tag-button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}">NIP-${record.nip} · ${nipStatusJa[record.status]}</button>`).join('')}</div>
+        ${records.length ? `<div class="basis-nips" aria-label="選択機能のNIP裏付け">${records.map(record => `<button type="button" class="nip-tag-button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}">NIP-${record.nip} · ${nipStatusJa[record.status]}</button>`).join('')}</div>` : ''}
       </section>
       <section class="card-layer evaluation-layer" aria-labelledby="ratings-${tool.id}">
         <h3 id="ratings-${tool.id}">利用者評価</h3>
@@ -282,31 +302,77 @@
         ${cardReviewThumbnails(tool)}
         <div class="evaluation-actions">
           <button type="button" class="like-button" data-like-tool="${tool.id}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCount(tool)}</button>
-          <button type="button" data-bookmark-tool="${tool.id}" aria-pressed="${Boolean(bookmark)}">${bookmark ? '保存済み' : '非公開で保存'}</button>
+          <button type="button" data-bookmark-tool="${tool.id}" aria-pressed="${Boolean(bookmark)}">${bookmark ? 'ブックマーク済み' : '非公開でブックマーク'}</button>
           <button type="button" data-review-tool="${tool.id}">レビュー ${reviewCount}</button>
         </div>
-        ${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${tool.id}" ${bookmark.public ? 'checked' : ''}> 公開へ切替（操作イメージ）</label><span class="privacy-state">${bookmark.public ? '公開プレビュー・未送信' : '非公開（既定）'}</span>` : '<span class="privacy-state">保存は非公開が既定</span>'}
+        ${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${tool.id}" ${bookmark.public ? 'checked' : ''}> 公開へ切替（操作イメージ）</label><span class="privacy-state">${bookmark.public ? '公開プレビュー・未送信' : '非公開（既定）'}</span>` : '<span class="privacy-state">ブックマークは非公開が既定</span>'}
       </section>
       ${dead ? '<p class="replacement-note">終了／到達不能の記録。<button type="button" class="text-button" data-find-alternative>同じ機能の稼働候補へ戻る</button></p>' : ''}
       <div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${tool.id}" ${checked ? 'checked' : ''}> 比較に追加</label><button class="secondary" type="button" data-feature-detail="${tool.id}">詳細・根拠</button></div>
     </article>`;
   }
 
+  function activeConditions() {
+    const conditions = state.features.map(id => ({key: `feature:${id}`, label: `機能「${featureById[id].name}」`, overrides: {features: state.features.filter(item => item !== id)}}));
+    if (state.query) conditions.push({key: 'query', label: `全文検索「${state.query}」`, overrides: {query: ''}});
+    if (state.platform !== 'all') conditions.push({key: 'platform', label: `OS／環境「${state.platform}」`, overrides: {platform: 'all'}});
+    if (state.category !== 'all') conditions.push({key: 'category', label: `カテゴリ「${categoryOptions.find(([value]) => value === state.category)?.[1] || state.category}」`, overrides: {category: 'all'}});
+    if (state.toolStatus !== 'all') conditions.push({key: 'toolStatus', label: `更新状態「${state.toolStatus}」`, overrides: {toolStatus: 'all'}});
+    if (state.support !== 'all') conditions.push({key: 'support', label: `機能対応「${statusLabel(state.support)}」`, overrides: {support: 'all'}});
+    if (state.delivery !== 'all') conditions.push({key: 'delivery', label: `提供形態「${state.delivery}」`, overrides: {delivery: 'all'}});
+    if (state.oss !== 'all') conditions.push({key: 'oss', label: `OSS「${state.oss === 'yes' ? 'OSS' : '不明'}」`, overrides: {oss: 'all'}});
+    if (state.includeDead) conditions.push({key: 'includeDead', label: '終了／到達不能を含む', overrides: {includeDead: false}});
+    if (state.savedOnly) conditions.push({key: 'savedOnly', label: 'ブックマーク済みだけ', overrides: {savedOnly: false}});
+    if (state.nipQuery) conditions.push({key: 'nipQuery', label: `NIP「${state.nipQuery}」`, overrides: {nipQuery: ''}});
+    return conditions;
+  }
+
+  function syncControls() {
+    if (!state.features.length) state.support = 'all';
+    els.query.value = state.query;
+    els.platform.value = state.platform;
+    els.category.value = state.category;
+    els.toolStatus.value = state.toolStatus;
+    els.support.value = state.support;
+    els.support.disabled = state.features.length === 0;
+    els.delivery.value = state.delivery;
+    els.oss.value = state.oss;
+    els.includeDead.checked = state.includeDead;
+    els.savedOnly.checked = state.savedOnly;
+    els.nipQuery.value = state.nipQuery;
+  }
+
+  function removeCondition(key) {
+    const condition = activeConditions().find(item => item.key === key);
+    if (!condition) return;
+    Object.assign(state, condition.overrides);
+    state.uiState = 'normal';
+    els.offline.hidden = true;
+    syncControls();
+    renderAll();
+  }
+
   function renderConditions() {
-    const feature = featureById[state.feature];
-    const active = [state.platform, state.category, state.toolStatus, state.support, state.delivery, state.oss].filter(value => value !== 'all').length + (state.includeDead ? 1 : 0) + (state.savedOnly ? 1 : 0) + (state.nipQuery ? 1 : 0);
-    els.activeFilterCount.textContent = active;
-    els.selected.innerHTML = `<strong>${feature.icon}${esc(feature.name)}</strong> <button class="text-button" type="button" data-show-feature-basis>NIPを見る</button>`;
-    const category = categoryOptions.find(([value]) => value === state.category)?.[1] || '全カテゴリ';
-    const parts = [feature.name, state.query ? `全文検索「${state.query}」` : '全文検索なし', state.platform === 'all' ? '全OS' : state.platform, state.category === 'all' ? '全カテゴリ' : category, state.includeDead ? '終了分を含む' : '終了分を除外'];
-    els.condition.textContent = `${parts.join(' / ')}${active ? ` / 詳細${active}件` : ''}`;
+    const selected = selectedFeatures();
+    const conditions = activeConditions();
+    const detailedCount = conditions.filter(condition => !condition.key.startsWith('feature:') && condition.key !== 'query').length;
+    els.activeFilterCount.textContent = detailedCount;
+    els.selected.innerHTML = selected.length
+      ? `<strong>機能条件（すべてAND）:</strong> ${selected.map(feature => `<button class="selected-condition" type="button" data-remove-condition="feature:${feature.id}" aria-label="${esc(feature.name)}条件を外す">${feature.icon}${esc(feature.name)} <span aria-hidden="true">×</span></button>`).join('<span class="and-mark">AND</span>')} <button class="text-button" type="button" data-show-feature-basis>NIPを見る</button>`
+      : '<strong>機能は未選択：</strong> すべての候補を表示';
+    els.condition.innerHTML = conditions.length
+      ? `<span class="condition-logic">有効な条件（すべてAND）</span>${conditions.map(condition => `<button type="button" class="condition-pill" data-remove-condition="${esc(condition.key)}" aria-label="${esc(condition.label)}を外す">${esc(condition.label)} <span aria-hidden="true">×</span></button>`).join('')}`
+      : '<span class="condition-logic">有効な追加条件なし（終了／到達不能は初期表示から除外）</span>';
   }
 
   function renderNips() {
-    const feature = featureById[state.feature];
-    const list = feature.nips.map(number => nipByNumber[number]).filter(Boolean);
+    const selected = selectedFeatures();
+    const numbers = [...new Set(selected.flatMap(feature => feature.nips))];
+    const list = numbers.map(number => nipByNumber[number]).filter(Boolean);
     els.nipCount.textContent = `${list.length} NIPs`;
-    els.nipList.innerHTML = list.map(nip => `<article class="nip-reference-card" id="nip-${nip.number}"><strong>NIP-${nip.number}</strong><h3>${esc(nip.title)}</h3><p>${esc(nip.purpose)}</p><a href="${nip.source}" target="_blank" rel="noreferrer">公式一次資料</a></article>`).join('');
+    els.nipList.innerHTML = list.length
+      ? list.map(nip => `<article class="nip-reference-card" id="nip-${nip.number}"><strong>NIP-${nip.number}</strong><h3>${esc(nip.title)}</h3><p>${esc(nip.purpose)}</p><a href="${nip.source}" target="_blank" rel="noreferrer">公式一次資料</a></article>`).join('')
+      : '<p class="feature-chip-empty">機能を選ぶと、関連するNIPの一次資料を表示します。</p>';
   }
 
   function renderCompareActions() {
@@ -330,29 +396,36 @@
     els.uiState.innerHTML = state.uiState === 'partial' ? stateMarkup('partial') : '';
     const list = filteredTools();
     els.resultCount.textContent = `${list.length}件`;
-    els.results.innerHTML = list.length ? list.map(featureCard).join('') : '<div class="empty">条件に合う候補がありません。条件を緩めるか、別の機能を選んでください。</div>';
+    if (list.length) {
+      els.results.innerHTML = list.map(featureCard).join('');
+      return;
+    }
+    const relaxations = activeConditions().map(condition => ({...condition, count: filteredTools(condition.overrides).length})).sort((a, b) => b.count - a.count);
+    const suggestion = relaxations[0];
+    els.results.innerHTML = `<div class="empty zero-results"><h2>条件に合う候補がありません</h2><p>有効な条件は上に個別表示されています。×で1件ずつ外せます。</p>${suggestion ? `<button class="secondary relaxation-suggestion" type="button" data-remove-condition="${esc(suggestion.key)}">「${esc(suggestion.label)}」を外すと ${suggestion.count}件</button>` : '<button class="secondary" type="button" data-reset-all>すべての条件をリセット</button>'}</div>`;
   }
 
   function stateMarkup(type) {
     if (type === 'loading') return '<div class="state-message"><div class="nip-skeleton" aria-label="読み込み中"><span></span><span></span><span></span></div><strong>機能対応情報を読み込み中…</strong></div>';
     if (type === 'empty') return '<div class="state-message"><div><strong>データが0件の状態</strong><p>選択した機能に候補がありません。別の条件を試してください。</p></div></div>';
     if (type === 'error') return '<div class="state-message error"><div><strong>対応情報を取得できませんでした</strong><p>再試行できます。</p><button class="secondary" type="button" data-ui-state="normal">再試行</button></div></div>';
-    if (type === 'partial') return '<div class="state-message partial"><strong>一部データのみ：</strong> 観測詳細が欠けている項目があります。「不明」を非対応と解釈しないでください。</div>';
+    if (type === 'partial') return '<div class="state-message partial"><strong>一部データのみ（現在の候補カード）：</strong> 観測詳細が欠けている項目があります。「不明」を非対応と解釈しないでください。</div>';
     return '';
   }
 
   function renderAll() {
+    syncControls();
     renderFeatures();
     renderResults();
   }
 
   function selectFeature(id) {
     if (!featureById[id]) return;
-    state.feature = id;
+    state.features = state.features.includes(id) ? state.features.filter(item => item !== id) : [...state.features, id];
     state.uiState = 'normal';
     els.offline.hidden = true;
     renderAll();
-    history.replaceState(null, '', `#feature-${id}`);
+    history.replaceState(null, '', state.features.length ? `#features-${state.features.join('-')}` : location.pathname);
   }
 
   function updateFilter(key, value) {
@@ -363,20 +436,16 @@
   }
 
   function resetFilters() {
-    Object.assign(state, {query: '', platform: 'all', category: 'all', toolStatus: 'all', support: 'all', delivery: 'all', oss: 'all', includeDead: false, savedOnly: false, nipQuery: ''});
-    [els.platform, els.category, els.toolStatus, els.support, els.delivery, els.oss].forEach(element => { element.value = 'all'; });
-    els.includeDead.checked = false;
-    els.savedOnly.checked = false;
-    els.query.value = '';
-    els.nipQuery.value = '';
-    renderResults();
+    Object.assign(state, {features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: 'all', delivery: 'all', oss: 'all', includeDead: false, savedOnly: false, nipQuery: ''});
+    syncControls();
+    renderAll();
   }
 
   function setUiState(value) {
     state.uiState = value === 'offline' ? 'normal' : value;
     els.offline.hidden = value !== 'offline';
     renderResults();
-    if (value === 'offline') els.uiState.innerHTML = '<div class="state-message partial"><strong>オフライン：</strong> 保存済みデータだけで表示しています。外部通信はありません。</div>';
+    if (value === 'offline') els.uiState.innerHTML = '<div class="state-message partial"><strong>オフライン：</strong> 端末キャッシュ済みデータだけで表示しています。外部通信はありません。</div>';
   }
 
   function toast(message) {
@@ -401,12 +470,18 @@
     renderCompareActions();
   }
 
+  function syncComparisonCheckboxes() {
+    document.querySelectorAll('[data-compare-tool]').forEach(checkbox => {
+      checkbox.checked = state.compare.includes(checkbox.dataset.compareTool);
+    });
+  }
+
   function dialogHead(kicker, title, description = '') {
     return `<div class="dialog-head"><div><div class="dialog-kicker">${esc(kicker)}</div><h2 id="evidence-title">${title}</h2>${description ? `<p>${esc(description)}</p>` : ''}</div><button class="icon-btn" type="button" data-close-dialog aria-label="閉じる">×</button></div>`;
   }
 
   function openEvidenceDialog() {
-    if (!els.evidenceDialog.open) els.evidenceDialog.showModal();
+    openDialog(els.evidenceDialog);
   }
 
   function showEvidence(toolId, nipNumber) {
@@ -427,12 +502,16 @@
     openEvidenceDialog();
   }
 
-  function showFeatureDetail(toolId) {
+  function showFeatureDetail(toolId, featureId = '') {
     const tool = tools.find(item => item.id === toolId);
-    const feature = featureById[state.feature];
     if (!tool) return;
-    const records = supportRecords(tool, feature);
-    els.evidenceContent.innerHTML = `${dialogHead('Feature basis', `${esc(tool.name)}の「${esc(feature.name)}」`, feature.scene)}
+    const detailFeatures = featureId ? [featureById[featureId]].filter(Boolean) : selectedFeatures();
+    const records = detailFeatures.length
+      ? [...new Map(detailFeatures.flatMap(feature => supportRecords(tool, feature)).map(record => [record.nip, record])).values()]
+      : tool.nips;
+    const featureLabel = detailFeatures.length ? detailFeatures.map(feature => feature.name).join(' AND ') : '全NIP記録';
+    const description = detailFeatures.length ? '選択した機能条件はすべてANDです。' : '機能条件がないため、この候補の全NIP記録を表示します。';
+    els.evidenceContent.innerHTML = `${dialogHead('Feature basis', `${esc(tool.name)}の「${esc(featureLabel)}」`, description)}
       <section class="dialog-layer fact-layer" aria-labelledby="detail-fact-title"><h3 id="detail-fact-title">事実・観測</h3><nav class="resource-links" aria-label="${esc(tool.name)}の公式導線">${linkMarkup(tool)}</nav><div class="feature-basis-list">${records.map(record => `<button class="basis-row" type="button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}"><span><strong>NIP-${record.nip}</strong> ${esc(nipByNumber[record.nip].title)}</span>${supportBadge(record.status)}<small>根拠・観測詳細へ</small></button>`).join('')}</div></section>
       <section class="dialog-layer evaluation-layer" aria-labelledby="detail-evaluation-title"><h3 id="detail-evaluation-title">利用者評価</h3><p class="local-only">いいね・保存・レビュー・添付画像はローカル操作モックです。事実・観測の根拠には含めません。</p><div class="evaluation-actions"><button type="button" data-review-tool="${tool.id}">レビューを見る</button><button type="button" data-gallery-tool="${tool.id}">レビュー画像ギャラリー</button></div></section>`;
     openEvidenceDialog();
@@ -464,10 +543,29 @@
     if (dialog?.open) dialog.close();
   }
 
+  const dialogOpeners = new WeakMap();
+  let dialogOpenerCandidate = null;
+
+  document.addEventListener('click', event => {
+    dialogOpenerCandidate = event.target.closest('button, a[href], input, select, textarea, [tabindex]');
+    setTimeout(() => { dialogOpenerCandidate = null; }, 0);
+  }, true);
+
+  function focusableElements(dialog) {
+    return [...dialog.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+      .filter(element => element.getClientRects().length > 0);
+  }
+
+  function openDialog(dialog) {
+    if (dialog.open) return;
+    dialogOpeners.set(dialog, dialogOpenerCandidate || document.activeElement);
+    dialog.showModal();
+    requestAnimationFrame(() => focusableElements(dialog)[0]?.focus());
+  }
+
   function showReviewDialog(toolId, focusReviewId = '') {
     const tool = tools.find(item => item.id === toolId);
     if (!tool) return;
-    [els.evidenceDialog, els.profileDialog, els.galleryDialog, els.imageDialog].forEach(closeDialog);
     const reviews = allReviews(tool);
     const imageOptions = screenshots.map((shot, index) => `<label class="shot-choice"><input type="radio" name="mockImage" value="${esc(shot.id)}"><span>${screenshotMarkup(shot, true)}${esc(shot.label)}</span></label>`).join('');
     els.reviewContent.innerHTML = `${dialogHead('Evaluation layer', `${esc(tool.name)}のレビュー`, '評価・プロフィール・画像は架空の操作モックです。事実・観測とは分離しています。')}
@@ -483,8 +581,12 @@
         <fieldset class="image-picker"><legend>画像添付（任意・外部アップロードなし）</legend><div class="shot-choices">${imageOptions}</div><label class="local-file">または端末内画像を安全にプレビュー<input type="file" name="localImage" accept="image/*"><small>ブラウザ内だけで読み込み、送信・保存しません。</small></label><div class="local-image-preview" aria-live="polite"></div><button class="text-button" type="button" data-clear-image>画像選択を解除</button></fieldset>
         <button class="primary" type="submit">未送信プレビューを作る</button><div class="review-preview" aria-live="polite">本文のみ・画像のみ・本文＋画像に対応。未署名・未送信です。</div>
       </form>`;
-    if (!els.reviewDialog.open) els.reviewDialog.showModal();
-    if (focusReviewId) requestAnimationFrame(() => document.getElementById(`review-${focusReviewId}`)?.scrollIntoView({block: 'center'}));
+    openDialog(els.reviewDialog);
+    if (focusReviewId) requestAnimationFrame(() => {
+      const review = document.getElementById(`review-${focusReviewId}`);
+      review?.scrollIntoView({block: 'center'});
+      review?.querySelector('button')?.focus({preventScroll: true});
+    });
   }
 
   function findReview(reviewId) {
@@ -502,7 +604,6 @@
   function showReviewerProfile(profileId) {
     const profile = reviewerProfiles[profileId];
     if (!profile) return;
-    [els.reviewDialog, els.evidenceDialog, els.galleryDialog, els.imageDialog].forEach(closeDialog);
     const historyItems = reviewsByProfile(profileId);
     const helpful = profile.useful + historyItems.reduce((sum, item) => sum + (state.reviewVotes[item.review.id] === 'helpful' ? 1 : 0), 0);
     const notUseful = profile.notUseful + historyItems.reduce((sum, item) => sum + (state.reviewVotes[item.review.id] === 'unhelpful' ? 1 : 0), 0);
@@ -510,14 +611,13 @@
       <section class="profile-summary"><p class="profile-npub">${esc(profile.npub)}</p><p>${esc(profile.bio)}</p><dl class="profile-facts"><div><dt>レビュー件数</dt><dd>${historyItems.length}</dd></div><div><dt>役に立った</dt><dd>${helpful}</dd></div><div><dt>立たなかった</dt><dd>${notUseful}</dd></div><div><dt>作成時期</dt><dd>${esc(profile.created)}</dd></div></dl></section>
       <section class="profile-signals" aria-labelledby="profile-signals-title"><h3 id="profile-signals-title">botかどうかを考える材料</h3><dl><div><dt>投稿履歴の広がり</dt><dd>${esc(profile.spread)}</dd></div><div><dt>投稿頻度・種類</dt><dd>${esc(profile.posts)}</dd></div><div><dt>注意</dt><dd>すべて架空データ。自動判定や本人確認はしていません。</dd></div></dl></section>
       <section class="profile-history" aria-labelledby="profile-history-title"><h3 id="profile-history-title">過去レビューと役立ち内訳</h3>${historyItems.length ? historyItems.slice(0, 12).map(({tool, review}) => { const counts = voteCounts(review); return `<article><div><strong>${esc(tool.name)}</strong><span>${esc(review.date)}</span></div><p>${esc(review.body || '画像レビュー')}</p><span>役に立った ${counts.helpful} / 立たなかった ${counts.unhelpful}</span><button type="button" class="text-button" data-review-jump="${esc(review.id)}" data-review-tool="${esc(tool.id)}">対応レビューへ</button></article>`; }).join('') : '<p>未送信プレビュー以外の履歴はありません。</p>'}</section>`;
-    els.profileDialog.showModal();
+    openDialog(els.profileDialog);
   }
 
   function showVoteBasis(reviewId) {
     const found = findReview(reviewId);
     if (!found) return;
     const counts = voteCounts(found.review);
-    [els.reviewDialog, els.profileDialog].forEach(closeDialog);
     els.evidenceContent.innerHTML = `${dialogHead('Helpfulness basis mock', '役立ち評価の内訳', '評価者の実在確認や署名検証は行わない静的モックです。')}
       <section class="dialog-layer evaluation-layer"><h3>利用者評価</h3><dl class="nip-evidence-grid"><div><dt>役に立った</dt><dd>${counts.helpful}人</dd></div><div><dt>立たなかった</dt><dd>${counts.unhelpful}人</dd></div><div><dt>評価者の広がり</dt><dd>架空npub ${counts.helpful + counts.unhelpful}件 / 作成時期3区分 / 投稿履歴5カテゴリ</dd></div><div><dt>あなたの操作</dt><dd>${counts.vote ? `${counts.vote === 'helpful' ? '役に立った' : '立たなかった'}（未署名・未送信）` : '未評価'}</dd></div></dl><button type="button" class="secondary" data-reviewer="${esc(found.review.profile)}">投稿者プロフィールを見る</button></section>`;
     openEvidenceDialog();
@@ -526,20 +626,18 @@
   function showGallery(toolId) {
     const tool = tools.find(item => item.id === toolId);
     if (!tool) return;
-    [els.evidenceDialog, els.reviewDialog, els.profileDialog, els.imageDialog].forEach(closeDialog);
     const images = allReviews(tool).filter(review => review.image);
     els.galleryContent.innerHTML = `${dialogHead('Evaluation image layer', `${esc(tool.name)}のレビュー画像`, 'レビュー添付だけを走査します。機能対応や観測根拠の画像ではありません。')}
       <section class="gallery-grid" aria-label="レビュー添付画像一覧">${images.length ? images.map(review => `<article class="gallery-card">${screenshotMarkup(review.image)}<dl><div><dt>投稿者</dt><dd><button class="reviewer-link compact-link" type="button" data-reviewer="${esc(review.profile)}">${esc(review.author)}</button></dd></div><div><dt>投稿日時</dt><dd>${esc(review.date)}</dd></div><div><dt>OS / version</dt><dd>${esc(review.os || '未入力')} / ${esc(review.version || '未入力')}</dd></div></dl><div><button type="button" class="primary" data-open-image="${esc(tool.id)}" data-image-review="${esc(review.id)}">拡大</button><button type="button" class="secondary" data-review-tool="${esc(tool.id)}" data-review-jump="${esc(review.id)}">元レビュー</button></div></article>`).join('') : '<p class="unknown-note">添付画像はまだありません。レビュー投稿モックで追加できます。</p>'}</section>`;
-    els.galleryDialog.showModal();
+    openDialog(els.galleryDialog);
   }
 
   function showImage(toolId, reviewId) {
     const tool = tools.find(item => item.id === toolId);
     const review = tool && allReviews(tool).find(item => item.id === reviewId);
     if (!tool || !review?.image) return;
-    closeDialog(els.galleryDialog);
     els.imageContent.innerHTML = `${dialogHead('Image preview', review.image.label, 'Escapeキーでも閉じられます。外部画像アップロードはありません。')}<div class="image-stage">${screenshotMarkup(review.image)}</div><dl class="nip-evidence-grid"><div><dt>投稿者</dt><dd><button type="button" class="reviewer-link compact-link" data-reviewer="${esc(review.profile)}">${esc(review.author)}</button></dd></div><div><dt>投稿日時</dt><dd>${esc(review.date)}</dd></div><div><dt>OS / version</dt><dd>${esc(review.os || '未入力')} / ${esc(review.version || '未入力')}</dd></div></dl><button type="button" class="primary" data-review-tool="${esc(tool.id)}" data-review-jump="${esc(review.id)}">元レビューへ</button>`;
-    els.imageDialog.showModal();
+    openDialog(els.imageDialog);
   }
 
   function comparisonItem(label, values, contents, iconMarkup = '') {
@@ -551,7 +649,7 @@
   }
 
   function showCompare() {
-    if (state.compare.length < 2) return;
+    if (state.compare.length < 1) return;
     const selected = state.compare.map(id => tools.find(tool => tool.id === id)).filter(Boolean);
     const featureRows = features
       .map(feature => {
@@ -578,13 +676,20 @@
     }).sort((a, b) => Number(b.different) - Number(a.different));
 
     const count = selected.length;
+    const alternatives = filteredTools().filter(tool => !state.compare.includes(tool.id));
     els.compareContent.innerHTML = `<div class="dialog-head"><div><div class="dialog-kicker">Differences first</div><h2 id="compare-title">${count}件の機能比較</h2><p>差がある項目を先に表示します。</p></div><button class="icon-btn" type="button" data-close-dialog aria-label="閉じる">×</button></div>
+      <div class="comparison-edit" aria-label="比較候補を編集">
+        <label>代替候補<select id="compare-alternative">${alternatives.map(tool => `<option value="${tool.id}">${esc(tool.name)}</option>`).join('')}</select></label>
+        ${count >= 3 ? `<label>入れ替える候補<select id="compare-replace-target">${selected.map(tool => `<option value="${tool.id}">${esc(tool.name)}</option>`).join('')}</select></label>` : ''}
+        <button class="secondary" type="button" data-compare-apply ${alternatives.length ? '' : 'disabled'}>${count >= 3 ? '選んだ候補と入れ替え' : '比較に追加'}</button>
+      </div>
       <div class="comparison-body" style="--candidate-count:${count}">
-        <div class="comparison-candidates" aria-label="比較候補">${selected.map(tool => `<div class="comparison-candidate">${esc(tool.name)}</div>`).join('')}</div>
+        <div class="comparison-candidates" aria-label="比較候補">${selected.map(tool => `<div class="comparison-candidate"><strong>${esc(tool.name)}</strong><button type="button" data-compare-remove="${tool.id}" aria-label="${esc(tool.name)}を比較から外す">外す</button></div>`).join('')}</div>
+        ${count < 2 ? '<p class="comparison-incomplete">比較を続けるには代替候補を1件追加してください。</p>' : ''}
         <section class="comparison-group" aria-labelledby="feature-comparison-title"><h3 class="comparison-group-title" id="feature-comparison-title">機能</h3>${featureRows.map(row => row.markup).join('')}</section>
         <section class="comparison-group" aria-labelledby="attribute-comparison-title"><h3 class="comparison-group-title" id="attribute-comparison-title">基本情報</h3>${factRows.map(row => row.markup).join('')}</section>
       </div>`;
-    els.compareDialog.showModal();
+    openDialog(els.compareDialog);
   }
 
   function showFeatureBasis() {
@@ -629,9 +734,7 @@
     }
     const matrix = event.target.closest('[data-matrix-basis]');
     if (matrix) {
-      els.compareDialog.close();
-      state.feature = matrix.dataset.matrixFeature;
-      showFeatureDetail(matrix.dataset.matrixBasis);
+      showFeatureDetail(matrix.dataset.matrixBasis, matrix.dataset.matrixFeature);
       return;
     }
     const source = event.target.closest('[data-mock-source]');
@@ -656,7 +759,7 @@
       const id = bookmark.dataset.bookmarkTool;
       state.bookmarks[id] = state.bookmarks[id] ? null : {public: false};
       renderResults();
-      toast(state.bookmarks[id] ? '非公開で保存しました（この表示中のみ）' : '保存を解除しました');
+      toast(state.bookmarks[id] ? '非公開でブックマークしました（この表示中のみ）' : 'ブックマークを解除しました');
       return;
     }
     const reviewer = event.target.closest('[data-reviewer]');
@@ -698,12 +801,46 @@
     }
     const review = event.target.closest('[data-review-tool]');
     if (review) {
+      const childDialog = review.closest('dialog');
+      if (review.dataset.reviewJump && els.reviewDialog.open && childDialog !== els.reviewDialog) closeDialog(childDialog);
       showReviewDialog(review.dataset.reviewTool, review.dataset.reviewJump || '');
       return;
     }
     const close = event.target.closest('[data-close-dialog]');
     if (close) {
       close.closest('dialog').close();
+      return;
+    }
+    const removeConditionButton = event.target.closest('[data-remove-condition]');
+    if (removeConditionButton) {
+      removeCondition(removeConditionButton.dataset.removeCondition);
+      return;
+    }
+    if (event.target.closest('[data-reset-all]')) {
+      resetFilters();
+      return;
+    }
+    const compareRemove = event.target.closest('[data-compare-remove]');
+    if (compareRemove) {
+      state.compare = state.compare.filter(id => id !== compareRemove.dataset.compareRemove);
+      renderCompareActions();
+      syncComparisonCheckboxes();
+      if (state.compare.length) showCompare();
+      else closeDialog(els.compareDialog);
+      return;
+    }
+    if (event.target.closest('[data-compare-apply]')) {
+      const alternative = $('#compare-alternative')?.value;
+      if (!alternative) return;
+      if (state.compare.length >= 3) {
+        const target = $('#compare-replace-target')?.value;
+        state.compare = state.compare.map(id => id === target ? alternative : id);
+      } else {
+        state.compare.push(alternative);
+      }
+      renderCompareActions();
+      syncComparisonCheckboxes();
+      showCompare();
       return;
     }
     const uiState = event.target.closest('[data-ui-state]');
@@ -772,12 +909,36 @@
     dialog.addEventListener('click', event => {
       if (event.target === dialog) dialog.close();
     });
+    dialog.addEventListener('keydown', event => {
+      if (event.key !== 'Tab') return;
+      const focusable = focusableElements(dialog);
+      if (!focusable.length) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+    dialog.addEventListener('close', () => {
+      const opener = dialogOpeners.get(dialog);
+      if (opener?.isConnected && (!opener.closest('dialog') || opener.closest('dialog').open)) setTimeout(() => opener.focus(), 0);
+    });
   });
 
   window.addEventListener('offline', () => setUiState('offline'));
   window.addEventListener('online', () => setUiState('normal'));
   els.filterDetails.open = false;
-  const initialFeature = location.hash.match(/^#feature-([a-z]+)$/)?.[1];
-  if (initialFeature && featureById[initialFeature]) state.feature = initialFeature;
+  const legacyFeature = location.hash.match(/^#feature-([a-z]+)$/)?.[1];
+  const initialFeatures = location.hash.match(/^#features-([a-z-]+)$/)?.[1]?.split('-') || [];
+  if (legacyFeature && featureById[legacyFeature]) state.features = [legacyFeature];
+  else state.features = initialFeatures.filter(id => featureById[id]);
   renderAll();
 })();

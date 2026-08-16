@@ -85,7 +85,7 @@
   border-color: #7866d3;
 }
 
-.feature-chip[aria-selected="true"] {
+.feature-chip[aria-pressed="true"] {
   border-color: var(--accent);
   background: #e9e3ff;
   box-shadow: inset 0 0 0 1px var(--accent);
@@ -104,6 +104,10 @@
   font-weight: 800;
   line-height: 1.15;
   overflow-wrap: anywhere;
+}
+
+.feature-description {
+  display: none;
 }
 
 .feature-chip-empty {
@@ -212,6 +216,12 @@
   font-size: .78rem;
 }
 
+.filter-prerequisite {
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 650;
+}
+
 .include-dead {
   display: flex;
   min-height: 38px;
@@ -253,10 +263,45 @@
 }
 
 .mobile-condition-summary {
-  display: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .3rem;
   margin-top: .35rem;
   color: var(--muted);
   font-size: .7rem;
+}
+
+.condition-logic {
+  margin-right: .15rem;
+  font-weight: 800;
+}
+
+.condition-pill,
+.selected-condition {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: .2rem;
+  padding: .3rem .48rem;
+  border: 1px solid #a99ada;
+  border-radius: 99px;
+  background: #f1edff;
+  color: #35217e;
+  font-size: .7rem;
+  font-weight: 800;
+}
+
+.selected-condition .feature-icon {
+  width: .85rem;
+  height: .85rem;
+}
+
+.and-mark {
+  margin: 0 .22rem;
+  color: #6b5a9e;
+  font-size: .62rem;
+  font-weight: 900;
 }
 
 .compare-actions {
@@ -290,6 +335,10 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: .7rem;
+}
+
+.feature-tool-results[hidden] {
+  display: none;
 }
 
 .feature-tool-card {
@@ -665,6 +714,39 @@
   overflow: hidden;
 }
 
+.comparison-edit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: .5rem;
+  align-items: end;
+  margin: .55rem 0;
+  padding: .55rem;
+  border: 1px solid #c9bce8;
+  border-radius: .55rem;
+  background: #f6f2ff;
+}
+
+.comparison-edit label {
+  min-width: 0;
+  color: #50368f;
+  font-size: .7rem;
+  font-weight: 800;
+}
+
+.comparison-edit select {
+  margin-top: .16rem;
+  padding: .42rem;
+  font-size: .75rem;
+}
+
+.comparison-incomplete {
+  padding: .5rem;
+  border-radius: .45rem;
+  background: #fff4d7;
+  font-size: .75rem;
+  text-align: center;
+}
+
 .comparison-body {
   max-width: 100%;
   max-height: 72vh;
@@ -699,6 +781,22 @@
   line-height: 1.2;
   text-align: center;
   overflow-wrap: anywhere;
+}
+
+.comparison-candidate strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.comparison-candidate button {
+  margin-top: .28rem;
+  padding: .18rem .38rem;
+  border: 1px solid #9a8bc9;
+  border-radius: 99px;
+  background: #fff;
+  color: #50368f;
+  font-size: .68rem;
+  font-weight: 800;
 }
 
 .comparison-candidate:first-child,
@@ -805,6 +903,18 @@
   .feature-filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .feature-description {
+    display: -webkit-box;
+    max-width: 100%;
+    color: var(--muted);
+    font-size: .68rem;
+    font-weight: 650;
+    line-height: 1.2;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
 }
 
 @media (max-width: 700px) {
@@ -815,10 +925,6 @@
   .feature-tool-results,
   .nip-list {
     grid-template-columns: 1fr;
-  }
-
-  .mobile-condition-summary {
-    display: block;
   }
 
   .feature-filter-grid {
@@ -854,7 +960,11 @@
   }
 
   .feature-chip-label {
-    font-size: .6rem;
+    font-size: .7rem;
+  }
+
+  .feature-description {
+    font-size: .68rem;
   }
 
   .feature-icon {
@@ -898,28 +1008,32 @@
     font-size: 1rem;
   }
 
+  .comparison-edit {
+    grid-template-columns: 1fr;
+  }
+
   .comparison-candidate {
     padding: .45rem .2rem;
-    font-size: .66rem;
+    font-size: .75rem;
   }
 
   .comparison-label {
     padding: .25rem .38rem;
-    font-size: .62rem;
+    font-size: .72rem;
   }
 
   .comparison-value {
     padding: .4rem .22rem;
-    font-size: .65rem;
+    font-size: .75rem;
   }
 
   .comparison-value .support-badge {
     padding: .12rem .25rem;
-    font-size: .6rem;
+    font-size: .7rem;
   }
 
   .comparison-evidence {
-    font-size: .59rem;
+    font-size: .72rem;
   }
 }
 
@@ -989,6 +1103,22 @@
   color: #35217e;
   font-size: .67rem;
   font-weight: 800;
+}
+
+.resource-link small {
+  display: block;
+  margin-top: .08rem;
+  color: #655985;
+  font-size: .58rem;
+  line-height: 1.1;
+}
+
+.safe-link-note {
+  flex-basis: 100%;
+  color: #4f4276;
+  font-size: .62rem;
+  font-weight: 900;
+  letter-spacing: .04em;
 }
 
 .like-button[aria-pressed="true"] {
