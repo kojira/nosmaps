@@ -1,52 +1,242 @@
-/* nosmaps static UI mock — shared records are loaded from data.js. */
-const {categories,purposes,statuses,statusJa,tools}=window.NOSMAPS_DATA;
-const state={screen:'home',mode:'A',query:'',category:'all',status:'all',platform:'all',purpose:'',compare:[],uiState:'normal',sort:'name'};
-const main=document.querySelector('#main');
-const detailDialog=document.querySelector('#detail-dialog');
-const contributionDialog=document.querySelector('#contribute-dialog');
-const dialogOpeners=new WeakMap();
-let dialogOpenerCandidate=null;
-document.addEventListener('click',event=>{dialogOpenerCandidate=event.target.closest('button,a[href],input,select,textarea,[tabindex]');setTimeout(()=>{dialogOpenerCandidate=null},0)},true);
+(() => {
+  'use strict';
 
-function dialogFocusable(dialog){return [...dialog.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(element=>element.getClientRects().length>0)}
-function openDialog(dialog){if(dialog.open)return;dialogOpeners.set(dialog,dialogOpenerCandidate||document.activeElement);dialog.showModal();requestAnimationFrame(()=>dialogFocusable(dialog)[0]?.focus())}
+  const {tools, statuses} = window.NOSMAPS_DATA;
+  const i18n = window.NOSMAPS_I18N;
+  const t = (key, variables) => i18n.t(key, variables);
+  const categories = ['clients', 'relay', 'identity', 'media', 'analytics', 'dev'];
+  const state = {
+    screen: location.hash.startsWith('#concept-') ? 'app' : 'home',
+    mode: (location.hash.match(/^#concept-([abc])$/i)?.[1] || 'A').toUpperCase(),
+    query: '', category: 'all', status: 'all', platform: 'all', purpose: '', compare: [], sort: 'name',
+    uiState: new URLSearchParams(location.search).get('state') || 'normal',
+    dialogs: {detail: null, contribution: null}, contributionDrafts: {}
+  };
+  const main = document.querySelector('#main');
+  const detailDialog = document.querySelector('#detail-dialog');
+  const contributionDialog = document.querySelector('#contribute-dialog');
+  const dialogOpeners = new WeakMap();
+  let lastInteractive = null;
 
-function esc(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
-function statusBadge(t){return `<span class="status ${t.status}">${statusJa[t.status]}</span>`}
-function routeHash(){history.replaceState(null,'',state.screen==='home'?'#home':`#concept-${state.mode.toLowerCase()}`)}
-function renderHome(){state.screen='home';routeHash();main.innerHTML=`
-  <section class="hero"><div class="eyebrow">Static prototype · 36 shared mock records</div><h1>Nostrの道具を、<br>どう見つけたい？</h1><p class="lead">同じ架空データを使った4つのUI案です。情報設計ではなく、まず触って比較するためのモック。</p><p class="mock-note">⚠ すべての状態・観測値はモック。Nostr未接続・送信なし。</p></section>
-  <section class="compare-prompt"><strong>何を比較してほしいか</strong><br>① 初見で次の操作が分かるか　② 欲しいツールへ早く着けるか　③ 状態の根拠を信頼できそうか　④ また探索したくなるか</section>
-  <section class="concept-grid" aria-label="UI案を選ぶ">
-    ${conceptCard('A','目的から探す','初心者・Nostrを始めたばかりの人','やりたいことを言葉で選べば、用語を知らなくても候補に着ける。',['目的カードから開始','おすすめ順の短いリスト','次の一歩を明示'])}
-    ${conceptCard('B','一覧・絞り込み・比較','候補を効率よく評価したい人','高密度な一覧と2〜3件比較で、判断に必要な差分を早く掴める。',['複数条件で絞り込み','最大3件を横比較','観測根拠を一覧で確認'])}
-    ${conceptCard('C','カテゴリを辿る探索','周辺領域も含めて発見したい人','分類を歩くことで、検索語を決めずに意外な道具と出会える。',['カテゴリツリー','関連領域への寄り道','発見を促すカード'])}
-    <article class="concept-card concept-card-d"><span class="letter">D</span><h2>機能探索・比較（NIP裏付け）</h2><p><strong>対象：</strong>今のツールの代替や別候補を探す人</p><p>使いたい機能から架空ツールを逆引きし、機能差を比較。NIPは技術的な裏付けとして辿れる。</p><ul><li>機能名・利用場面から検索</li><li>deadを除いた候補の逆引き</li><li>最大3件の機能マトリクス</li></ul><a class="primary link-button" href="nip-explorer.html">D案を操作する</a></article>
-  </section>
-  <section class="principles"><div class="principle"><strong>同じ36件</strong><br><span>全案で共通の架空データ。</span></div><div class="principle"><strong>根拠を隠さない</strong><br><span>状態と観測日時を詳細・比較に表示。</span></div><div class="principle"><strong>静的で完結</strong><br><span>バックエンド・API・DB・中央インデクサなし。</span></div></section>`;}
-function conceptCard(letter,title,user,hypothesis,points){return `<article class="concept-card"><span class="letter">${letter}</span><h2>${title}</h2><p><strong>対象：</strong>${user}</p><p>${hypothesis}</p><ul>${points.map(x=>`<li>${x}</li>`).join('')}</ul><button class="primary" data-action="open-mode" data-mode="${letter}">${letter}案を操作する</button></article>`}
-function filtered(){let list=tools.filter(t=>(state.category==='all'||t.category===state.category)&&(state.status==='all'||t.status===state.status)&&(state.platform==='all'||t.platform===state.platform)&&(!state.purpose||t.purposes.includes(state.purpose))&&(!state.query||`${t.name} ${t.description} ${t.tags.join(' ')}`.toLowerCase().includes(state.query.toLowerCase())));if(state.sort==='status')list.sort((a,b)=>statuses.indexOf(a.status)-statuses.indexOf(b.status));else list.sort((a,b)=>a.name.localeCompare(b.name));return list;}
-function renderApp(){state.screen='app';routeHash();const meta={A:['目的から探す','対象：初心者。やりたいことから選べば、用語を知らなくても候補へ着ける。'],B:['一覧・絞り込み・比較','対象：比較検討する人。密度の高い一覧と最大3件比較で、差分を速く掴む。'],C:['カテゴリを辿る探索','対象：探索したい人。分類を歩き、検索語なしでも周辺の道具と出会う。']}[state.mode];main.innerHTML=`
-  <header class="app-head"><div><div class="eyebrow">CONCEPT ${state.mode}</div><h1>${meta[0]}</h1><p class="hypothesis">${meta[1]}</p></div><div class="mode-switch" aria-label="案を切り替える">${['A','B','C'].map(x=>`<button data-action="open-mode" data-mode="${x}" aria-current="${state.mode===x}">${x}</button>`).join('')}</div></header>
-  ${state.mode==='A'?purposePanel():''}${state.mode==='C'?categoryView():standardView()}
-  ${stateLab()}<p class="footer-note">この画面の名称、状態、観測値はすべてUI確認用のモックです。実在サービスの稼働状況を示しません。</p>`;renderCompareDock();}
-function purposePanel(){return `<section class="purpose-panel"><h2>今日は何をしたい？</h2><p>専門用語はあとで大丈夫。近いものをひとつ選んでください。</p><div class="purpose-grid">${purposes.map(p=>`<button class="chip ${state.purpose===p?'selected':''}" data-action="purpose" data-purpose="${p}">${p}</button>`).join('')}<button class="chip ${!state.purpose?'selected':''}" data-action="purpose" data-purpose="">全部見る</button></div></section>`}
-function toolbar(){return `<section class="toolbar" aria-label="検索と絞り込み"><div class="field"><label for="search">キーワード検索</label><input id="search" type="search" value="${esc(state.query)}" placeholder="名前・特徴で検索"></div><div class="field"><label for="category">カテゴリ</label><select id="category"><option value="all">すべて</option>${categories.map(c=>`<option value="${c[0]}" ${state.category===c[0]?'selected':''}>${c[1]}</option>`).join('')}</select></div><div class="field"><label for="status">状態</label><select id="status"><option value="all">すべて</option>${statuses.map(s=>`<option value="${s}" ${state.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="field"><label for="platform">環境</label><select id="platform"><option value="all">すべて</option>${['Web','Desktop','Mobile'].map(p=>`<option ${state.platform===p?'selected':''}>${p}</option>`).join('')}</select></div></section>`}
-function standardView(){const list=filtered();return `${toolbar()}<div class="results-meta"><strong>${list.length}件のモック候補</strong><label>並び順 <select id="sort"><option value="name" ${state.sort==='name'?'selected':''}>名前</option><option value="status" ${state.sort==='status'?'selected':''}>状態</option></select></label></div>${results(list)}`}
-function categoryView(){const list=filtered();return `<div class="category-layout"><aside class="category-tree" aria-label="カテゴリ"><button class="ghost ${state.category==='all'?'selected':''}" data-action="category" data-category="all">🗺️ すべて</button>${categories.map(c=>`<button class="ghost ${state.category===c[0]?'selected':''}" data-action="category" data-category="${c[0]}">${c[2]} ${c[1]} <small>6</small></button>`).join('')}</aside><section><div class="breadcrumb"><button class="ghost" data-action="category" data-category="all">全領域</button><span>›</span><strong>${state.category==='all'?'発見フィード':categories.find(c=>c[0]===state.category)[1]}</strong></div>${toolbar()}<div class="results-meta"><strong>${list.length}件を探索中</strong><span>隣のカテゴリにも寄り道できます</span></div>${results(list)}</section></div>`}
-function results(list){if(state.uiState==='loading')return `<div class="skeleton" aria-label="読み込み中"><span></span><span></span><span></span></div>`;if(state.uiState==='empty'||!list.length)return `<div class="empty"><h2>候補が見つかりません</h2><p>条件を減らすか、別の言葉で試してください。</p><button class="secondary" data-action="reset">条件をリセット</button></div>`;if(state.uiState==='error')return `<div class="empty"><h2>表示を再現できませんでした</h2><p>エラー状態のUIモックです。データは失われていません。</p><button class="primary" data-action="ui-state" data-state="normal">もう一度試す</button></div>`;let show=list;if(state.uiState==='partial')show=list.slice(0,7);return `${state.uiState==='partial'?'<div class="partial-note" role="status"><strong>一部のみ表示：</strong>36件中、端末キャッシュ済みの7件を確認できました（モック）。</div>':''}<div class="results">${show.map(toolCard).join('')}</div>`}
-function toolCard(t){const checked=state.compare.includes(t.id);return `<article class="tool-card"><div class="card-top"><span class="tool-icon" aria-hidden="true">${t.icon}</span>${statusBadge(t)}</div><h3>${t.name}</h3><p>${t.description}</p><div class="tags">${t.tags.map(x=>`<span class="tag">${x}</span>`).join('')}</div><p class="status-line"><span>${t.platform}</span><small>観測 ${t.observed.split(' ')[0]}</small></p><div class="card-actions"><button class="secondary" data-action="detail" data-id="${t.id}">詳細を見る</button><label class="compare-check"><input type="checkbox" data-action="compare" data-id="${t.id}" ${checked?'checked':''}> 比較</label></div></article>`}
-function renderCompareDock(){document.querySelector('.compare-dock')?.remove();if(!state.compare.length)return;const el=document.createElement('div');el.className='compare-dock';el.innerHTML=`<span><strong>${state.compare.length}件を選択</strong> <small>（2〜3件推奨）</small></span><button class="primary" data-action="show-compare" ${state.compare.length<2?'disabled':''}>比較する</button><button class="ghost danger" data-action="clear-compare">解除</button>`;document.body.append(el)}
-function showDetail(id){const t=tools.find(x=>x.id===id);detailDialog.querySelector('#detail-content').innerHTML=`<div class="dialog-head"><div><div class="eyebrow">${t.categoryLabel} · MOCK RECORD</div><h2 id="detail-title">${t.icon} ${t.name}</h2></div><button class="icon-btn" data-action="close-detail" aria-label="閉じる">✕</button></div><p>${t.description}</p><p>${statusBadge(t)} <strong>${t.basis}</strong></p><section class="evidence"><div><span class="label">最終観測日時</span><br><strong>${t.observed}</strong></div><div><span class="label">判定方法</span><br>静的モックルール v0</div><div><span class="label">対応環境</span><br>${t.platform}</div><div><span class="label">ライセンス</span><br>${t.license}</div></section><h3>観測ログ（すべてモック）</h3><ul class="timeline">${t.observations.map(x=>`<li>${x}</li>`).join('')}</ul><div class="mock-note">実在サービスへの疎通結果ではありません</div><div class="card-actions"><button class="primary" data-action="add-and-compare" data-id="${t.id}">比較候補に追加</button><button class="secondary" data-action="open-correction" data-id="${t.id}">作者として訂正案</button></div>`;openDialog(detailDialog);}
-function showCompare(){const selected=state.compare.map(id=>tools.find(t=>t.id===id));detailDialog.querySelector('#detail-content').innerHTML=`<div class="dialog-head"><div><div class="eyebrow">COMPARE · MOCK</div><h2 id="detail-title">${selected.length}件を比較</h2></div><button class="icon-btn" data-action="close-detail" aria-label="閉じる">✕</button></div><div class="compare-table"><table><thead><tr><th>項目</th>${selected.map(t=>`<th>${t.name}</th>`).join('')}</tr></thead><tbody><tr><th>状態</th>${selected.map(t=>`<td>${statusBadge(t)}</td>`).join('')}</tr><tr><th>根拠</th>${selected.map(t=>`<td>${t.basis}</td>`).join('')}</tr><tr><th>観測日時</th>${selected.map(t=>`<td>${t.observed}</td>`).join('')}</tr><tr><th>カテゴリ</th>${selected.map(t=>`<td>${t.categoryLabel}</td>`).join('')}</tr><tr><th>環境</th>${selected.map(t=>`<td>${t.platform}</td>`).join('')}</tr><tr><th>ライセンス</th>${selected.map(t=>`<td>${t.license}</td>`).join('')}</tr></tbody></table></div><p class="mock-note">状態・根拠・日時を含む全項目がモックです</p>`;openDialog(detailDialog);}
-function stateLab(){return `<section class="state-lab"><div class="section-head"><div><span class="eyebrow">UI STATE LAB</span><h2>主要状態を確認</h2></div></div><div class="state-buttons">${['normal','loading','empty','error','partial','offline'].map(s=>`<button class="secondary" data-action="ui-state" data-state="${s}" aria-pressed="${state.uiState===s}">${s}</button>`).join('')}</div><div class="state-view"><p><strong>現在：${state.uiState}</strong><br>${{normal:'通常の操作状態',loading:'読み込み中のスケルトン',empty:'検索結果なし',error:'再試行できるエラー',partial:'一部データだけ取得',offline:'オフラインで端末キャッシュ済みデータを表示'}[state.uiState]}</p></div></section>`}
-function openContribution(kind,toolId=''){const map={submit:['候補を投稿','新しい道具の候補'],curate:['キュレーション','掲載候補への推薦コメント'],correction:['作者訂正','作者からの修正提案']};const [title,desc]=map[kind];const tool=tools.find(t=>t.id===toolId);contributionDialog.querySelector('#contribute-content').innerHTML=`<div class="dialog-head"><div><div class="eyebrow">NOSTR NOT CONNECTED</div><h2 id="contribute-title">${title}</h2><p>${desc}を作る操作イメージです。</p></div><button class="icon-btn" data-action="close-contribute" aria-label="閉じる">✕</button></div><form id="contribution-form" data-kind="${kind}"><div class="form-grid"><div class="field"><label for="con-name">対象名</label><input id="con-name" required value="${tool?tool.name:''}" placeholder="例：新しいツール"></div><div class="field"><label for="con-category">カテゴリ</label><select id="con-category">${categories.map(c=>`<option>${c[1]}</option>`).join('')}</select></div><div class="field full"><label for="con-note">提案内容</label><textarea id="con-note" rows="4" required placeholder="確認してほしい内容、根拠など"></textarea></div><div class="field full"><label><input id="con-author" type="checkbox" style="width:auto"> 作者として提案する（このモックでは本人確認なし）</label></div></div><h3>イベントプレビュー</h3><div class="preview" id="event-preview"><code>{ kind: "未接続", content: "入力するとプレビュー" }</code></div><p class="form-status"><strong>状態：下書きのみ</strong><br>秘密鍵へのアクセス、署名、リレー送信は一切行いません。</p><button class="primary" type="submit">送信直前の状態を確認</button></form>`;openDialog(contributionDialog);}
-function toast(msg){const e=document.querySelector('#toast');e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
+  const esc = value => String(value).replace(/[&<>'"]/g, character => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'}[character]));
+  const category = id => i18n.value(`categories.${id}`);
+  const purposeList = () => i18n.value('purposes');
+  const toolDescription = tool => category(tool.category).description;
+  const metadataValues = value => value == null ? [] : Array.isArray(value) ? value.flatMap(metadataValues) : typeof value === 'object' ? Object.values(value).flatMap(metadataValues) : [String(value)];
+  const toolSearchText = tool => [
+    tool.name, tool.platform, ...metadataValues(tool.description), ...metadataValues(tool.tags), ...metadataValues(tool.summary),
+    ...metadataValues(tool.aliases), ...metadataValues(tool.purposes), ...metadataValues(tool.categoryLabel),
+    ...['ja', 'en'].flatMap(language => {
+      const item = i18n.value(`categories.${tool.category}`, language);
+      return item ? [item.name, item.description] : [];
+    })
+  ].join(' ').toLowerCase();
+  const license = tool => /^(MIT|AGPL)/.test(tool.license) ? tool.license : t('unknown');
+  const languageControl = compact => `<div class="language-switch${compact ? ' compact' : ''}" role="group" aria-label="${esc(t('language'))}"><button type="button" data-language="ja" aria-pressed="${i18n.language === 'ja'}">日本語</button><button type="button" data-language="en" aria-pressed="${i18n.language === 'en'}">English</button></div>`;
 
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(a==='home')renderHome();if(a==='open-mode'){state.mode=b.dataset.mode;state.category='all';state.purpose='';state.uiState='normal';renderApp()}if(a==='purpose'){state.purpose=b.dataset.purpose;renderApp()}if(a==='category'){state.category=b.dataset.category;renderApp()}if(a==='detail')showDetail(b.dataset.id);if(a==='close-detail')detailDialog.close();if(a==='close-contribute')contributionDialog.close();if(a==='open-submit')openContribution('submit');if(a==='open-curate')openContribution('curate');if(a==='open-correction')openContribution('correction',b.dataset.id);if(a==='add-and-compare'){if(!state.compare.includes(b.dataset.id)&&state.compare.length<3)state.compare.push(b.dataset.id);detailDialog.close();renderApp();toast('比較候補に追加しました')}if(a==='show-compare')showCompare();if(a==='clear-compare'){state.compare=[];renderCompareDock()}if(a==='reset'){state.query='';state.category='all';state.status='all';state.platform='all';state.purpose='';state.uiState='normal';renderApp()}if(a==='ui-state'){state.uiState=b.dataset.state;document.querySelector('#offline-banner').hidden=state.uiState!=='offline';renderApp()} });
-document.addEventListener('change',e=>{if(e.target.matches('[data-action="compare"]')){const id=e.target.dataset.id;if(e.target.checked){if(state.compare.length>=3){e.target.checked=false;toast('比較は最大3件です');return}state.compare.push(id)}else state.compare=state.compare.filter(x=>x!==id);renderCompareDock()}if(e.target.id==='category'){state.category=e.target.value;renderApp()}if(e.target.id==='status'){state.status=e.target.value;renderApp()}if(e.target.id==='platform'){state.platform=e.target.value;renderApp()}if(e.target.id==='sort'){state.sort=e.target.value;renderApp()}});
-document.addEventListener('input',e=>{if(e.target.id==='search'){state.query=e.target.value;renderApp();const s=document.querySelector('#search');s.focus();s.setSelectionRange(state.query.length,state.query.length)}if(e.target.id==='con-note'||e.target.id==='con-name'){const n=document.querySelector('#con-name')?.value||'';const note=document.querySelector('#con-note')?.value||'';document.querySelector('#event-preview').innerHTML=`<code>{ kind: "Nostr未接続", name: "${esc(n)}", content: "${esc(note)}" }</code>`}});
-document.addEventListener('submit',e=>{if(e.target.id==='contribution-form'){e.preventDefault();e.target.querySelector('.form-status').innerHTML='<strong>状態：プレビュー確認済み（未送信）</strong><br>署名・送信ボタンは意図的に実装していません。';toast('未送信のプレビューを更新しました')}});
-[detailDialog,contributionDialog].forEach(dialog=>{dialog.addEventListener('keydown',event=>{if(event.key!=='Tab')return;const focusable=dialogFocusable(dialog);if(!focusable.length){event.preventDefault();dialog.focus();return}const first=focusable[0];const last=focusable[focusable.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}});dialog.addEventListener('close',()=>{const opener=dialogOpeners.get(dialog);if(opener?.isConnected&&(!opener.closest('dialog')||opener.closest('dialog').open))setTimeout(()=>opener.focus(),0)})});
-window.addEventListener('hashchange',()=>{if(location.hash==='#home')renderHome()});
-renderHome();
+  function routeHash() {
+    history.replaceState(null, '', state.screen === 'home' ? '#home' : `#concept-${state.mode.toLowerCase()}`);
+  }
+
+  function renderChrome() {
+    document.title = t('title');
+    document.querySelector('meta[name="description"]').content = t('description');
+    document.querySelector('#skip-link').textContent = t('skip');
+    document.querySelector('#site-header').innerHTML = `<a class="brand" href="#home" data-action="home" aria-label="nosmaps · ${esc(t('nav.home'))}"><span class="brand-mark" aria-hidden="true">N</span><span>nosmaps</span></a><nav aria-label="${esc(t('nav.home'))}"><button class="ghost" data-action="home">${esc(t('nav.home'))}</button><a class="ghost nav-link" href="nip-explorer.html">${esc(t('nav.explorer'))}</a><button class="ghost" data-action="open-contribution" data-kind="submit">${esc(t('nav.submit'))}</button><button class="ghost" data-action="open-contribution" data-kind="curate">${esc(t('nav.curate'))}</button><button class="ghost" data-action="open-contribution" data-kind="correction">${esc(t('nav.correction'))}</button></nav>${languageControl(false)}`;
+    const banner = document.querySelector('#offline-banner');
+    banner.textContent = t('explorer.offlineBanner');
+    banner.hidden = state.uiState !== 'offline';
+  }
+
+  function conceptCard(letter) {
+    const item = i18n.value(`concepts.${letter}`);
+    const action = letter === 'D'
+      ? `<a class="primary link-button" href="nip-explorer.html">${esc(t('concepts.open', {letter}))}</a>`
+      : `<button class="primary" data-action="open-mode" data-mode="${letter}">${esc(t('concepts.open', {letter}))}</button>`;
+    return `<article class="concept-card concept-card-${letter.toLowerCase()}"><span class="letter" aria-hidden="true">${letter}</span><h2>${esc(item.title)}</h2><p><strong>${esc(t('concepts.target'))}:</strong> ${esc(item.target)}</p><p>${esc(item.summary)}</p><ul>${item.points.map(point => `<li>${esc(point)}</li>`).join('')}</ul>${action}</article>`;
+  }
+
+  function renderHome() {
+    state.screen = 'home';
+    routeHash();
+    const title = t('concepts.heroTitle').split('\n').map(esc).join('<br>');
+    main.innerHTML = `<section class="hero"><div class="eyebrow">${esc(t('concepts.heroKicker'))}</div><h1>${title}</h1><p class="lead">${esc(t('concepts.heroLead'))}</p></section><section class="concept-grid" aria-label="${esc(t('concepts.gridLabel'))}">${['A', 'B', 'C', 'D'].map(conceptCard).join('')}</section><section class="principles">${i18n.value('concepts.principles').map(item => `<div class="principle"><strong>${esc(item.title)}</strong><br><span>${esc(item.text)}</span></div>`).join('')}</section>`;
+  }
+
+  function categoryButtons() {
+    return `<div class="category-icon-group" role="group" aria-label="${esc(t('concepts.categoryFilter'))}"><button class="category-icon ${state.category === 'all' ? 'selected' : ''}" data-action="category" data-category="all" aria-pressed="${state.category === 'all'}" aria-label="${esc(t('all'))}" title="${esc(t('all'))}">🗺️</button>${categories.map(id => { const item = category(id); return `<button class="category-icon ${state.category === id ? 'selected' : ''}" data-action="category" data-category="${id}" aria-pressed="${state.category === id}" aria-label="${esc(item.name)}" title="${esc(item.name)}">${item.icon}</button>`; }).join('')}</div>`;
+  }
+
+  function purposeMatches(tool) {
+    if (!state.purpose) return true;
+    return ({read: ['clients'], talk: ['clients'], publish: ['media'], community: ['relay', 'analytics'], keys: ['identity'], relay: ['relay'], observe: ['analytics', 'dev'], build: ['dev']}[state.purpose] || []).includes(tool.category);
+  }
+
+  function filtered() {
+    const query = state.query.toLowerCase();
+    const list = tools.filter(tool => (state.category === 'all' || tool.category === state.category) && (state.status === 'all' || tool.status === state.status) && (state.platform === 'all' || tool.platform === state.platform) && purposeMatches(tool) && (!query || toolSearchText(tool).includes(query)));
+    return list.sort((a, b) => state.sort === 'status' ? statuses.indexOf(a.status) - statuses.indexOf(b.status) : a.name.localeCompare(b.name));
+  }
+
+  function purposePanel() {
+    return `<section class="purpose-panel"><h2>${esc(t('concepts.purposeTitle'))}</h2><p>${esc(t('concepts.purposeHelp'))}</p><div class="purpose-grid">${purposeList().map(item => `<button class="chip ${state.purpose === item.id ? 'selected' : ''}" data-action="purpose" data-purpose="${item.id}" aria-pressed="${state.purpose === item.id}">${esc(item.label)}</button>`).join('')}<button class="chip ${!state.purpose ? 'selected' : ''}" data-action="purpose" data-purpose="" aria-pressed="${!state.purpose}">${esc(t('concepts.allPurposes'))}</button></div></section>`;
+  }
+
+  function toolbar() {
+    return `<section class="toolbar"><div class="field"><label for="search">${esc(t('concepts.search'))}</label><input id="search" type="search" value="${esc(state.query)}" placeholder="${esc(t('concepts.searchPlaceholder'))}"></div>${categoryButtons()}<div class="field"><label for="status">${esc(t('concepts.status'))}</label><select id="status"><option value="all">${esc(t('all'))}</option>${statuses.map(value => `<option value="${value}" ${state.status === value ? 'selected' : ''}>${esc(t(`statuses.${value}`))}</option>`).join('')}</select></div><div class="field"><label for="platform">${esc(t('concepts.platform'))}</label><select id="platform"><option value="all">${esc(t('all'))}</option>${['Web', 'Desktop', 'Mobile'].map(value => `<option ${state.platform === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div></section>`;
+  }
+
+  function statusBadge(tool) { return `<span class="status ${tool.status}">${esc(t(`statuses.${tool.status}`))}</span>`; }
+
+  function toolCard(tool) {
+    const checked = state.compare.includes(tool.id);
+    return `<article class="tool-card" data-tool-id="${tool.id}"><div class="card-top"><span class="tool-icon" aria-hidden="true">${category(tool.category).icon}</span>${statusBadge(tool)}</div><h3>${esc(tool.name)}</h3><p>${esc(toolDescription(tool))}</p><div class="tags"><span class="tag">${esc(category(tool.category).name)}</span><span class="tag">${tool.platform}</span></div><p class="status-line"><small>${esc(t('concepts.observed', {date: tool.observed.split(' ')[0]}))}</small></p><div class="card-actions"><button class="secondary" data-action="detail" data-id="${tool.id}">${esc(t('concepts.detail'))}</button><label class="compare-check"><input type="checkbox" data-action="compare" data-id="${tool.id}" ${checked ? 'checked' : ''}> ${esc(t('concepts.compare'))}</label></div></article>`;
+  }
+
+  function stateView() {
+    if (state.uiState === 'loading') return `<div class="skeleton" aria-label="${esc(t('explorer.loading'))}"><span></span><span></span><span></span></div>`;
+    if (state.uiState === 'empty') return `<div class="empty"><h2>${esc(t('explorer.emptyState'))}</h2></div>`;
+    if (state.uiState === 'error') return `<div class="empty"><h2>${esc(t('explorer.errorState'))}</h2><button class="secondary" data-action="set-state" data-state="normal">${esc(t('explorer.retry'))}</button></div>`;
+    return '';
+  }
+
+  function results() {
+    const special = stateView();
+    if (special) return special;
+    const list = filtered();
+    const partial = state.uiState === 'partial' ? `<div class="partial-note" role="status">${esc(t('explorer.partialState'))}</div>` : '';
+    if (!list.length) return `<div class="empty"><h2>${esc(t('concepts.noResults'))}</h2><p>${esc(t('concepts.noResultsHelp'))}</p><button class="secondary" data-action="reset">${esc(t('reset'))}</button></div>`;
+    return `${partial}<div class="results">${list.map(toolCard).join('')}</div>`;
+  }
+
+  function renderCompareDock() {
+    document.querySelector('.compare-dock')?.remove();
+    if (!state.compare.length || state.screen !== 'app') return;
+    document.body.insertAdjacentHTML('beforeend', `<div class="compare-dock"><span><strong>${esc(t('concepts.selected', {count: state.compare.length}))}</strong> <small>${esc(t('concepts.compareRecommended'))}</small></span><button class="primary" data-action="show-compare" ${state.compare.length < 2 ? 'disabled' : ''}>${esc(t('concepts.compareOpen'))}</button><button class="ghost danger" data-action="clear-compare">${esc(t('concepts.clear'))}</button></div>`);
+  }
+
+  function renderApp() {
+    state.screen = 'app';
+    routeHash();
+    const meta = i18n.value(`concepts.${state.mode}`);
+    main.innerHTML = `<header class="app-head"><div><div class="eyebrow">${esc(t('concepts.mode', {letter: state.mode}))}</div><h1>${esc(meta.title)}</h1><p class="hypothesis">${esc(meta.summary)}</p></div><div class="mode-switch" aria-label="${esc(t('concepts.switchMode'))}">${['A', 'B', 'C'].map(letter => `<button data-action="open-mode" data-mode="${letter}" aria-current="${state.mode === letter}">${letter}</button>`).join('')}</div></header>${state.mode === 'A' ? purposePanel() : ''}${state.mode === 'C' ? `<div class="category-layout"><aside class="category-tree">${categoryButtons()}</aside><section><div class="breadcrumb"><span>${esc(t('concepts.categoryTrail'))}</span><span aria-hidden="true">›</span><strong>${esc(state.category === 'all' ? t('concepts.discoveryFeed') : category(state.category).name)}</strong></div>${toolbar()}<div class="results-meta"><strong>${esc(t('concepts.exploring', {count: filtered().length}))}</strong></div>${results()}</section></div>` : `${toolbar()}<div class="results-meta"><strong>${esc(t('concepts.results', {count: filtered().length}))}</strong><label>${esc(t('concepts.sort'))} <select id="sort"><option value="name" ${state.sort === 'name' ? 'selected' : ''}>${esc(t('concepts.name'))}</option><option value="status" ${state.sort === 'status' ? 'selected' : ''}>${esc(t('concepts.status'))}</option></select></label></div>${results()}`}`;
+    renderCompareDock();
+  }
+
+  function dialogHeader(title, kicker = '') {
+    return `<div class="dialog-head"><div>${kicker ? `<div class="eyebrow">${esc(kicker)}</div>` : ''}<h2>${esc(title)}</h2></div><div class="dialog-tools">${languageControl(true)}<button class="icon-btn" type="button" data-action="close-dialog" aria-label="${esc(t('close'))}" title="${esc(t('close'))}">×</button></div></div>`;
+  }
+
+  function focusable(dialog) { return [...dialog.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(element => element.getClientRects().length); }
+  function openDialog(dialog, opener) { if (!dialog.open) { dialogOpeners.set(dialog, opener || lastInteractive || document.activeElement); dialog.showModal(); focusable(dialog)[0]?.focus(); } }
+
+  function renderDetail(id, shouldOpen = true) {
+    const tool = tools.find(item => item.id === id);
+    if (!tool) return;
+    state.dialogs.detail = {type: 'detail', id};
+    detailDialog.setAttribute('aria-label', tool.name);
+    document.querySelector('#detail-content').innerHTML = `${dialogHeader(tool.name, category(tool.category).name)}<p>${esc(toolDescription(tool))}</p><p>${statusBadge(tool)}</p><section class="evidence"><div><span class="label">${esc(t('concepts.observedAt'))}</span><br><strong>${esc(tool.observed)}</strong></div><div><span class="label">${esc(t('concepts.basis'))}</span><br>${esc(tool.basis)}</div><div><span class="label">${esc(t('concepts.platformLabel'))}</span><br>${tool.platform}</div><div><span class="label">${esc(t('concepts.license'))}</span><br>${esc(license(tool))}</div></section><div class="card-actions"><button class="primary" data-action="add-and-compare" data-id="${tool.id}">${esc(t('concepts.compareAdd'))}</button><button class="secondary" data-action="open-contribution" data-kind="correction" data-id="${tool.id}">${esc(t('nav.correction'))}</button></div>`;
+    if (shouldOpen) openDialog(detailDialog);
+  }
+
+  function renderComparison(shouldOpen = true) {
+    const selected = state.compare.map(id => tools.find(tool => tool.id === id)).filter(Boolean);
+    state.dialogs.detail = {type: 'compare'};
+    detailDialog.setAttribute('aria-label', t('concepts.compare'));
+    document.querySelector('#detail-content').innerHTML = `${dialogHeader(t('concepts.selected', {count: selected.length}), t('concepts.compare'))}<div class="compare-table"><table><thead><tr><th>${esc(t('concepts.item'))}</th>${selected.map(tool => `<th>${esc(tool.name)}</th>`).join('')}</tr></thead><tbody><tr><th>${esc(t('concepts.status'))}</th>${selected.map(tool => `<td>${statusBadge(tool)}</td>`).join('')}</tr><tr><th>${esc(t('concepts.basis'))}</th>${selected.map(tool => `<td>${esc(tool.basis)}</td>`).join('')}</tr><tr><th>${esc(t('concepts.observedAt'))}</th>${selected.map(tool => `<td>${esc(tool.observed)}</td>`).join('')}</tr><tr><th>${esc(t('concepts.categoryFilter'))}</th>${selected.map(tool => `<td>${esc(category(tool.category).name)}</td>`).join('')}</tr><tr><th>${esc(t('concepts.platform'))}</th>${selected.map(tool => `<td>${tool.platform}</td>`).join('')}</tr></tbody></table></div>`;
+    if (shouldOpen) openDialog(detailDialog);
+  }
+
+  function renderContribution(kind, id = '', shouldOpen = true) {
+    const content = i18n.value(`concepts.contribution.${kind}`) || i18n.value('concepts.contribution.submit');
+    const tool = tools.find(item => item.id === id);
+    const draftKey = `${kind}:${id}`;
+    const draft = state.contributionDrafts[draftKey] || {};
+    state.dialogs.contribution = {type: 'contribution', kind, id};
+    contributionDialog.setAttribute('aria-label', content[0]);
+    document.querySelector('#contribute-content').innerHTML = `${dialogHeader(content[0], content[1])}<form id="contribution-form" data-draft-key="${esc(draftKey)}"><div class="form-grid"><div class="field"><label for="con-name">${esc(t('concepts.contribution.name'))}</label><input id="con-name" name="name" required value="${esc(draft.name ?? tool?.name ?? '')}" placeholder="${esc(t('concepts.contribution.namePlaceholder'))}"></div><div class="field"><label for="con-category">${esc(t('concepts.contribution.category'))}</label><select id="con-category" name="category">${categories.map(value => `<option value="${value}" ${draft.category === value ? 'selected' : ''}>${esc(category(value).name)}</option>`).join('')}</select></div><div class="field full"><label for="con-note">${esc(t('concepts.contribution.note'))}</label><textarea id="con-note" name="note" rows="4" required placeholder="${esc(t('concepts.contribution.notePlaceholder'))}">${esc(draft.note || '')}</textarea></div><label class="full compare-check"><input id="con-author" name="author" type="checkbox" ${draft.author ? 'checked' : ''}> ${esc(t('concepts.contribution.author'))}</label></div><button class="primary" type="submit">${esc(t('concepts.contribution.review'))}</button></form>`;
+    if (shouldOpen) openDialog(contributionDialog);
+  }
+
+  function captureContributionDraft() {
+    const form = document.querySelector('#contribution-form');
+    if (!form?.dataset.draftKey) return;
+    state.contributionDrafts[form.dataset.draftKey] = {
+      name: form.elements.name.value, category: form.elements.category.value, note: form.elements.note.value, author: form.elements.author.checked
+    };
+  }
+
+  function renderCurrentDialogs() {
+    const detail = state.dialogs.detail;
+    const contribution = state.dialogs.contribution;
+    if (detail?.type === 'detail') renderDetail(detail.id, false);
+    if (detail?.type === 'compare') renderComparison(false);
+    if (contribution) renderContribution(contribution.kind, contribution.id, false);
+  }
+
+  function renderAll() { renderChrome(); state.screen === 'home' ? renderHome() : renderApp(); renderCurrentDialogs(); }
+  function toast(message) { const element = document.querySelector('#toast'); element.textContent = message; element.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => element.classList.remove('show'), 1800); }
+
+  document.addEventListener('pointerdown', event => { lastInteractive = event.target.closest('button,a,input,select,textarea,[tabindex]'); }, true);
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Tab') return;
+    const dialog = [detailDialog, contributionDialog].filter(item => item.open).at(-1);
+    if (!dialog) return;
+    const items = focusable(dialog);
+    if (!items.length) { event.preventDefault(); dialog.focus(); return; }
+    const index = items.indexOf(document.activeElement);
+    if (index < 0 || (event.shiftKey && index === 0) || (!event.shiftKey && index === items.length - 1)) {
+      event.preventDefault();
+      items[event.shiftKey ? items.length - 1 : 0].focus();
+    }
+  }, true);
+  document.addEventListener('click', event => {
+    const language = event.target.closest('[data-language]');
+    if (language) {
+      captureContributionDraft();
+      const openerSelectors = [detailDialog, contributionDialog].map(dialog => {
+        const opener = dialogOpeners.get(dialog);
+        if (!dialog.open || !opener) return null;
+        if (opener.dataset.kind) return `[data-action="open-contribution"][data-kind="${opener.dataset.kind}"]`;
+        if (opener.dataset.id) return `[data-action="${opener.dataset.action}"][data-id="${opener.dataset.id}"]`;
+        return opener.dataset.action ? `[data-action="${opener.dataset.action}"]` : null;
+      });
+      i18n.set(language.dataset.language);
+      [detailDialog, contributionDialog].forEach((dialog, index) => { const replacement = openerSelectors[index] && document.querySelector(openerSelectors[index]); if (replacement) dialogOpeners.set(dialog, replacement); });
+      return;
+    }
+    const control = event.target.closest('[data-action]');
+    if (!control) return;
+    const action = control.dataset.action;
+    if (action === 'home') { state.screen = 'home'; renderAll(); }
+    if (action === 'open-mode') { state.mode = control.dataset.mode; state.category = 'all'; state.purpose = ''; state.screen = 'app'; renderAll(); }
+    if (action === 'purpose') { state.purpose = control.dataset.purpose; renderApp(); }
+    if (action === 'category') { state.category = control.dataset.category; renderApp(); }
+    if (action === 'detail') renderDetail(control.dataset.id);
+    if (action === 'show-compare') renderComparison();
+    if (action === 'clear-compare') { state.compare = []; renderCompareDock(); document.querySelectorAll('[data-action="compare"]').forEach(input => { input.checked = false; }); }
+    if (action === 'open-contribution') renderContribution(control.dataset.kind, control.dataset.id);
+    if (action === 'close-dialog') control.closest('dialog').close();
+    if (action === 'add-and-compare') { if (!state.compare.includes(control.dataset.id) && state.compare.length < 3) state.compare.push(control.dataset.id); detailDialog.close(); renderApp(); toast(t('concepts.toastAdded')); }
+    if (action === 'reset') { Object.assign(state, {query: '', category: 'all', status: 'all', platform: 'all', purpose: '', uiState: 'normal'}); renderApp(); }
+    if (action === 'set-state') { state.uiState = control.dataset.state; renderAll(); }
+  });
+
+  document.addEventListener('input', event => { if (event.target.id === 'search') { state.query = event.target.value; renderApp(); requestAnimationFrame(() => { const input = document.querySelector('#search'); input?.focus(); input?.setSelectionRange(state.query.length, state.query.length); }); } });
+  document.addEventListener('change', event => {
+    if (event.target.matches('[data-action="compare"]')) { const id = event.target.dataset.id; if (event.target.checked && state.compare.length >= 3) { event.target.checked = false; toast(t('concepts.compareLimit')); return; } state.compare = event.target.checked ? [...state.compare, id] : state.compare.filter(value => value !== id); renderCompareDock(); }
+    if (event.target.id === 'status') { state.status = event.target.value; renderApp(); }
+    if (event.target.id === 'platform') { state.platform = event.target.value; renderApp(); }
+    if (event.target.id === 'sort') { state.sort = event.target.value; renderApp(); }
+  });
+  document.addEventListener('submit', event => { if (event.target.id !== 'contribution-form') return; event.preventDefault(); contributionDialog.close(); toast(t('concepts.contribution.confirmed')); });
+
+  [detailDialog, contributionDialog].forEach(dialog => {
+    dialog.addEventListener('close', () => { const opener = dialogOpeners.get(dialog); if (dialog === detailDialog) state.dialogs.detail = null; else state.dialogs.contribution = null; if (opener?.isConnected && (!opener.closest('dialog') || opener.closest('dialog').open)) setTimeout(() => opener.focus(), 0); });
+    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+  });
+
+  i18n.onChange(() => renderAll());
+  window.__NOSMAPS_SET_STATE__ = next => { state.uiState = next; renderAll(); };
+  renderAll();
+})();

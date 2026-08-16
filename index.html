@@ -3,32 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Nostr周辺ツールを探すための、4種類の操作可能な静的UIモック">
-  <title>nosmaps — Nostr tool discovery UI mock</title>
+  <meta name="description" content="nosmaps">
+  <title>nosmaps</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <a class="skip" href="#main">本文へスキップ</a>
-  <header class="site-header">
-    <a class="brand" href="#home" aria-label="nosmaps ホーム"><span class="brand-mark">N</span><span>nosmaps</span><small>UI MOCK</small></a>
-    <nav aria-label="主要メニュー">
-      <button class="ghost" data-action="home">4案トップ</button>
-      <a class="ghost nav-link" href="nip-explorer.html">D: 機能探索</a>
-      <button class="ghost" data-action="open-submit">候補を投稿</button>
-      <button class="ghost" data-action="open-curate">キュレーション</button>
-      <button class="ghost" data-action="open-correction">作者訂正</button>
-    </nav>
-  </header>
-
-  <div id="offline-banner" class="offline-banner" hidden role="status">オフライン表示モック：端末キャッシュ済みの共通サンプルデータを表示しています。外部通信はありません。</div>
+  <a class="skip" href="#main" id="skip-link"></a>
+  <header class="site-header" id="site-header"></header>
+  <div id="offline-banner" class="offline-banner" hidden role="status"></div>
   <main id="main" tabindex="-1"></main>
-
-  <dialog id="detail-dialog" aria-labelledby="detail-title"><div id="detail-content"></div></dialog>
-  <dialog id="contribute-dialog" aria-labelledby="contribute-title"><div id="contribute-content"></div></dialog>
-
+  <dialog id="detail-dialog"><div id="detail-content"></div></dialog>
+  <dialog id="contribute-dialog"><div id="contribute-content"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="data.js"></script>
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
