@@ -22,7 +22,12 @@
   }
 
   const POLICY = {
-    POINTER_KIND: 30367,
+    // NIP-78 application-specific data. Uniqueness comes from the `d`
+    // namespace, not from owning an integer kind, so no unassigned-kind
+    // squatting problem applies. Every event on this kind belongs to some
+    // other app until proven otherwise, hence the strict `d`/L/l checks below.
+    POINTER_KIND: 30078,
+    DISCOVERY_TAG: 'nosmaps',
     MANIFEST_MIME: 'application/vnd.nosmaps.catalog+json',
     POINTER_D_PREFIX: 'nosmaps:catalog:v1:',
     DEFAULT_RELAYS: ['wss://x.kojira.io', 'wss://nos.lol'],
@@ -214,8 +219,9 @@
     if (opts.scope != null && scope !== opts.scope) return fail('bad-d');
 
     // §7.1 common envelope: exactly one L and one l with the schema namespace.
-    // This alone rejects the unrelated live XRP-directory kind-30367 events,
-    // which carry no L/l tags.
+    // kind 30078 is shared by every NIP-78 app, so the `d` prefix above plus
+    // these tags are what separate our records from unrelated app data
+    // (ditto/metadata, AmethystSettings, seen_notifications_at, ...).
     const lUpper = tagsWithName(tags, 'L');
     if (lUpper.length !== 1 || lUpper[0][1] !== POINTER_L_NAMESPACE) return fail('bad-schema');
     const lLower = tagsWithName(tags, 'l');

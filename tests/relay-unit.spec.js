@@ -43,7 +43,7 @@ function installHelpers() {
       }
       for (let i = 0; i < content.mirrors.length; i += 1) tags.push(['url', content.mirrors[i]]);
       return {
-        id: 'b'.repeat(64), pubkey: 'c'.repeat(64), kind: 30367,
+        id: 'b'.repeat(64), pubkey: 'c'.repeat(64), kind: 30078,
         created_at: 1700000000, content: contentStr, tags: tags, sig: 'd'.repeat(128)
       };
     },
@@ -73,14 +73,18 @@ function installHelpers() {
 
 const EXPLORER = 'nip-explorer.html';
 
-const XRP_SQUATTER = {
-  content: '{"displayName":"rHwWjw...LPvD","pftlAddress":"rHwWjwq5Sxq9u48zrLzqH29c2ATg3zLPvD"}',
-  created_at: 1765910648,
-  id: 'd97f9222b84668fc68440fbbf8e13dc7deb23ecefb615e0849dcd66fe53213ab',
-  kind: 30367,
-  pubkey: '5772f4ffb014df0da170245d8216dafc3969e7516e392e2e51e76b6e087ee680',
-  sig: '4e8f786e8c736d6f1efb49cf87c1a276dbedb65a3a474d6858124c0d82373f4d3e59a1a2ed278c51813acc2f6c7d52dc5adb915af482b2db96356b0fb384ccb6',
-  tags: [['d', 'c376eab2ffe9489b'], ['p', 'a5aa1c83362a7c7e79d0cb596b488405a1e7350428826199729b58a44857b710']]
+// A real, unmodified kind-30078 event fetched from wss://yabu.me on 2026-08-17.
+// kind 30078 is shared by every NIP-78 app, so foreign records like this one
+// (nostter's read-state) are the normal case, not an anomaly. Our `d` namespace
+// check is what keeps them out.
+const FOREIGN_APP_EVENT = {
+  content: '',
+  created_at: 1786953266,
+  id: '803d89f822ca7c284c4668c2af8c46a2e8a2907456535b84ea6e0cc6aa35d1b2',
+  kind: 30078,
+  pubkey: '4d39c23b3b03bf99494df5f3a149c7908ae1bc7416807fdd6b34a31886eaae25',
+  sig: '8f2723a6462e8fb6f1eae323e74bad29dc5d10e4fbf46c9d992bc1d9999f526c63213e16e37ee9bda9897160a32c7888d89514ff03c92a28accbb87a3b422eb9',
+  tags: [['d', 'nostter-read']]
 };
 
 function registerUnit() {
@@ -94,7 +98,7 @@ function registerUnit() {
     await page.goto(EXPLORER);
     const r = await page.evaluate(() => {
       const {selectPointerWinner, selectWinnersByCurator} = window.NOSMAPS_CATALOG;
-      const mk = (id, created_at, pubkey, d) => ({id, created_at, pubkey: pubkey || 'p'.repeat(64), kind: 30367, tags: [['d', d || 'nosmaps:catalog:v1:global']]});
+      const mk = (id, created_at, pubkey, d) => ({id, created_at, pubkey: pubkey || 'p'.repeat(64), kind: 30078, tags: [['d', d || 'nosmaps:catalog:v1:global']]});
       // 1. greater created_at wins regardless of id ordering.
       const greater = selectPointerWinner([mk('ffff', 10), mk('0000', 20)]);
       // 2. tie on created_at -> lexicographically lowest id, order independent.
@@ -132,16 +136,16 @@ function registerUnit() {
   });
 
   // ---- B. pointer validation ----
-  test('B. validatePointerEvent accepts a well-formed pointer and rejects the live XRP squatter', async ({page}) => {
+  test('B. validatePointerEvent accepts a well-formed pointer and rejects a live foreign 30078 record', async ({page}) => {
     const errors = collectErrors(page);
     await page.goto(EXPLORER);
-    const r = await page.evaluate((xrp) => {
+    const r = await page.evaluate((foreign) => {
       const V = window.NOSMAPS_CATALOG.validatePointerEvent;
       const good = window.__T.makePointerEvent();
       const okRes = V(good);
-      const xrpRes = V(xrp);
+      const xrpRes = V(foreign);
       return {ok: okRes, xrp: xrpRes, goodPub: good.pubkey, goodCreated: good.created_at};
-    }, XRP_SQUATTER);
+    }, FOREIGN_APP_EVENT);
     // 5. well-formed pointer validates and echoes the parsed fields.
     expect(r.ok.ok).toBe(true);
     expect(r.ok.pointer.curator).toBe(r.goodPub);
@@ -156,7 +160,7 @@ function registerUnit() {
     expect(r.ok.pointer.mirrors).toEqual([]);
     expect(r.ok.pointer.state).toBe('active');
     expect(r.ok.pointer.createdAt).toBe(r.goodCreated);
-    // 6. the real live XRP squatter event is rejected.
+    // 6. a real live foreign 30078 record (nostter-read) is rejected on `d`.
     expect(r.xrp.ok).toBe(false);
     expect(r.xrp.reason).toBe('bad-d');
   });
