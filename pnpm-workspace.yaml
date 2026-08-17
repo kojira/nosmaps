@@ -1,0 +1,10 @@
+# pnpm settings for this project.
+#
+# minimumReleaseAge: refuse to install any version (including transitive
+# dependencies) published less than 7 days ago. This is a supply-chain
+# mitigation: malicious releases are usually pulled from the registry within
+# hours, so waiting a week keeps them out without any custom tooling.
+#
+# NOTE: pnpm 10.x defaults this to 0, so it must be set explicitly.
+# NOTE: this cannot live in .npmrc — pnpm only reads auth/registry from there.
+minimumReleaseAge: 10080

@@ -42,9 +42,26 @@ nip-explorer.html?state=empty
 nip-explorer.html?state=error
 nip-explorer.html?state=partial
 nip-explorer.html?state=offline
+nip-explorer.html?state=stale
+nip-explorer.html?state=incomplete
+nip-explorer.html?state=unavailable
 ```
 
 E2Eからは `window.__NOSMAPS_SET_STATE__(state)` も利用できます。
+
+## リレー実データ（Phase 1、既定で無効）
+
+`nip-explorer.html?relay=1` のときだけ、署名済みNostrイベントを一次情報として実データを取得します。付けなければネットワークアクセスは一切発生せず、従来どおり `data.js` のサンプルだけを表示します。
+
+- 既定リレーは `wss://x.kojira.io` と `wss://nos.lol`。`?relays=` と `?curators=` で上書きできます
+- kind `30367` のカタログポインタを取得し、NIP-01のaddressable勝者選択（`created_at` 最大、同値ならイベントid最小）を適用します
+- ポインタが指すカタログ本体はBlossomの匿名 `GET /<sha256>` で取得し、**バイト数・SHA-256・RFC 8785正規形・スキーマ・件数のすべてが一致した場合にのみ**採用します。1つでも失敗したバイト列は決して表示に使いません。ミラー再試行は上限つきです
+- 検証済みカタログはIndexedDB（`nosmaps-catalog`）に派生キャッシュとして保存します。これは再構築可能な高速化用で、真実の源ではありません。全消去してもリレーとBlossomから再構築できます
+- 実データが無い・検証できない・リレー到達が不完全な場合は `stale` / `incomplete` / `unavailable` を明示します。**データが無いことを成功として表示しません**
+- 各カードには出所バッジ（サンプル / リレー検証済み）を表示し、実データとサンプルを混同しません
+- リレー診断（リレー別カバレッジ、キュレーター、ポインタid、generation、blobハッシュ、as-of、REQ数）は `#relay-diagnostics` で確認できます
+
+kind `30367`–`30372` は 2026-08-17 時点で `nostr-protocol/registry-of-kinds` に未登録の候補kindです。kind `30367` は無関係の第三者アプリが実際に使用しているため、上記の検証を通らないイベントはすべて破棄されます。
 
 ## ローカル確認
 
@@ -53,10 +70,16 @@ python3 -m http.server 4173 --bind 127.0.0.1
 npx playwright test
 ```
 
-Playwright設定はChromiumとWebKitを対象にし、デスクトップと375×812のシナリオを含みます。アプリ本体の依存追加やビルド工程はありません。
+Playwright設定はChromiumとWebKitを対象にし、デスクトップと375×812のシナリオを含みます。ビルド工程はありません。
 
 ## データと構成
 
 `data.js` の36件を全案で共有します。NIPの番号・英語見出し・一次資料URLは `nostr-protocol/nips` の固定commitを参照し、ツール名と観測記録は画面設計用のデータです。
 
-このリポジトリは静的ファイルだけで構成し、バックエンド、専用API、永続DB、中央インデクサは追加しません。Nostr接続、署名、イベント送信、外部画像アップロードも実装しません。
+このリポジトリは静的ファイルだけで構成し、バックエンド、専用API、サーバ側DB、中央インデクサは追加しません。真実の源は署名済みNostrイベントであり、IndexedDBは再構築可能な派生キャッシュにすぎません。
+
+リレー通信には `rx-nostr@3.7.5` と `@rx-nostr/crypto@3.1.6` を使います。依存は `package.json` + `pnpm-lock.yaml` で固定し、`pnpm install` 後に `pnpm run build`（esbuild）で `dist/rx-nostr.js` / `dist/rx-nostr-crypto.js` を生成します。生成物は import 文を持たない自己完結ESMで、`nostr-catalog.js` から動的 `import()` で遅延ロードします。
+
+供給網攻撃対策として `pnpm-workspace.yaml` に `minimumReleaseAge: 10080`（7日）を明示設定しています。pnpm 10系の既定は 0 なので、この設定が無いと保護されません。除外リスト（`minimumReleaseAgeExclude`）は使いません。
+
+リレー通信は読み取り専用（REQ）のみで、署名、イベント送信、外部画像アップロードは実装しません。

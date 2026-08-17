@@ -423,6 +423,95 @@
   color: #46535f;
 }
 
+.card-top-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+
+.provenance-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 99px;
+  padding: .16rem .42rem;
+  font-size: .64rem;
+  font-weight: 850;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.provenance-badge.sample {
+  border: 1px solid #b7bec8;
+  background: #eef1f5;
+  color: #45505d;
+}
+
+.provenance-badge.relay {
+  background: #d9f4e9;
+  color: #005c48;
+}
+
+.relay-diagnostics {
+  margin: 0 0 .65rem;
+  border: 1px solid #b9c0cc;
+  border-radius: .65rem;
+  background: #f6f8fb;
+  font-size: .78rem;
+}
+
+.relay-diagnostics > summary {
+  padding: .55rem .7rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.relay-diagnostics-body {
+  padding: 0 .7rem .6rem;
+}
+
+.relay-diagnostics-body section {
+  margin-top: .5rem;
+}
+
+.relay-diagnostics-body h3 {
+  margin: 0 0 .25rem;
+  font-size: .74rem;
+  color: var(--muted);
+}
+
+.relay-diagnostics-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  overflow-wrap: anywhere;
+}
+
+.relay-diagnostics-list code {
+  overflow-wrap: anywhere;
+}
+
+.relay-diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .25rem .5rem;
+  margin: .25rem 0 0;
+}
+
+.relay-diagnostics-grid > div {
+  min-width: 0;
+}
+
+.relay-diagnostics-grid dt {
+  font-size: .68rem;
+  color: var(--muted);
+}
+
+.relay-diagnostics-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .tool-facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

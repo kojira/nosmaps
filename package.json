@@ -1,0 +1,18 @@
+{
+  "name": "nosmaps",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Relay-native catalog of Nostr tools. Static site, no backend.",
+  "scripts": {
+    "build": "esbuild build/entry-rx-nostr.js --bundle --format=esm --platform=browser --outfile=dist/rx-nostr.js && esbuild build/entry-rx-nostr-crypto.js --bundle --format=esm --platform=browser --outfile=dist/rx-nostr-crypto.js",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@rx-nostr/crypto": "3.1.6",
+    "rx-nostr": "3.7.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "esbuild": "0.28.1"
+  }
+}
