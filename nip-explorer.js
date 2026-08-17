@@ -193,7 +193,10 @@
     return `<div class="card-review-thumbnails" aria-label="${esc(t('explorer.openGallery'))}">${shown.map(review => { const label = t('explorer.imageAlt', {author: review.author, date: review.date}); return `<button type="button" class="card-review-thumbnail" data-open-image="${tool.id}" data-image-review="${review.id}" aria-label="${esc(label)}" title="${esc(label)}">${screenshotMarkup(review.image, true, '')}</button>`; }).join('')}${remaining ? `<button type="button" class="card-review-more" data-gallery-tool="${tool.id}" aria-label="${esc(t('explorer.remainingGallery', {count: remaining}))}" title="${esc(t('explorer.openGallery'))}">+${remaining}</button>` : ''}</div>`;
   }
 
-  function likeCount(tool) { const serial = Number(String(tool.id).replace('tool-', '')); return 12 + (Number.isFinite(serial) ? serial * 3 : 0) + (state.likes[tool.id] ? 1 : 0); }
+  // data.js の id は tool-<n> で、いいね数はその連番から作るサンプル値。リレー由来の id からは数を作らず、観測がないことを null で返す。
+  function likeCount(tool) { if (relayEntry(tool)) return null; const serial = Number(String(tool.id).replace('tool-', '')); return 12 + (Number.isFinite(serial) ? serial * 3 : 0) + (state.likes[tool.id] ? 1 : 0); }
+  // 観測値がないときは比較ダイアログと同じ「—（不明）」マーカーで出す。数字を捏造しない。
+  function likeCountMarkup(tool) { const count = likeCount(tool); return count === null ? `<span class="no-support-record" aria-label="${esc(t('unknown'))}" title="${esc(t('unknown'))}">—</span>` : String(count); }
   function provenanceBadge(tool) {
     const verified = tool && tool.provenance === 'relay';
     return `<span class="provenance-badge ${verified ? 'relay' : 'sample'}">${esc(t(verified ? 'explorer.relayVerified' : 'explorer.sampleData'))}</span>`;
@@ -205,7 +208,7 @@
     const bookmark = state.bookmarks[tool.id];
     return `<article class="feature-tool-card ${tool.status === 'dead' ? 'dead-tool' : ''}" data-tool-id="${tool.id}"><div class="nip-card-top"><span class="tool-icon" aria-hidden="true">${iconSvg(category(tool.category).icon)}</span><span class="card-top-meta">${provenanceBadge(tool)}<span class="status ${tool.status}">${esc(t(`statuses.${tool.status}`))}</span></span></div><h2>${esc(tool.name)}</h2><p>${esc(toolDescription(tool))}</p>
       <section class="card-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><div class="support-line">${supports.length ? supports.map(item => `<span class="feature-support-summary">${esc(item.feature.name)} ${supportBadge(item.support)}</span>`).join('') : `<span class="tag">${esc(t('explorer.noFeatureCondition'))}</span>`}<span class="tag">${tool.platform}</span><span class="tag">${esc((tool.os || []).filter(value => value !== tool.platform).join(' / ') || deliveryLabel(delivery(tool)))}</span></div><dl class="tool-facts"><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(category(tool.category).name)}</dd></div><div><dt>OSS</dt><dd>${esc(displayLicense(tool))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(tool.observed.split(' ')[0])}</dd></div></dl><nav class="resource-links" aria-label="${esc(t('explorer.officialLinks', {name: tool.name}))}">${resourceLinks(tool)}</nav>${records.length ? `<div class="basis-nips">${records.map(record => `<button type="button" class="nip-tag-button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}">NIP-${record.nip} · ${esc(statusLabel(record.status))}</button>`).join('')}</div>` : ''}</section>
-      <section class="card-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${tool.id}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCount(tool)}</button><button type="button" data-bookmark-tool="${tool.id}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${tool.id}">${esc(t('explorer.reviews', {count: allReviews(tool).length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${tool.id}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}</section>
+      <section class="card-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${tool.id}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCountMarkup(tool)}</button><button type="button" data-bookmark-tool="${tool.id}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${tool.id}">${esc(t('explorer.reviews', {count: allReviews(tool).length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${tool.id}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}</section>
       ${tool.status === 'dead' ? `<p class="replacement-note">${esc(t('explorer.endedRecord'))} <button type="button" class="text-button" data-find-alternative>${esc(t('explorer.alternatives'))}</button></p>` : ''}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${tool.id}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${tool.id}">${esc(t('explorer.details'))}</button></div></article>`;
   }
 
@@ -240,7 +243,8 @@
   }
 
   function renderCompareActions() {
-    state.compare = state.compare.filter(id => tools.some(tool => tool.id === id));
+    // 比較対象は data.js サンプルとリレー由来エントリの両方。tools だけで絞ると relay:<coordinate> が毎回落ちる。
+    state.compare = state.compare.filter(id => Boolean(findTool(id)));
     els.compareActions.hidden = !state.compare.length;
     els.compareSummary.textContent = t('explorer.selectedCount', {count: state.compare.length});
     els.openCompare.disabled = state.compare.length < 2;
@@ -288,7 +292,7 @@
     const stats = result.stats || {};
     const field = (label, value) => `<div><dt>${esc(label)}</dt><dd>${esc(value == null || value === '' ? t('none') : value)}</dd></div>`;
     const relayRows = relayUrls.length ? relayUrls.map(url => `<li><code>${esc(url)}</code> — ${esc(relayCoverageLabel(coverage[url]))}</li>`).join('') : `<li>${esc(t('none'))}</li>`;
-    const curatorRows = curators.length ? curators.map(item => `<li><code>${esc(item.curator || t('none'))}</code><dl class="relay-diagnostics-grid">${field(t('explorer.relayCuratorStatus'), item.status)}${field(t('explorer.relayPointer'), item.pointerId)}${field(t('explorer.relayGeneration'), item.generation)}${field(t('explorer.relayBlob'), item.sha256)}${field(t('explorer.relayVerifiedAt'), item.verifiedAt)}${item.reason ? field(t('explorer.relayReason'), item.reason) : ''}</dl></li>`).join('') : `<li>${esc(t('none'))}</li>`;
+    const curatorRows = curators.length ? curators.map(item => `<li><code>${esc(item.curator || t('none'))}</code><dl class="relay-diagnostics-grid">${field(t('explorer.relayCuratorStatus'), item.status)}${field(t('explorer.relayPointer'), item.pointerId)}${field(t('explorer.relayGeneration'), item.generation)}${field(t('explorer.relayBlob'), item.sha256)}${field(t('explorer.relayVerifiedAt'), formatObserved(item.verifiedAt))}${item.reason ? field(t('explorer.relayReason'), item.reason) : ''}</dl></li>`).join('') : `<li>${esc(t('none'))}</li>`;
     const statsRow = `<dl class="relay-diagnostics-grid">${field(t('explorer.relayAsOf'), formatObserved(result.asOf))}${field(t('explorer.relayLogical'), stats.logicalReqs)}${field(t('explorer.relayPhysical'), stats.physicalReqs)}${field(t('explorer.relayHttp'), stats.httpAttempts)}${field(t('explorer.relayCache'), stats.cacheHits)}</dl>`;
     return `<details id="relay-diagnostics" class="relay-diagnostics">${summary}<div class="relay-diagnostics-body"><section><h3>${esc(t('explorer.relayRelays'))}</h3><ul class="relay-diagnostics-list">${relayRows}</ul></section><section><h3>${esc(t('explorer.relayCurators'))}</h3><ul class="relay-diagnostics-list">${curatorRows}</ul></section><section><h3>${esc(t('explorer.relayReqs'))}</h3>${statsRow}</section>${reload}</div></details>`;
   }
@@ -408,7 +412,7 @@
     return {different, markup: `<section class="comparison-item ${different ? 'is-different' : 'is-identical'}" data-difference="${different}"><div class="comparison-label">${icon}<span>${esc(label)}</span></div><div class="comparison-values">${contents.join('')}</div></section>`};
   }
   function renderCompare(context = {type: 'compare'}, shouldOpen = true) {
-    const selected = state.compare.map(id => tools.find(tool => tool.id === id)).filter(Boolean);
+    const selected = state.compare.map(id => findTool(id)).filter(Boolean);
     const alternatives = filteredTools().filter(tool => !state.compare.includes(tool.id));
     const items = featureDefinitions.map(definition => {
       const records = selected.map(tool => featureSupportRecord(tool, definition));
@@ -422,7 +426,8 @@
       comparisonItem(t('explorer.os'), selected.map(tool => (tool.os || [tool.platform]).join('/')), selected.map(tool => `<div class="comparison-value">${esc((tool.os || [tool.platform]).join(' / '))}</div>`)),
       comparisonItem(t('explorer.category'), selected.map(tool => tool.category), selected.map(tool => `<div class="comparison-value">${esc(category(tool.category).name)}</div>`)),
       comparisonItem('OSS', selected.map(tool => displayLicense(tool)), selected.map(tool => `<div class="comparison-value">${esc(displayLicense(tool))}</div>`)),
-      comparisonItem(t('explorer.observed'), selected.map(tool => tool.observed), selected.map(tool => `<div class="comparison-value">${esc(tool.observed.split(' ')[0])}</div>`))
+      // observed が空のリレー由来エントリでも空欄にせず、observedText の「不明」語彙で出す。
+      comparisonItem(t('explorer.observed'), selected.map(tool => observedText(tool)), selected.map(tool => `<div class="comparison-value">${esc(observedText(tool).split(' ')[0])}</div>`))
     ];
     const orderedFeatures = [...items].sort((a, b) => Number(b.different) - Number(a.different));
     const orderedBasics = [...basics].sort((a, b) => Number(b.different) - Number(a.different));
