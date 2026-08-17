@@ -255,6 +255,13 @@
     if (type === 'unavailable') return `<div class="state-message error unavailable"><div><strong>${esc(t('explorer.unavailableState'))}</strong><p><button class="secondary" type="button" data-relay-action="reload">${esc(t('explorer.relayReload'))}</button></p></div></div>`;
     return '';
   }
+  // data.js の observed は "YYYY-MM-DD HH:MM UTC" 形式の文字列。リレー由来の asOf は Date.now() のミリ秒なので、境界でこの形式に揃える。
+  function formatObserved(value) {
+    if (typeof value === 'string') return value;
+    const ms = Number(value);
+    if (!Number.isFinite(ms) || ms <= 0) return '';
+    return `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+  }
   function relayCoverageLabel(value) { const key = value && typeof value === 'object' ? value.status : value; const label = i18n.value(`explorer.coverage.${key}`); return typeof label === 'string' ? label : String(key); }
   function relayEntryToTool(entry, asOf) {
     const fields = (entry && entry.fields) || {};
@@ -262,7 +269,7 @@
     const stale = Boolean(entry && (entry.stale === true || entry.state === 'stale'));
     return {
       id: `relay:${(entry && entry.coordinate) || Math.random().toString(36).slice(2)}`, name: fields.name || (entry && entry.coordinate) || '—',
-      category: validCategory, status: stale ? 'stale' : 'active', platform: 'Web', os: ['Web'], license: '', observed: asOf || '', nips: [], provenance: 'relay'
+      category: validCategory, status: stale ? 'stale' : 'active', platform: 'Web', os: ['Web'], license: '', observed: formatObserved(asOf), nips: [], provenance: 'relay'
     };
   }
   function relayDiagnosticsMarkup(result) {
@@ -308,6 +315,7 @@
       applyRelayResult(result);
       return result;
     } catch (error) {
+      console.error('[nosmaps] relay catalog load failed', error);
       window.__NOSMAPS_RELAY_RESULT__ = null;
       applyRelayResult(null);
       return null;
