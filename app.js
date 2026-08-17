@@ -229,7 +229,7 @@
     if (action === 'set-state') { state.uiState = control.dataset.state; renderAll(); }
   });
 
-  document.addEventListener('input', event => { if (event.target.id === 'search') { state.query = event.target.value; renderApp(); requestAnimationFrame(() => { const input = document.querySelector('#search'); input?.focus(); input?.setSelectionRange(state.query.length, state.query.length); }); } });
+  document.addEventListener('input', event => { if (event.target.id === 'search') { const {selectionStart, selectionEnd} = event.target; state.query = event.target.value; renderApp(); const input = document.querySelector('#search'); input?.focus(); if (selectionStart !== null) input?.setSelectionRange(selectionStart, selectionEnd); } });
   document.addEventListener('change', event => {
     if (event.target.matches('[data-action="compare"]')) { const id = event.target.dataset.id; if (event.target.checked && state.compare.length >= 3) { event.target.checked = false; toast(t('concepts.compareLimit')); return; } state.compare = event.target.checked ? [...state.compare, id] : state.compare.filter(value => value !== id); renderCompareDock(); }
     if (event.target.id === 'status') { state.status = event.target.value; renderApp(); }

@@ -172,7 +172,8 @@
       rating: index === 1 ? 4 : 5, helpful: 7 + index * 2, unhelpful: index % 2, image: {label: labels[index], src: imageData(labels[index], shotPalette[index])}
     }));
   }
-  function allReviews(tool) { return [...seedReviews(tool), ...(state.reviews[tool.id] || [])]; }
+  // リレー由来のエントリはレビューを観測していないので、data.js 前提の seed を混ぜない。
+  function allReviews(tool) { if (!tool) return []; return [...(tool.provenance === 'relay' ? [] : seedReviews(tool)), ...(state.reviews[tool.id] || [])]; }
   function reviewCounts(review) {
     const vote = state.reviewVotes[review.id];
     return {helpful: review.helpful + (vote === 'helpful' ? 1 : 0), unhelpful: review.unhelpful + (vote === 'unhelpful' ? 1 : 0), vote};
@@ -272,6 +273,11 @@
       category: validCategory, status: stale ? 'stale' : 'active', platform: 'Web', os: ['Web'], license: '', observed: formatObserved(asOf), nips: [], provenance: 'relay'
     };
   }
+  // カード一覧に出る候補は data.js のサンプルとリレー由来エントリの両方。ダイアログの参照もこの両方を辿る。
+  function relayEntries() { return relayState && Array.isArray(relayState.entries) ? relayState.entries : []; }
+  function findTool(id) { return tools.find(item => item.id === id) || relayEntries().find(item => item.id === id) || null; }
+  function relayEntry(tool) { return Boolean(tool) && tool.provenance === 'relay'; }
+  function observedText(tool) { return formatObserved(tool.observed) || t('unknown'); }
   function relayDiagnosticsMarkup(result) {
     const summary = `<summary>${esc(t('explorer.relayDiagnostics'))}</summary>`;
     const reload = `<p><button class="secondary" type="button" data-relay-action="reload">${esc(t('explorer.relayReload'))}</button></p>`;
@@ -283,7 +289,7 @@
     const field = (label, value) => `<div><dt>${esc(label)}</dt><dd>${esc(value == null || value === '' ? t('none') : value)}</dd></div>`;
     const relayRows = relayUrls.length ? relayUrls.map(url => `<li><code>${esc(url)}</code> — ${esc(relayCoverageLabel(coverage[url]))}</li>`).join('') : `<li>${esc(t('none'))}</li>`;
     const curatorRows = curators.length ? curators.map(item => `<li><code>${esc(item.curator || t('none'))}</code><dl class="relay-diagnostics-grid">${field(t('explorer.relayCuratorStatus'), item.status)}${field(t('explorer.relayPointer'), item.pointerId)}${field(t('explorer.relayGeneration'), item.generation)}${field(t('explorer.relayBlob'), item.sha256)}${field(t('explorer.relayVerifiedAt'), item.verifiedAt)}${item.reason ? field(t('explorer.relayReason'), item.reason) : ''}</dl></li>`).join('') : `<li>${esc(t('none'))}</li>`;
-    const statsRow = `<dl class="relay-diagnostics-grid">${field(t('explorer.relayAsOf'), result.asOf)}${field(t('explorer.relayLogical'), stats.logicalReqs)}${field(t('explorer.relayPhysical'), stats.physicalReqs)}${field(t('explorer.relayHttp'), stats.httpAttempts)}${field(t('explorer.relayCache'), stats.cacheHits)}</dl>`;
+    const statsRow = `<dl class="relay-diagnostics-grid">${field(t('explorer.relayAsOf'), formatObserved(result.asOf))}${field(t('explorer.relayLogical'), stats.logicalReqs)}${field(t('explorer.relayPhysical'), stats.physicalReqs)}${field(t('explorer.relayHttp'), stats.httpAttempts)}${field(t('explorer.relayCache'), stats.cacheHits)}</dl>`;
     return `<details id="relay-diagnostics" class="relay-diagnostics">${summary}<div class="relay-diagnostics-body"><section><h3>${esc(t('explorer.relayRelays'))}</h3><ul class="relay-diagnostics-list">${relayRows}</ul></section><section><h3>${esc(t('explorer.relayCurators'))}</h3><ul class="relay-diagnostics-list">${curatorRows}</ul></section><section><h3>${esc(t('explorer.relayReqs'))}</h3>${statsRow}</section>${reload}</div></details>`;
   }
   function applyRelayResult(result) {
@@ -357,8 +363,8 @@
   function dialogHead(kicker, title) { return `<div class="dialog-head"><div><div class="dialog-kicker">${esc(kicker)}</div><h2>${esc(title)}</h2></div><div class="dialog-tools">${languageControl(true)}<button class="icon-btn" type="button" data-close-dialog aria-label="${esc(t('close'))}" title="${esc(t('close'))}">×</button></div></div>`; }
 
   function renderEvidence(context, shouldOpen = true) {
-    const tool = tools.find(item => item.id === context.toolId);
-    const record = tool?.nips.find(item => item.nip === context.nip);
+    const tool = findTool(context.toolId);
+    const record = (tool?.nips || []).find(item => item.nip === context.nip);
     const nip = record ? nipByNumber[record.nip] : null;
     if (!tool || !record || !nip) return;
     els.evidenceDialog.setAttribute('aria-label', `${tool.name} · NIP-${record.nip}`);
@@ -366,18 +372,28 @@
     if (shouldOpen) openDialog(els.evidenceDialog, context);
   }
   function renderToolDetail(context, shouldOpen = true) {
-    const tool = tools.find(item => item.id === context.toolId);
+    const tool = findTool(context.toolId);
     if (!tool) return;
+    // リレー由来のエントリは説明文・NIP・レビューを観測していない。埋め合わせず「不明」「なし」で出す。
+    const description = relayEntry(tool) ? t('unknown') : toolDescription(tool);
+    const records = (tool.nips || []).slice(0, 7);
+    const reviews = allReviews(tool);
+    const basisList = records.length
+      ? records.map(record => `<button class="basis-row" type="button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}"><strong>NIP-${record.nip}</strong>${supportBadge(record.status)}<small>${esc(evidenceText(record.status))}</small></button>`).join('')
+      : `<p class="no-support-record">${esc(t('none'))}</p>`;
     els.evidenceDialog.setAttribute('aria-label', tool.name);
-    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.details'), tool.name)}<p>${esc(toolDescription(tool))}</p><section class="dialog-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.state'))}</dt><dd>${esc(t(`statuses.${tool.status}`))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(tool.observed)}</dd></div><div><dt>${esc(t('explorer.os'))}</dt><dd>${esc((tool.os || [tool.platform]).join(' / '))}</dd></div><div><dt>${esc(t('explorer.license'))}</dt><dd>${esc(displayLicense(tool))}</dd></div></dl><div class="feature-basis-list">${tool.nips.slice(0, 7).map(record => `<button class="basis-row" type="button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}"><strong>NIP-${record.nip}</strong>${supportBadge(record.status)}<small>${esc(evidenceText(record.status))}</small></button>`).join('')}</div></section><section class="dialog-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3><button type="button" class="secondary" data-review-tool="${tool.id}">${esc(t('explorer.reviews', {count: allReviews(tool).length}))}</button></section>`;
+    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.details'), tool.name)}<p>${esc(description)}</p><section class="dialog-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.state'))}</dt><dd>${esc(t(`statuses.${tool.status}`))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool))}</dd></div><div><dt>${esc(t('explorer.os'))}</dt><dd>${esc((tool.os || [tool.platform]).filter(Boolean).join(' / ') || t('unknown'))}</dd></div><div><dt>${esc(t('explorer.license'))}</dt><dd>${esc(displayLicense(tool))}</dd></div></dl><div class="feature-basis-list">${basisList}</div></section><section class="dialog-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${reviews.length ? `<button type="button" class="secondary" data-review-tool="${tool.id}">${esc(t('explorer.reviews', {count: reviews.length}))}</button>` : `<p class="no-support-record">${esc(t('none'))}</p>`}</section>`;
     if (shouldOpen) openDialog(els.evidenceDialog, context);
   }
   function resourceUrl(tool, type) { const slug = tool.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'); return ({site: `https://${slug}.example.invalid/`, distribution: `https://store.example.invalid/apps/${slug}`, docs: `https://docs.${slug}.example.invalid/`, source: `https://code.example.invalid/${slug}/source`}[type]); }
   function renderResource(context, shouldOpen = true) {
-    const tool = tools.find(item => item.id === context.toolId);
+    const tool = findTool(context.toolId);
+    if (!tool) return;
     const typeLabel = t(`explorer.${context.resourceType}`);
+    // resourceUrl は data.js サンプル用の生成 URL。リレー由来のエントリには観測された URL がないので出さない。
+    const url = relayEntry(tool) ? '' : resourceUrl(tool, context.resourceType);
     els.evidenceDialog.setAttribute('aria-label', t('explorer.linkDetails', {type: typeLabel}));
-    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.linkDetails', {type: typeLabel}), tool.name)}<dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.displayUrl'))}</dt><dd>${esc(resourceUrl(tool, context.resourceType))}</dd></div><div><dt>${esc(t('explorer.checkedAt'))}</dt><dd>${esc(tool.observed)}</dd></div></dl>`;
+    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.linkDetails', {type: typeLabel}), tool.name)}<dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.displayUrl'))}</dt><dd>${esc(url || t('unknown'))}</dd></div><div><dt>${esc(t('explorer.checkedAt'))}</dt><dd>${esc(observedText(tool))}</dd></div></dl>`;
     if (shouldOpen) openDialog(els.evidenceDialog, context);
   }
   function renderFeatureBasis(context = {type: 'featureBasis'}, shouldOpen = true) {
@@ -417,7 +433,8 @@
   }
 
   function reviewForm(tool) {
-    const seeds = seedReviews(tool).slice(0, 3);
+    // seed 画像は data.js サンプル用。リレー由来のエントリでは選択肢に出さない（送信時の seed 参照も走らない）。
+    const seeds = relayEntry(tool) ? [] : seedReviews(tool).slice(0, 3);
     const draft = state.reviewDrafts[tool.id] || {};
     const localPreview = draft.localImage ? `<img src="${esc(draft.localImage)}" alt="${esc(t('explorer.imageTitle'))}">${draft.localFilename ? `<small>${esc(draft.localFilename)}</small>` : ''}` : '';
     return `<form class="review-form" data-review-form="${tool.id}" data-local-image="${esc(draft.localImage || '')}" data-local-filename="${esc(draft.localFilename || '')}"><h3>${esc(t('explorer.writeReview'))}</h3><label class="review-body">${esc(t('explorer.body'))}<textarea name="body" placeholder="${esc(t('explorer.bodyPlaceholder'))}">${esc(draft.body || '')}</textarea></label><fieldset class="image-picker"><legend>${esc(t('explorer.chooseImage'))}</legend><div class="shot-choices">${seeds.map((review, index) => `<label class="shot-choice"><input type="radio" name="imageChoice" value="${index}" ${String(draft.imageChoice) === String(index) ? 'checked' : ''}><span>${screenshotMarkup(review.image, true, review.image.label)}</span></label>`).join('')}</div><label class="local-file">${esc(t('explorer.deviceImage'))}<input type="file" name="deviceImage" accept="image/*"></label><div class="local-image-preview">${localPreview}</div></fieldset><label>${esc(t('explorer.osOptional'))}<input name="os" value="${esc(draft.os || '')}"></label><label>${esc(t('explorer.versionOptional'))}<input name="version" value="${esc(draft.version || '')}"></label><label>${esc(t('explorer.useOptional'))}<input name="use" value="${esc(draft.use || '')}"></label><label>${esc(t('explorer.ratingOptional'))}<select name="rating"><option value="">${esc(t('optional'))}</option>${[5, 4, 3, 2, 1].map(value => `<option ${String(draft.rating) === String(value) ? 'selected' : ''}>${value}</option>`).join('')}</select></label><div class="review-preview" aria-live="polite"></div><button class="primary" type="submit">${esc(t('explorer.createReview'))}</button></form>`;
@@ -434,7 +451,8 @@
   }
   function renderReview(context, shouldOpen = true) {
     if (!context.clearDraft) captureReviewDraft();
-    const tool = tools.find(item => item.id === context.toolId);
+    const tool = findTool(context.toolId);
+    if (!tool) return;
     const reviews = allReviews(tool);
     els.reviewDialog.setAttribute('aria-label', t('explorer.reviewTitle', {name: tool.name}));
     els.reviewContent.innerHTML = `${dialogHead(t('explorer.reviewCount', {count: reviews.length}), t('explorer.reviewTitle', {name: tool.name}))}<div class="review-toolbar"><button class="secondary" type="button" data-gallery-tool="${tool.id}">${esc(t('explorer.openGallery'))}</button></div><section class="review-list">${reviews.map(review => reviewItem(tool, review)).join('')}</section>${reviewForm(tool)}`;
@@ -457,14 +475,15 @@
     if (shouldOpen) openDialog(els.profileDialog, context);
   }
   function renderGallery(context, shouldOpen = true) {
-    const tool = tools.find(item => item.id === context.toolId);
+    const tool = findTool(context.toolId);
+    if (!tool) return;
     const reviews = allReviews(tool).filter(review => review.image);
     els.galleryDialog.setAttribute('aria-label', t('explorer.galleryTitle', {name: tool.name}));
     els.galleryContent.innerHTML = `${dialogHead(t('explorer.openGallery'), t('explorer.galleryTitle', {name: tool.name}))}<section class="gallery-grid">${reviews.length ? reviews.map(review => `<article class="gallery-card">${screenshotMarkup(review.image, false, t('explorer.imageAlt', {author: review.author, date: review.date}))}<dl><div><dt>${esc(t('explorer.reviewer'))}</dt><dd><button type="button" class="reviewer-link compact-link" data-reviewer="${review.profile}">${esc(review.author)}</button></dd></div><div><dt>${esc(t('explorer.postedAt'))}</dt><dd>${esc(review.date)}</dd></div><div><dt>OS / version</dt><dd>${esc(review.os || t('explorer.notEntered'))} / ${esc(review.version || t('explorer.notEntered'))}</dd></div></dl><div><button type="button" class="primary" data-open-image="${tool.id}" data-image-review="${review.id}">${esc(t('explorer.enlarge'))}</button><button type="button" class="secondary" data-review-tool="${tool.id}" data-review-jump="${review.id}">${esc(t('explorer.originalReview'))}</button></div></article>`).join('') : `<p>${esc(t('explorer.galleryEmpty'))}</p>`}</section>`;
     if (shouldOpen) openDialog(els.galleryDialog, context);
   }
   function renderImage(context, shouldOpen = true) {
-    const tool = tools.find(item => item.id === context.toolId);
+    const tool = findTool(context.toolId);
     const review = tool && allReviews(tool).find(item => item.id === context.reviewId);
     if (!review?.image) return;
     els.imageDialog.setAttribute('aria-label', t('explorer.imageTitle'));
@@ -472,8 +491,9 @@
     if (shouldOpen) openDialog(els.imageDialog, context);
   }
   function renderVoteBasis(context, shouldOpen = true) {
-    const tool = tools.find(item => item.id === context.toolId);
+    const tool = findTool(context.toolId);
     const review = allReviews(tool).find(item => item.id === context.reviewId);
+    if (!review) return;
     const counts = reviewCounts(review);
     els.evidenceDialog.setAttribute('aria-label', t('explorer.voteBreakdown'));
     els.evidenceContent.innerHTML = `${dialogHead(t('explorer.communityVotes'), t('explorer.voteBreakdown'))}<dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.helpfulVotes'))}</dt><dd>${counts.helpful}</dd></div><div><dt>${esc(t('explorer.unhelpfulVotes'))}</dt><dd>${counts.unhelpful}</dd></div></dl>`;
