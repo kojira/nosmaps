@@ -1799,6 +1799,328 @@
     }
   }
 
+  /* ---- the write path (design-relay-native-write-path.md) --------------------
+     Slice 2 of issue #9: the whole chain, crudely. Sign -> publish -> read back
+     -> the row appears. The parts this slice does NOT have are named in the
+     comments rather than faked: manual retry (§W4.5), withdrawal (§W6), and the
+     `created_at = prior + 1` branch of §W3.4.
+
+     One rule governs everything below and is the reason the code is shaped this
+     way: `published` is a claim about a read-back, not about an OK (§W4.3). An
+     OK is evidence. Only `readback.state === 'returned'` may produce success. */
+
+  const WRITE = {
+    PUBLISH_TIMEOUT_MS: 15000,
+    READBACK_ATTEMPTS: 3,
+    READBACK_BACKOFF_MS: [0, 2000, 8000],
+    SIGNER_TIMEOUT_MS: 60000
+  };
+
+  const DISCOVERY_TOPIC = POLICY.DISCOVERY_TOPICS[0];
+
+  /* §W3: the unsigned draft. Every value is either the user's or a computed
+     constant (§W3.5) — nothing here is invented, and nothing is left for a
+     library to default (which is why `created_at` is set even though rx-nostr
+     would happily fill it in). The draft is deliberately unsigned so that
+     validateSoftwareEvent — the *same* function object the read path calls
+     (§W0.1) — is what decides whether it may be published at all. */
+  function buildSoftwareDraft(input) {
+    input = input || {};
+    const nfc = (value) => (typeof value === 'string' ? value.normalize('NFC') : '');
+    const local = nfc(input.dLocal).trim();
+    const name = nfc(input.name).trim();
+    const summary = nfc(input.summary);
+    const homepage = nfc(input.homepage).trim();
+    // §W3.3: state is computed from the invoked action and is never a form control.
+    const state = input.state === 'withdrawn' ? 'withdrawn' : 'active';
+
+    // §5.1 rule 1 / §W3.6: the author normalises and lowercases; the validator
+    // only rejects. If the form skipped this the record would still be valid —
+    // it would just be indexed under bytes the publisher did not expect.
+    const topics = [];
+    const supplied = Array.isArray(input.topics) ? input.topics : [];
+    for (let i = 0; i < supplied.length; i += 1) {
+      const topic = nfc(supplied[i]).trim().toLowerCase();
+      if (!topic || topic === DISCOVERY_TOPIC) continue;
+      if (topics.indexOf(topic) === -1) topics.push(topic);
+    }
+    topics.sort(compareCodePoints);
+
+    // §W3.2: exact order, so identical input produces an identical event id.
+    // No `state` tag, no `client` tag, no `alt` tag — see §W3.2 for why each of
+    // those would be app-authored metadata nobody asked us to sign.
+    const tags = [['d', SOFTWARE_D_PREFIX + local], ['t', DISCOVERY_TOPIC]];
+    for (let i = 0; i < topics.length; i += 1) tags.push(['t', topics[i]]);
+
+    // §W3.3 fixed key order. A blank homepage omits the key entirely: `""` fails
+    // the https:// check, so serialising it would make the record unreadable.
+    const content = { schema: SOFTWARE_SCHEMA, version: 1, state: state, name: name, summary: summary };
+    if (homepage) content.homepage = homepage;
+
+    return {
+      kind: POLICY.SOFTWARE_KIND,
+      pubkey: typeof input.pubkey === 'string' ? input.pubkey : '',
+      created_at: Number.isSafeInteger(input.createdAt) ? input.createdAt : Math.floor(Date.now() / 1000),
+      tags: tags,
+      content: JSON.stringify(content)
+    };
+  }
+
+  /* §W1.3: what the signer handed back has to be the thing we asked it to sign.
+     rx-nostr's own nip07Signer appends tags on signing, so "the signer changed
+     the event" is documented behaviour of a shipped implementation, not a
+     hypothetical. Returns a reason slug, or null when the signature is usable. */
+  function checkSignedEvent(draft, signed, expectedPubkey) {
+    if (!signed || typeof signed !== 'object') return 'signer-missing-fields';
+    if (!isLowercaseHex64(signed.id) || !isLowercaseHex64(signed.pubkey)) return 'signer-missing-fields';
+    if (typeof signed.sig !== 'string' || !/^[0-9a-f]{128}$/.test(signed.sig)) return 'signer-missing-fields';
+    if (signed.pubkey !== expectedPubkey) return 'signer-wrong-pubkey';
+    const shape = (event) => ({
+      kind: event.kind, created_at: event.created_at, tags: event.tags, content: event.content
+    });
+    let ours;
+    let theirs;
+    try {
+      ours = C.canonicalize(shape(draft));
+      theirs = C.canonicalize(shape(signed));
+    } catch (e) {
+      return 'signer-mutated-event';
+    }
+    if (!C.bytesEqual(ours, theirs)) return 'signer-mutated-event';
+    return null;
+  }
+
+  /* §W4.1: publication over the read path's own relay context. The per-relay
+     outcome model of §W4.2 is what makes partial success expressible; an
+     aggregate that cannot say "1 of 2" can only lie in one direction. */
+  function sendEvent(ctx, signed, relays, timeoutMs) {
+    return new Promise((resolve) => {
+      // §W4.2: every relay starts undetermined. `timeout` is NOT failure — the
+      // relay may hold the event and have lost the OK — so it never collapses
+      // into `rejected`, and it never counts as accepted either.
+      const outcomes = {};
+      for (let i = 0; i < relays.length; i += 1) outcomes[relays[i]] = { outcome: 'timeout', notice: '' };
+      let settled = false;
+      let sub = null;
+      const timer = setTimeout(() => finish(), timeoutMs);
+
+      function finish() {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (sub && typeof sub.unsubscribe === 'function') {
+          try { sub.unsubscribe(); } catch (e) { /* noop */ }
+        }
+        resolve(outcomes);
+      }
+
+      function record(packet) {
+        if (!packet || typeof packet !== 'object') return;
+        const from = typeof packet.from === 'string' ? packet.from : '';
+        // rx-nostr normalises relay URLs, so match on the trailing slash too
+        // rather than dropping a packet we cannot key.
+        let key = from in outcomes ? from : null;
+        if (!key) {
+          for (let i = 0; i < relays.length; i += 1) {
+            if (normalizeRelayUrl(relays[i]) === normalizeRelayUrl(from)) { key = relays[i]; break; }
+          }
+        }
+        if (!key) return;
+        const notice = typeof packet.notice === 'string' ? packet.notice : '';
+        outcomes[key] = { outcome: packet.ok === true ? 'accepted' : 'rejected', notice: notice };
+      }
+
+      try {
+        sub = ctx.rxNostr.send(signed, {
+          on: { relays: relays },
+          completeOn: 'all-ok',
+          errorOnTimeout: false
+        }).subscribe({
+          next: record,
+          // A socket that never opened is `connection-failed`, which is
+          // undetermined-leaning-negative and, crucially, not "the relay
+          // rejected the content".
+          error: () => {
+            for (let i = 0; i < relays.length; i += 1) {
+              if (outcomes[relays[i]].outcome === 'timeout') outcomes[relays[i]] = { outcome: 'connection-failed', notice: '' };
+            }
+            finish();
+          },
+          complete: () => finish()
+        });
+      } catch (e) {
+        for (let i = 0; i < relays.length; i += 1) outcomes[relays[i]] = { outcome: 'connection-failed', notice: '' };
+        finish();
+      }
+    });
+  }
+
+  function normalizeRelayUrl(url) {
+    return String(url || '').trim().toLowerCase().replace(/\/+$/, '');
+  }
+
+  /* §W5.1: two filters, both single-author. Filter 1 verifies the coordinate;
+     filter 2 is the `#t` index probe §13.1 calls the most load-bearing probe in
+     the design, and running it here means every publish contributes one real
+     data point for free. §W5.2: a positive is weaker than it looks, so the
+     result is recorded as "returned via #t", never as "#t is indexed". */
+  async function readBackOnce(ctx, signed, d) {
+    const filters = [
+      { kinds: [POLICY.SOFTWARE_KIND], authors: [signed.pubkey], '#d': [d], limit: 8 },
+      { kinds: [POLICY.SOFTWARE_KIND], authors: [signed.pubkey], '#t': [DISCOVERY_TOPIC], limit: 16 }
+    ];
+    const round = await fetchRound(ctx, filters, 'publish-readback');
+    const events = round.events.map((item) => item.event);
+    const mine = events.find((event) => event && event.id === signed.id) || null;
+    // Every relay unreachable means nothing was learned. §W5.3 is explicit that
+    // `query-failed` must never be aggregated with `not-returned-yet`: one is
+    // ignorance, the other is a (weak, local, this-round-only) observation.
+    const statuses = Object.keys(round.coverage).map((url) => round.coverage[url].status);
+    const anyComplete = statuses.indexOf('eose') !== -1;
+    if (!mine) return { state: anyComplete ? 'not-returned-yet' : 'query-failed', round: round, event: null, tIndex: 'not-returned' };
+    // §W5.4: the question is what readers will see, not whether our bytes
+    // arrived — so the returned set goes through the read path's own selector.
+    const check = validateSoftwareEvent(mine, { receivedAtSec: Math.floor(Date.now() / 1000) });
+    if (!check.ok) return { state: 'readback-quarantined', reason: check.reason, round: round, event: mine, tIndex: 'not-returned' };
+    const selection = selectSoftwareWinners(events, {});
+    const winners = (selection && selection.winners) || [];
+    const winner = winners.find((entry) => entry && entry.coordinate === check.record.coordinate) || null;
+    const winnerId = winner && winner.event ? winner.event.id : null;
+    if (winnerId && winnerId !== signed.id) {
+      return { state: 'superseded-during-publish', round: round, event: mine, winnerId: winnerId, tIndex: 'returned' };
+    }
+    return { state: 'returned', round: round, event: mine, tIndex: 'returned' };
+  }
+
+  function delay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+  /* The whole chain, in one call. Returns a closed set of states and never a
+     bare boolean: `unconfirmed` (acknowledged, not read back) is a different
+     fact from `failed` (refused) and from `published`, and flattening them is
+     exactly how a rejection becomes a success in a user's memory. */
+  async function publishSoftwareRecord(opts) {
+    opts = opts || {};
+    const relays = (Array.isArray(opts.relays) && opts.relays.length ? opts.relays : POLICY.DEFAULT_RELAYS).slice();
+    const timeoutMs = Number.isFinite(opts.timeoutMs) ? opts.timeoutMs : POLICY.REQ_TIMEOUT_MS;
+    const publishTimeoutMs = Number.isFinite(opts.publishTimeoutMs) ? opts.publishTimeoutMs : WRITE.PUBLISH_TIMEOUT_MS;
+    const attempts = Number.isFinite(opts.readbackAttempts) ? opts.readbackAttempts : WRITE.READBACK_ATTEMPTS;
+    const backoff = Array.isArray(opts.readbackBackoffMs) ? opts.readbackBackoffMs : WRITE.READBACK_BACKOFF_MS;
+    const signer = opts.signer || (typeof window !== 'undefined' ? window.nostr : null);
+    const nowSec = Number.isSafeInteger(opts.nowSec) ? opts.nowSec : Math.floor(Date.now() / 1000);
+
+    const fail = (state, reason) => ({
+      state: state, reason: reason, eventId: null, coordinate: null, event: null,
+      relays: relays.map((url) => ({ url: url, outcome: 'not-attempted', notice: '' })),
+      readback: null, attempts: 0, asOf: Date.now()
+    });
+
+    if (!signer || typeof signer.signEvent !== 'function' || typeof signer.getPublicKey !== 'function') {
+      return fail('blocked', 'signer-absent');
+    }
+
+    // §W1.4 / §W6.4 the account-switch hazard: an extension can change accounts
+    // between page load and publish, so the key is re-read immediately before
+    // signing and never taken from a cache.
+    let pubkey = null;
+    try {
+      pubkey = decodeNpub(await signer.getPublicKey());
+    } catch (e) {
+      return fail('blocked', 'signer-rejected');
+    }
+    if (!pubkey) return fail('blocked', 'nip07-key-unparsable');
+    if (opts.expectPubkey && opts.expectPubkey !== pubkey) return fail('blocked', 'pubkey-mismatch');
+
+    const draft = buildSoftwareDraft(Object.assign({}, opts.draft, { pubkey: pubkey, createdAt: nowSec }));
+    // §W0.1: the Publish control is enabled by, and only by, the read path's own
+    // validator. Re-checked here so no caller can route around the gate.
+    const preflight = validateSoftwareEvent(draft, { receivedAtSec: nowSec });
+    if (!preflight.ok) return fail('invalid', preflight.reason);
+    const d = preflight.record.d;
+
+    let signed = null;
+    try {
+      signed = await signer.signEvent(draft);
+    } catch (e) {
+      return fail('blocked', 'signer-rejected');
+    }
+    const signerProblem = checkSignedEvent(draft, signed, pubkey);
+    if (signerProblem) return fail('blocked', signerProblem);
+    const postflight = validateSoftwareEvent(signed, { receivedAtSec: nowSec });
+    if (!postflight.ok) return fail('blocked', 'signer-invalid-record');
+
+    let ctx = null;
+    try {
+      ctx = await createRelayContext(relays, timeoutMs);
+      if (!ctx.ok) {
+        return {
+          state: 'failed', reason: 'relay-unavailable', eventId: signed.id,
+          coordinate: postflight.record.coordinate, event: signed,
+          relays: relays.map((url) => ({ url: url, outcome: 'connection-failed', notice: '' })),
+          readback: null, attempts: 0, asOf: Date.now()
+        };
+      }
+
+      const outcomes = await sendEvent(ctx, signed, relays, publishTimeoutMs);
+      const perRelay = relays.map((url) => ({ url: url, outcome: outcomes[url].outcome, notice: outcomes[url].notice }));
+      const accepted = perRelay.filter((entry) => entry.outcome === 'accepted').length;
+      const undetermined = perRelay.filter((entry) => entry.outcome === 'timeout' || entry.outcome === 'connection-failed').length;
+
+      // Nothing acknowledged and nothing outstanding: every relay said no. There
+      // is nothing to read back, so we do not spend 18 seconds pretending there
+      // might be.
+      if (accepted === 0 && undetermined === 0) {
+        return {
+          state: 'failed', reason: 'all-relays-rejected', eventId: signed.id,
+          coordinate: postflight.record.coordinate, event: signed,
+          relays: perRelay, readback: null, attempts: 0, asOf: Date.now()
+        };
+      }
+
+      // §W5.5: a small bounded automatic wait, because relay propagation really
+      // is eventually consistent on a seconds timescale. After the budget the
+      // app stops claiming anything at all.
+      let readback = null;
+      let used = 0;
+      for (let i = 0; i < attempts; i += 1) {
+        const wait = Number.isFinite(backoff[i]) ? backoff[i] : 0;
+        if (wait > 0) await delay(wait);
+        used = i + 1;
+        readback = await readBackOnce(ctx, signed, d);
+        if (readback.state === 'returned' || readback.state === 'superseded-during-publish' || readback.state === 'readback-quarantined') break;
+      }
+
+      let state;
+      if (readback && readback.state === 'returned') state = accepted === relays.length ? 'published' : 'published-partial';
+      else if (readback && readback.state === 'superseded-during-publish') state = 'superseded-during-publish';
+      else if (readback && readback.state === 'readback-quarantined') state = 'readback-quarantined';
+      else state = 'unconfirmed';
+
+      return {
+        state: state,
+        reason: readback ? (readback.reason || readback.state) : 'no-readback',
+        eventId: signed.id,
+        coordinate: postflight.record.coordinate,
+        event: signed,
+        relays: perRelay,
+        accepted: accepted,
+        readback: readback ? { state: readback.state, tIndex: readback.tIndex, winnerId: readback.winnerId || null } : null,
+        attempts: used,
+        asOf: Date.now()
+      };
+    } catch (e) {
+      return {
+        state: 'failed', reason: 'publish-error', eventId: signed ? signed.id : null,
+        coordinate: postflight.record.coordinate, event: signed,
+        relays: relays.map((url) => ({ url: url, outcome: 'connection-failed', notice: '' })),
+        readback: null, attempts: 0, asOf: Date.now()
+      };
+    } finally {
+      if (ctx && ctx.rxNostr && typeof ctx.rxNostr.dispose === 'function') {
+        try { ctx.rxNostr.dispose(); } catch (e) { /* noop */ }
+      }
+    }
+  }
+
   window.NOSMAPS_CATALOG = {
     POLICY,
     SOFTWARE_SCHEMA,
@@ -1822,6 +2144,8 @@
     compareCodePoints,
     cache,
     loadCatalog,
+    buildSoftwareDraft,
+    publishSoftwareRecord,
     stats
   };
 })();

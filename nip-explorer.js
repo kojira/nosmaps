@@ -189,6 +189,8 @@
     host.dataset.viewerStatus = viewer.pending ? 'pending' : viewer.status;
     host.innerHTML = viewerMarkup();
     if (hadFocus) host.querySelector('button')?.focus();
+    // サインイン状態が Publish フォームの有無そのものを決めるので、必ず一緒に描き直す。
+    if (typeof renderPublish === 'function') renderPublish();
   }
   // サインインしていないビューアには npub が無い。無いことを「—」ではなく言葉で出す。
   function reviewerNpub(profileId) {
@@ -525,6 +527,9 @@
     const stale = Boolean(entry && entry.stale === true);
     return {
       id: `relay:${(entry && entry.coordinate) || ''}`, name: fields.name || (entry && entry.coordinate) || '—',
+      // §21.4 R4: レコードの状態（active / withdrawn）はプロジェクトの生死とは別の軸。
+      // ここを埋め忘れていたので、リレー由来のカードは `recordStates.undefined` を描いていた。
+      recordState: (entry && entry.state) || 'active',
       // category はアイコン表示用のフォールバック。観測できたかは categoryObserved で持ち、表示語彙はそちらで決める。
       category: observedCategory || 'clients', categoryObserved: Boolean(observedCategory),
       status: stale ? 'stale' : 'active', platform: '', os: [], license: '', observed: formatObserved(asOf), nips: [], provenance: 'relay',
@@ -671,7 +676,165 @@
     els.results.innerHTML = `<div class="empty zero-results"><h2>${esc(t('explorer.noMatch'))}</h2><p>${esc(t('explorer.noMatchHelp'))}</p>${suggestion ? `<button class="secondary relaxation-suggestion" type="button" data-remove-condition="${esc(suggestion.key)}">${esc(t('explorer.removeGets', {label: suggestion.label, count: suggestion.count}))}</button>` : `<button class="secondary" type="button" data-reset-all>${esc(t('explorer.resetAll'))}</button>`}</div>`;
   }
 
-  function renderAll() { renderIdentity(); renderFeatures(); renderFilterPanel(); els.query.value = state.query; renderResults(); rerenderOpenDialogs(); }
+
+  /* ---- 投稿フォーム (issue #9 スライス2, design-relay-native-write-path.md) ----------
+     署名済み → publish → 読み戻し → 一覧に1行、という鎖を端から端まで通すのがこのスライス。
+     鎖の途中で切れたときに「成功」と読める画面を出さないことだけを守っている。
+
+     成功文言を出す経路はただ一つ、readback.state === 'returned' のときだけ (§W4.3 / W-I3)。
+     OK は「リレーがそう言った」という証拠であって、公開されたことの定義ではない。
+     楽観的に一覧へ差し込むこともしない (§W5.6) —— 観測していない行は行ではない。
+
+     window.nostr が無いブラウザではフォームごと描画しない (§W1.2 状態1)。無効化されたボタンは
+     「ここにその機能はある」と読めてしまい、拡張が無いという事実と食い違う。 */
+  const publish = {
+    dLocal: '', name: '', summary: '', homepage: '', topics: '',
+    busy: false, result: null, error: null
+  };
+  const PUBLISH_D_MAX_BYTES = 192;
+  /* §W0.2 の既定値。テストは待ち時間を潰したいだけなので URL から縮められるようにしてあるが、
+     出荷時の値は設計のままで、コードのほうが設計より短気になることはない。 */
+  const publishReadbackAttempts = (() => { const value = Number(params.get('readbackattempts')); return Number.isFinite(value) && value > 0 ? value : 3; })();
+  const publishReadbackBackoff = (() => {
+    const raw = params.get('readbackbackoff');
+    if (!raw) return [0, 2000, 8000];
+    const values = raw.split(',').map(Number).filter(Number.isFinite);
+    return values.length ? values : [0, 2000, 8000];
+  })();
+  const publishTimeoutMs = (() => { const value = Number(params.get('publishtimeout')); return Number.isFinite(value) && value > 0 ? value : 15000; })();
+
+  function signerCanSign() {
+    const signer = window.nostr && typeof window.nostr === 'object' ? window.nostr : null;
+    return Boolean(signer && typeof signer.signEvent === 'function' && typeof signer.getPublicKey === 'function');
+  }
+  function publishDraft() {
+    const catalog = window.NOSMAPS_CATALOG;
+    if (!catalog || typeof catalog.buildSoftwareDraft !== 'function') return null;
+    return catalog.buildSoftwareDraft({
+      dLocal: publish.dLocal, name: publish.name, summary: publish.summary, homepage: publish.homepage,
+      topics: publish.topics.split(',').map(value => value.trim()).filter(Boolean),
+      pubkey: viewer.pubkey || '', createdAt: Math.floor(Date.now() / 1000)
+    });
+  }
+  /* §W0.1: 出せるかどうかを決めるのは読み取り側と同じ validateSoftwareEvent ただ一つ。
+     フォーム独自の判定を持たせると「出せるのに読めない」レコードが作れてしまう。 */
+  function publishValidation() {
+    const catalog = window.NOSMAPS_CATALOG;
+    const draft = publishDraft();
+    if (!catalog || !draft) return {ok: false, reason: 'unavailable'};
+    return catalog.validateSoftwareEvent(draft, {receivedAtSec: Math.floor(Date.now() / 1000)});
+  }
+  function publishDBytes() {
+    const encoder = new TextEncoder();
+    return encoder.encode(`${window.NOSMAPS_CATALOG?.SOFTWARE_D_PREFIX || 'nosmaps:'}${publish.dLocal.normalize('NFC').trim()}`).length;
+  }
+  function publishReasonText(reason) {
+    if (!reason) return '';
+    return i18n.has(`explorer.publish.reasons.${reason}`) ? t(`explorer.publish.reasons.${reason}`) : t('explorer.publish.reasons.unknownReason', {reason});
+  }
+  function publishOutcomeText(outcome) {
+    return i18n.has(`explorer.publish.outcomes.${outcome}`) ? t(`explorer.publish.outcomes.${outcome}`) : String(outcome);
+  }
+  /* §W4.4: 「1/2」と「2/2」は世界についての別の事実なので、見出しは必ず数を持つ。
+     一部成功のときは「一部のリレーしか持っていない」という帰結まで書く。 */
+  function publishResultMarkup() {
+    const result = publish.result;
+    if (!result) return '';
+    const total = result.relays.length;
+    const accepted = result.relays.filter(entry => entry.outcome === 'accepted').length;
+    const rows = result.relays.map(entry => `<li><code>${esc(entry.url)}</code> — ${esc(publishOutcomeText(entry.outcome))}${entry.notice ? ` — <q class="relay-notice">${esc(entry.notice)}</q>` : ''}</li>`).join('');
+    let headline;
+    if (result.state === 'published') headline = t('explorer.publish.headlines.published', {accepted, total});
+    else if (result.state === 'published-partial') headline = t('explorer.publish.headlines.partial', {accepted, total});
+    else if (result.state === 'unconfirmed') headline = t('explorer.publish.headlines.unconfirmed', {attempts: result.attempts});
+    else if (result.state === 'failed') headline = t('explorer.publish.headlines.failed');
+    else if (result.state === 'invalid') headline = t('explorer.publish.headlines.invalid');
+    else if (result.state === 'blocked') headline = t('explorer.publish.headlines.blocked');
+    else headline = t('explorer.publish.headlines.other', {state: result.state});
+    const consequence = result.state === 'published-partial' ? `<p class="publish-consequence">${esc(t('explorer.publish.partialConsequence'))}</p>` : '';
+    const reason = result.reason && result.state !== 'published' && result.state !== 'published-partial'
+      ? `<p class="publish-reason" data-publish-reason="${esc(result.reason)}">${esc(publishReasonText(result.reason))}</p>` : '';
+    const id = result.eventId ? `<p class="publish-event-id">${esc(t('explorer.publish.eventId'))} <code data-publish-event-id>${esc(result.eventId)}</code></p>` : '';
+    return `<div class="publish-result" data-publish-state="${esc(result.state)}">`
+      + `<p class="publish-headline" data-publish-headline>${esc(headline)}</p>${consequence}${reason}${id}`
+      + `<ul class="publish-relays">${rows}</ul></div>`;
+  }
+  function publishMarkup() {
+    // §W1.2 状態1: 拡張が無いなら Publish の UI そのものを描かない。
+    if (!signerCanSign()) return `<p class="publish-unavailable" data-publish-unavailable>${esc(t('explorer.publish.noSigner'))}</p>`;
+    if (viewer.status !== 'signedIn') return `<p class="publish-unavailable" data-publish-unavailable>${esc(t('explorer.publish.signInFirst'))}</p>`;
+    const validation = publishValidation();
+    const bytes = publishDBytes();
+    const canPublish = validation.ok === true && !publish.busy;
+    const hint = validation.ok === true ? '' : publishReasonText(validation.reason);
+    return `<h2 class="publish-title">${esc(t('explorer.publish.title'))}</h2>`
+      + `<p class="publish-lead">${esc(t('explorer.publish.lead'))}</p>`
+      + `<form class="publish-form" data-publish-form novalidate>`
+      + `<label class="field">${esc(t('explorer.publish.dLocal'))}<input id="publish-d" type="text" autocomplete="off" value="${esc(publish.dLocal)}" placeholder="com.example.tool"><small class="publish-bytes" data-publish-bytes>${esc(t('explorer.publish.dBytes', {bytes, max: PUBLISH_D_MAX_BYTES}))}</small></label>`
+      + `<label class="field">${esc(t('explorer.publish.name'))}<input id="publish-name" type="text" autocomplete="off" value="${esc(publish.name)}"></label>`
+      + `<label class="field">${esc(t('explorer.publish.summary'))}<textarea id="publish-summary" rows="3">${esc(publish.summary)}</textarea><small>${esc(t('explorer.publish.summaryHelp'))}</small></label>`
+      + `<label class="field">${esc(t('explorer.publish.homepage'))}<input id="publish-homepage" type="text" autocomplete="off" inputmode="url" value="${esc(publish.homepage)}" placeholder="https://"></label>`
+      + `<label class="field">${esc(t('explorer.publish.topics'))}<input id="publish-topics" type="text" autocomplete="off" value="${esc(publish.topics)}" placeholder="clients, relay"><small>${esc(t('explorer.publish.topicsHelp'))}</small></label>`
+      + `<p class="publish-hint" data-publish-hint>${esc(hint)}</p>`
+      + `<button class="primary" type="submit" data-publish-submit ${canPublish ? '' : 'disabled'}>${esc(publish.busy ? t('explorer.publish.publishing') : t('explorer.publish.submit'))}</button>`
+      + `</form>${publishResultMarkup()}`;
+  }
+  function renderPublish() {
+    const host = $('#publish-panel');
+    if (!host) return;
+    host.innerHTML = publishMarkup();
+  }
+  /* 打鍵のたびにフォームごと描き直すとキャレットが飛ぶので、判定に連動する部分だけ差し替える。 */
+  function refreshPublishState() {
+    const host = $('#publish-panel');
+    if (!host) return;
+    const button = host.querySelector('[data-publish-submit]');
+    const hint = host.querySelector('[data-publish-hint]');
+    const bytes = host.querySelector('[data-publish-bytes]');
+    if (!button || !hint || !bytes) return;
+    const validation = publishValidation();
+    button.disabled = !(validation.ok === true && !publish.busy);
+    hint.textContent = validation.ok === true ? '' : publishReasonText(validation.reason);
+    bytes.textContent = t('explorer.publish.dBytes', {bytes: publishDBytes(), max: PUBLISH_D_MAX_BYTES});
+  }
+  async function submitPublish() {
+    if (publish.busy) return;
+    const catalog = window.NOSMAPS_CATALOG;
+    if (!catalog || typeof catalog.publishSoftwareRecord !== 'function') return;
+    publish.busy = true;
+    publish.result = null;
+    renderPublish();
+    const relayOverride = params.get('relays');
+    const relays = relayOverride
+      ? relayOverride.split(',').map(value => value.trim()).filter(Boolean)
+      : ((catalog.POLICY && catalog.POLICY.DEFAULT_RELAYS) || []).slice();
+    let result;
+    try {
+      result = await catalog.publishSoftwareRecord({
+        relays,
+        signer: window.nostr,
+        expectPubkey: viewer.pubkey || '',
+        draft: {
+          dLocal: publish.dLocal, name: publish.name, summary: publish.summary, homepage: publish.homepage,
+          topics: publish.topics.split(',').map(value => value.trim()).filter(Boolean)
+        },
+        readbackAttempts: publishReadbackAttempts,
+        readbackBackoffMs: publishReadbackBackoff,
+        publishTimeoutMs: publishTimeoutMs
+      });
+    } catch (error) {
+      // 例外を成功に読ませない。理由が分からないなら分からないと書く。
+      result = {state: 'failed', reason: 'publish-error', eventId: null, relays: relays.map(url => ({url, outcome: 'connection-failed', notice: ''})), readback: null, attempts: 0};
+    }
+    publish.busy = false;
+    publish.result = result;
+    renderPublish();
+    // §W5.6: 一覧に出るのは観測できたレコードだけ。読み戻せたときにだけ読み直す。
+    if (result && result.state === 'published') await loadRelayCatalog();
+    else if (result && result.state === 'published-partial') await loadRelayCatalog();
+  }
+
+  function renderAll() { renderIdentity(); renderFeatures(); renderFilterPanel(); els.query.value = state.query; renderResults(); renderPublish(); rerenderOpenDialogs(); }
   function focusableElements(dialog) { return [...dialog.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(element => element.getClientRects().length); }
   function focusKey(element) {
     if (!element) return null;
@@ -962,7 +1125,15 @@
     if (file) { const form = file.closest('form'); const selected = file.files?.[0]; if (!selected?.type.startsWith('image/')) return; const reader = new FileReader(); reader.onload = () => { const image = String(reader.result); form.dataset.localImage = image; form.dataset.localFilename = selected.name; form.querySelectorAll('input[name="imageChoice"]').forEach(input => { input.checked = false; }); form.querySelector('.local-image-preview').innerHTML = `<img src="${esc(image)}" alt="${esc(t('explorer.imageTitle'))}"><small>${esc(selected.name)}</small>`; captureReviewDraft(); }; reader.readAsDataURL(selected); }
   });
   document.addEventListener('input', event => { if (event.target.id === 'nip-query') { state.nipQuery = event.target.value; renderResults(); } });
+  const PUBLISH_FIELDS = {'publish-d': 'dLocal', 'publish-name': 'name', 'publish-summary': 'summary', 'publish-homepage': 'homepage', 'publish-topics': 'topics'};
+  document.addEventListener('input', event => {
+    const field = PUBLISH_FIELDS[event.target.id];
+    if (!field) return;
+    publish[field] = event.target.value;
+    refreshPublishState();
+  });
   document.addEventListener('submit', event => {
+    if (event.target.closest('[data-publish-form]')) { event.preventDefault(); submitPublish(); return; }
     const form = event.target.closest('[data-review-form]'); if (!form) return; event.preventDefault();
     const data = new FormData(form); const body = String(data.get('body') || '').trim(); const selectedIndex = data.get('imageChoice');
     const seedImage = selectedIndex === null ? null : seedReviews(tools.find(tool => tool.id === form.dataset.reviewForm))[Number(selectedIndex)]?.image;

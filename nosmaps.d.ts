@@ -576,6 +576,65 @@ interface NosmapsRelayFilter {
   readonly [tagFilter: string]: unknown;
 }
 
+/** Field values as the form holds them; everything else about the event is a
+    computed constant (§W3.5) and therefore deliberately absent here. */
+interface NosmapsSoftwareDraftInput {
+  dLocal?: string;
+  name?: string;
+  summary?: string;
+  homepage?: string;
+  topics?: readonly string[];
+  state?: 'active' | 'withdrawn';
+  pubkey?: string;
+  createdAt?: number;
+}
+
+interface NosmapsNip07Signer {
+  getPublicKey(): Promise<string> | string;
+  signEvent(draft: unknown): Promise<NosmapsNostrEvent> | NosmapsNostrEvent;
+}
+
+interface NosmapsPublishOptions {
+  relays?: readonly string[];
+  draft?: NosmapsSoftwareDraftInput;
+  signer?: NosmapsNip07Signer | null;
+  /** The key the viewer signed in with. A mismatch aborts before signing. */
+  expectPubkey?: string;
+  nowSec?: number;
+  timeoutMs?: number;
+  publishTimeoutMs?: number;
+  readbackAttempts?: number;
+  readbackBackoffMs?: readonly number[];
+}
+
+/** §W4.2: one record per relay, from a closed enum. `timeout` and
+    `connection-failed` are undetermined, NOT failures, and never aggregate as one. */
+type NosmapsPublishOutcome =
+  | 'accepted' | 'rejected' | 'auth-required' | 'timeout' | 'connection-failed' | 'not-attempted';
+
+/** §W4.3: `published` is a claim about a read-back, not about an OK. */
+type NosmapsPublishState =
+  | 'published' | 'published-partial' | 'unconfirmed' | 'failed'
+  | 'invalid' | 'blocked' | 'superseded-during-publish' | 'readback-quarantined';
+
+interface NosmapsPublishResult {
+  readonly state: NosmapsPublishState;
+  readonly reason: string | null;
+  readonly eventId: string | null;
+  readonly coordinate: string | null;
+  readonly event: NosmapsNostrEvent | null;
+  readonly relays: readonly {url: string; outcome: NosmapsPublishOutcome; notice: string}[];
+  readonly accepted?: number;
+  readonly readback: {
+    readonly state: string;
+    /** §W5.2: "returned via #t", never "#t is indexed". */
+    readonly tIndex: string;
+    readonly winnerId: string | null;
+  } | null;
+  readonly attempts: number;
+  readonly asOf: number;
+}
+
 interface NosmapsCatalogCache {
   open(): Promise<unknown>;
   putRecord(record: unknown): Promise<unknown>;
@@ -606,6 +665,13 @@ interface NosmapsCatalog {
   /** One filter per author, each carrying that author's `#d` values. */
   groupByAuthor(coordinates: readonly string[]): readonly NosmapsRelayFilter[];
   loadCatalog(opts?: NosmapsLoadCatalogOptions): Promise<NosmapsCatalogResult>;
+  /** The unsigned kind 30078 draft (write path §W3). Unsigned on purpose: the
+      read path's own validateSoftwareEvent is what gates publication, and it
+      reads `id` only optionally, so it runs before a signer is ever asked. */
+  buildSoftwareDraft(input?: NosmapsSoftwareDraftInput): NosmapsNostrEvent;
+  /** Sign, publish, read back. Never resolves to a bare boolean: `unconfirmed`
+      (acknowledged but not read back) is a different fact from `failed`. */
+  publishSoftwareRecord(opts?: NosmapsPublishOptions): Promise<NosmapsPublishResult>;
   /** Hex in, hex out; null for anything that is not a well-formed npub or
       64-char lowercase hex key. */
   decodeNpub(value: unknown): string | null;
@@ -623,6 +689,9 @@ interface NosmapsCatalog {
 /* ------------------------------------------------------------------------ */
 
 interface Window {
+  /* NIP-07. Optional because its absence is a state the app renders (§W1.2
+     state 1), not an error: no extension means the Publish UI is not drawn. */
+  nostr?: NosmapsNip07Signer;
   NOSMAPS_DATA: NosmapsData;
   NOSMAPS_I18N: NosmapsI18n;
   NOSMAPS_ICONS: NosmapsIcons;
