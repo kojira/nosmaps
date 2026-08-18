@@ -201,14 +201,33 @@
     const verified = tool && tool.provenance === 'relay';
     return `<span class="provenance-badge ${verified ? 'relay' : 'sample'}">${esc(t(verified ? 'explorer.relayVerified' : 'explorer.sampleData'))}</span>`;
   }
+  const unknownMarker = () => `<span class="no-support-record" aria-label="${esc(t('unknown'))}" title="${esc(t('unknown'))}">—</span>`;
+  // 観測していない欄は data.js 由来の語彙で埋めず、既存の「不明」語彙で出す。
+  function categoryText(tool) { return relayEntry(tool) && !tool.categoryObserved ? t('unknown') : category(tool.category).name; }
+  function osText(tool) { const list = (tool.os || []).filter(Boolean); if (list.length) return list.join(' / '); return tool.platform || t('unknown'); }
+  function platformTags(tool) {
+    // 32267 は OS / 配布形態を観測しない。data.js サンプルだけが実データを持つ。
+    if (relayEntry(tool) && !(tool.os || []).length && !tool.platform) return `<span class="tag">${esc(t('explorer.os'))}: ${esc(t('unknown'))}</span>`;
+    return `<span class="tag">${esc(tool.platform)}</span><span class="tag">${esc((tool.os || []).filter(value => value !== tool.platform).join(' / ') || deliveryLabel(delivery(tool)))}</span>`;
+  }
+  // §6.4: 推薦数はビューアのフォローグラフから数えた「distinct pubkey 数」。
+  // グラフが無いときは unknown で、0 とは別の見た目にし、並び順にも 0 として入れない (I8)。
+  function recommendationMarkup(tool) {
+    if (!relayEntry(tool)) return '';
+    const count = tool.recommendations;
+    if (count === null || count === undefined) {
+      return `<p class="recommendation-count is-unknown" data-recommendations="unknown">${esc(t('explorer.recommendationsUnknown'))} ${unknownMarker()}</p>`;
+    }
+    return `<p class="recommendation-count" data-recommendations="${esc(String(count))}">${esc(t('explorer.recommendations', {count}))}</p>`;
+  }
   function featureCard(tool) {
     const selected = state.features.map(id => localizedFeature(id));
     const supports = selected.map(feature => ({feature, support: featureSupport(tool, feature)}));
     const records = [...new Map(selected.flatMap(feature => supportRecords(tool, feature)).map(record => [record.nip, record])).values()];
     const bookmark = state.bookmarks[tool.id];
     return `<article class="feature-tool-card ${tool.status === 'dead' ? 'dead-tool' : ''}" data-tool-id="${tool.id}"><div class="nip-card-top"><span class="tool-icon" aria-hidden="true">${iconSvg(category(tool.category).icon)}</span><span class="card-top-meta">${provenanceBadge(tool)}<span class="status ${tool.status}">${esc(t(`statuses.${tool.status}`))}</span></span></div><h2>${esc(tool.name)}</h2><p>${esc(toolDescription(tool))}</p>
-      <section class="card-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><div class="support-line">${supports.length ? supports.map(item => `<span class="feature-support-summary">${esc(item.feature.name)} ${supportBadge(item.support)}</span>`).join('') : `<span class="tag">${esc(t('explorer.noFeatureCondition'))}</span>`}<span class="tag">${tool.platform}</span><span class="tag">${esc((tool.os || []).filter(value => value !== tool.platform).join(' / ') || deliveryLabel(delivery(tool)))}</span></div><dl class="tool-facts"><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(category(tool.category).name)}</dd></div><div><dt>OSS</dt><dd>${esc(displayLicense(tool))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(tool.observed.split(' ')[0])}</dd></div></dl><nav class="resource-links" aria-label="${esc(t('explorer.officialLinks', {name: tool.name}))}">${resourceLinks(tool)}</nav>${records.length ? `<div class="basis-nips">${records.map(record => `<button type="button" class="nip-tag-button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}">NIP-${record.nip} · ${esc(statusLabel(record.status))}</button>`).join('')}</div>` : ''}</section>
-      <section class="card-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${tool.id}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCountMarkup(tool)}</button><button type="button" data-bookmark-tool="${tool.id}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${tool.id}">${esc(t('explorer.reviews', {count: allReviews(tool).length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${tool.id}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}</section>
+      <section class="card-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><div class="support-line">${supports.length ? supports.map(item => `<span class="feature-support-summary">${esc(item.feature.name)} ${supportBadge(item.support)}</span>`).join('') : `<span class="tag">${esc(t('explorer.noFeatureCondition'))}</span>`}${platformTags(tool)}</div><dl class="tool-facts"><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(categoryText(tool))}</dd></div><div><dt>OSS</dt><dd>${esc(displayLicense(tool))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool).split(' ')[0])}</dd></div></dl><nav class="resource-links" aria-label="${esc(t('explorer.officialLinks', {name: tool.name}))}">${resourceLinks(tool)}</nav>${records.length ? `<div class="basis-nips">${records.map(record => `<button type="button" class="nip-tag-button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}">NIP-${record.nip} · ${esc(statusLabel(record.status))}</button>`).join('')}</div>` : ''}</section>
+      <section class="card-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${recommendationMarkup(tool)}${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${tool.id}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCountMarkup(tool)}</button><button type="button" data-bookmark-tool="${tool.id}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${tool.id}">${esc(t('explorer.reviews', {count: allReviews(tool).length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${tool.id}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}</section>
       ${tool.status === 'dead' ? `<p class="replacement-note">${esc(t('explorer.endedRecord'))} <button type="button" class="text-button" data-find-alternative>${esc(t('explorer.alternatives'))}</button></p>` : ''}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${tool.id}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${tool.id}">${esc(t('explorer.details'))}</button></div></article>`;
   }
 
@@ -268,13 +287,21 @@
     return `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
   }
   function relayCoverageLabel(value) { const key = value && typeof value === 'object' ? value.status : value; const label = i18n.value(`explorer.coverage.${key}`); return typeof label === 'string' ? label : String(key); }
+  // kind 32267 の v1 content にカテゴリ・OS・ライセンスの欄はない。`t` トピックが
+  // UI のカテゴリ id と一致したときだけ観測値として使い、それ以外は不明のまま出す。
+  function categoryFromTopics(topics) { return (Array.isArray(topics) ? topics.find(value => categories.includes(value)) : null) || null; }
   function relayEntryToTool(entry, asOf) {
     const fields = (entry && entry.fields) || {};
-    const validCategory = categories.includes(fields.category) ? fields.category : 'clients';
-    const stale = Boolean(entry && (entry.stale === true || entry.state === 'stale'));
+    const observedCategory = categoryFromTopics(entry && entry.topics);
+    const stale = Boolean(entry && entry.stale === true);
     return {
-      id: `relay:${(entry && entry.coordinate) || Math.random().toString(36).slice(2)}`, name: fields.name || (entry && entry.coordinate) || '—',
-      category: validCategory, status: stale ? 'stale' : 'active', platform: 'Web', os: ['Web'], license: '', observed: formatObserved(asOf), nips: [], provenance: 'relay'
+      id: `relay:${(entry && entry.coordinate) || ''}`, name: fields.name || (entry && entry.coordinate) || '—',
+      // category はアイコン表示用のフォールバック。観測できたかは categoryObserved で持ち、表示語彙はそちらで決める。
+      category: observedCategory || 'clients', categoryObserved: Boolean(observedCategory),
+      status: stale ? 'stale' : 'active', platform: '', os: [], license: '', observed: formatObserved(asOf), nips: [], provenance: 'relay',
+      coordinate: (entry && entry.coordinate) || '', summary: fields.summary || '', homepage: (fields.homepage) || null,
+      recommendations: entry && 'recommendations' in entry ? entry.recommendations : null,
+      recommenders: (entry && entry.recommenders) || [], quarantinedNewer: (entry && entry.quarantinedNewer) || null
     };
   }
   // カード一覧に出る候補は data.js のサンプルとリレー由来エントリの両方。ダイアログの参照もこの両方を辿る。
@@ -282,19 +309,67 @@
   function findTool(id) { return tools.find(item => item.id === id) || relayEntries().find(item => item.id === id) || null; }
   function relayEntry(tool) { return Boolean(tool) && tool.provenance === 'relay'; }
   function observedText(tool) { return formatObserved(tool.observed) || t('unknown'); }
+  function shortKey(value) { return typeof value === 'string' && value.length > 16 ? `${value.slice(0, 8)}…${value.slice(-8)}` : String(value || ''); }
   function relayDiagnosticsMarkup(result) {
     const summary = `<summary>${esc(t('explorer.relayDiagnostics'))}</summary>`;
     const reload = `<p><button class="secondary" type="button" data-relay-action="reload">${esc(t('explorer.relayReload'))}</button></p>`;
     if (!result) return `<details id="relay-diagnostics" class="relay-diagnostics">${summary}<p>${esc(t('explorer.relayNoData'))}</p>${reload}</details>`;
     const coverage = result.coverage || {};
     const relayUrls = Object.keys(coverage);
-    const curators = Array.isArray(result.curators) ? result.curators : [];
+    const graph = result.graph || {};
+    const curation = result.curation || {};
+    const curators = Array.isArray(curation.curators) ? curation.curators : [];
+    const manual = Array.isArray(curation.manual) ? curation.manual : [];
+    const rounds = Array.isArray(result.rounds) ? result.rounds : [];
+    const quarantined = Array.isArray(result.quarantined) ? result.quarantined : [];
+    const unresolved = Array.isArray(result.unresolved) ? result.unresolved : [];
+    const slugs = Array.isArray(result.diagnostics) ? result.diagnostics : [];
     const stats = result.stats || {};
     const field = (label, value) => `<div><dt>${esc(label)}</dt><dd>${esc(value == null || value === '' ? t('none') : value)}</dd></div>`;
     const relayRows = relayUrls.length ? relayUrls.map(url => `<li><code>${esc(url)}</code> — ${esc(relayCoverageLabel(coverage[url]))}</li>`).join('') : `<li>${esc(t('none'))}</li>`;
-    const curatorRows = curators.length ? curators.map(item => `<li><code>${esc(item.curator || t('none'))}</code><dl class="relay-diagnostics-grid">${field(t('explorer.relayCuratorStatus'), item.status)}${field(t('explorer.relayPointer'), item.pointerId)}${field(t('explorer.relayGeneration'), item.generation)}${field(t('explorer.relayBlob'), item.sha256)}${field(t('explorer.relayVerifiedAt'), formatObserved(item.verifiedAt))}${item.reason ? field(t('explorer.relayReason'), item.reason) : ''}</dl></li>`).join('') : `<li>${esc(t('none'))}</li>`;
+    // §6.2/§3: グラフの状態とカバレッジは数のそばに必ず出す。none は 0 ではなく不明。
+    const graphRow = `<dl class="relay-diagnostics-grid">${field(t('explorer.relayGraphState'), t(`explorer.graphStates.${graph.state || 'none'}`))}${field(t('explorer.relayGraphCoverage'), t(`explorer.graphCoverage.${graph.coverage || 'unknown'}`))}${field(t('explorer.relayGraphFollows'), graph.state === 'tier1' ? t('explorer.relayGraphFollowsValue', {used: graph.followsUsed, total: graph.followsTotal}) : t('none'))}${field(t('explorer.relayGraphMalformed'), graph.malformedPTags)}${field(t('explorer.relayViewer'), graph.viewerPubkey ? shortKey(graph.viewerPubkey) : t('none'))}${field(t('explorer.relayViewerSource'), result.viewerSource || 'none')}</dl>`;
+    // §6.4: 数の裏にいる pubkey は必ず辿れるようにする。それが唯一の信頼調整手段。
+    const curatorRow = item => `<li><code>${esc(shortKey(item.curator))}</code><dl class="relay-diagnostics-grid">${field(t('explorer.relayCuratorSets'), t('explorer.relayCuratorSetsValue', {used: item.setsUsed, observed: item.setsObserved}))}${field(t('explorer.relayCuratorMembers'), item.memberCount)}${item.truncated ? field(t('explorer.relayReason'), 'sets-truncated') : ''}</dl></li>`;
+    const curatorRows = curators.length ? curators.map(curatorRow).join('') : `<li>${esc(t('explorer.relayNoCuration'))}</li>`;
+    const manualRows = manual.length ? `<h4>${esc(t('explorer.relayManualCurators'))}</h4><ul class="relay-diagnostics-list">${manual.map(curatorRow).join('')}</ul>` : '';
+    const roundRows = rounds.length ? rounds.map(round => `<li><code>${esc(round.label)}</code><dl class="relay-diagnostics-grid">${field(t('explorer.relayLogical'), round.logicalReqs)}${field(t('explorer.relayPhysical'), round.physicalReqs)}${field(t('explorer.relayChunks'), round.chunks)}${round.reason ? field(t('explorer.relayReason'), round.reason) : ''}</dl></li>`).join('') : `<li>${esc(t('none'))}</li>`;
     const statsRow = `<dl class="relay-diagnostics-grid">${field(t('explorer.relayAsOf'), formatObserved(result.asOf))}${field(t('explorer.relayLogical'), stats.logicalReqs)}${field(t('explorer.relayPhysical'), stats.physicalReqs)}${field(t('explorer.relayHttp'), stats.httpAttempts)}${field(t('explorer.relayCache'), stats.cacheHits)}</dl>`;
-    return `<details id="relay-diagnostics" class="relay-diagnostics">${summary}<div class="relay-diagnostics-body"><section><h3>${esc(t('explorer.relayRelays'))}</h3><ul class="relay-diagnostics-list">${relayRows}</ul></section><section><h3>${esc(t('explorer.relayCurators'))}</h3><ul class="relay-diagnostics-list">${curatorRows}</ul></section><section><h3>${esc(t('explorer.relayReqs'))}</h3>${statsRow}</section>${reload}</div></details>`;
+    // §4.2 / §3: quarantine は理由付きで残し、「存在しない」とは絶対に言わない。
+    const quarantineRows = quarantined.length ? quarantined.map(item => `<li><code>${esc(item.coordinate || t('none'))}</code> — ${esc(item.reason)}${item.eventId ? ` <small>${esc(shortKey(item.eventId))}</small>` : ''}</li>`).join('') : `<li>${esc(t('none'))}</li>`;
+    // §5.4: 推薦されたが観測できなかった座標。行を捏造せずここにだけ出す。
+    const unresolvedRows = unresolved.length ? unresolved.map(coord => `<li><code>${esc(coord)}</code></li>`).join('') : `<li>${esc(t('none'))}</li>`;
+    const slugRow = `<p class="relay-diagnostics-slugs">${slugs.length ? slugs.map(slug => `<code>${esc(slug)}</code>`).join(' ') : esc(t('none'))}</p>`;
+    return `<details id="relay-diagnostics" class="relay-diagnostics">${summary}<div class="relay-diagnostics-body">`
+      + `<section><h3>${esc(t('explorer.relayRelays'))}</h3><ul class="relay-diagnostics-list">${relayRows}</ul></section>`
+      + `<section><h3>${esc(t('explorer.relayGraph'))}</h3>${graphRow}</section>`
+      + `<section><h3>${esc(t('explorer.relayCurators'))}</h3><ul class="relay-diagnostics-list">${curatorRows}</ul>${manualRows}</section>`
+      + `<section><h3>${esc(t('explorer.relayRounds'))}</h3><ul class="relay-diagnostics-list">${roundRows}</ul></section>`
+      + `<section><h3>${esc(t('explorer.relayReqs'))}</h3>${statsRow}</section>`
+      + `<section><h3>${esc(t('explorer.relayQuarantined'))}</h3><ul class="relay-diagnostics-list">${quarantineRows}</ul></section>`
+      + `<section><h3>${esc(t('explorer.relayUnresolved'))}</h3><ul class="relay-diagnostics-list">${unresolvedRows}</ul></section>`
+      + `<section><h3>${esc(t('explorer.relaySlugs'))}</h3>${slugRow}</section>${reload}</div></details>`;
+  }
+  // §5.1 rule 5 / D10: 発見はトピック opt-in なので必ず「全部」ではないと明示する。
+  function discoveryScopeMarkup(result) {
+    const topics = (result && Array.isArray(result.topics) ? result.topics : []).join(', ');
+    if (!topics) return '';
+    return `<p class="discovery-scope" data-discovery-scope>${esc(t('explorer.discoveryScope', {topics}))}</p>`;
+  }
+  // §6.5.4: グラフが無いときは黙って空にせず、状況と二つの解決手段を出す。
+  function graphBannerMarkup(result) {
+    const graph = (result && result.graph) || null;
+    if (!graph) return '';
+    if (graph.state !== 'none') {
+      const label = graph.state === 'tier1'
+        ? t('explorer.graphStateLine', {state: t(`explorer.graphStates.${graph.state}`), coverage: t(`explorer.graphCoverage.${graph.coverage || 'unknown'}`), used: graph.followsUsed, total: graph.followsTotal})
+        : t('explorer.graphStateLineShort', {state: t(`explorer.graphStates.${graph.state}`), coverage: t(`explorer.graphCoverage.${graph.coverage || 'unknown'}`)});
+      return `<p class="graph-state" data-graph-state="${esc(graph.state)}">${esc(label)}</p>`;
+    }
+    return `<div class="graph-banner" data-graph-state="none"><p>${esc(t('explorer.graphNoneBanner'))}</p>`
+      + `<div class="graph-banner-actions"><button class="secondary" type="button" data-graph-connect>${esc(t('explorer.graphConnect'))}</button>`
+      + `<label class="graph-npub-field">${esc(t('explorer.graphPasteLabel'))}<input id="graph-npub" type="text" inputmode="text" autocomplete="off" placeholder="npub1…" value="${esc(relayViewer.viewerPubkey)}"></label>`
+      + `<button class="secondary" type="button" data-graph-apply>${esc(t('explorer.graphApply'))}</button></div></div>`;
   }
   function applyRelayResult(result) {
     if (!result) { relayState = {active: true, result: null, entries: []}; state.uiState = 'unavailable'; renderResults(); return; }
@@ -310,15 +385,27 @@
     state.uiState = ui;
     renderResults();
   }
-  async function loadRelayCatalog() {
+  // §6.5.4 の二つの手段（NIP-07 接続 / npub 貼り付け）はここで保持する。既定は空で、
+  // アプリが既定のキュレーターを持つことはない (§6.5.5)。
+  const relayViewer = {viewerPubkey: (params.get('viewer') || '').trim(), useNip07: false};
+  async function loadRelayCatalog(override) {
+    const next = override && typeof override === 'object' && !(override instanceof Event) ? override : {};
+    if ('viewerPubkey' in next) relayViewer.viewerPubkey = String(next.viewerPubkey || '').trim();
+    if ('useNip07' in next) relayViewer.useNip07 = Boolean(next.useNip07);
     try {
       const catalog = window.NOSMAPS_CATALOG;
       if (!catalog || typeof catalog.loadCatalog !== 'function') return null;
       const relayOverride = params.get('relays');
-      const curatorOverride = params.get('curators');
+      // §17.2 / §6.5.6: `?curators=` は掲載ゲートではなく、手動の「これも数える」リスト。
+      // 出荷時は空で、行の集合には一切影響しない。
+      const manualOverride = params.get('curators');
+      const topicOverride = params.get('topics');
       const relays = relayOverride ? relayOverride.split(',').map(value => value.trim()).filter(Boolean) : ((catalog.POLICY && catalog.POLICY.DEFAULT_RELAYS) || []);
       const options = {relays};
-      if (curatorOverride) options.curators = curatorOverride.split(',').map(value => value.trim()).filter(Boolean);
+      if (manualOverride) options.manualCounted = manualOverride.split(',').map(value => value.trim()).filter(Boolean);
+      if (topicOverride) options.topics = topicOverride.split(',').map(value => value.trim()).filter(Boolean);
+      if (relayViewer.viewerPubkey) options.viewerPubkey = relayViewer.viewerPubkey;
+      if (relayViewer.useNip07) options.useNip07 = true;
       state.uiState = 'loading'; renderResults();
       const result = await catalog.loadCatalog(options);
       window.__NOSMAPS_RELAY_RESULT__ = result;
@@ -335,10 +422,12 @@
     renderConditions(); renderNips(); renderCompareActions();
     els.offline.hidden = state.uiState !== 'offline';
     const relayActive = Boolean(relayState && relayState.active);
+    // グラフの状態バナーと発見スコープの但し書きは、結果が空でも必ず出す。
+    const relayContext = relayActive ? graphBannerMarkup(relayState.result) + discoveryScopeMarkup(relayState.result) : '';
     const diagnostics = relayActive ? relayDiagnosticsMarkup(relayState.result) : '';
-    if (['loading', 'empty', 'error', 'unavailable'].includes(state.uiState)) { els.results.hidden = true; els.resultCount.textContent = t('explorer.count', {count: 0}); els.uiState.innerHTML = stateMarkup(state.uiState) + diagnostics; return; }
+    if (['loading', 'empty', 'error', 'unavailable'].includes(state.uiState)) { els.results.hidden = true; els.resultCount.textContent = t('explorer.count', {count: 0}); els.uiState.innerHTML = stateMarkup(state.uiState) + relayContext + diagnostics; return; }
     els.results.hidden = false;
-    els.uiState.innerHTML = (['partial', 'offline', 'stale', 'incomplete'].includes(state.uiState) ? stateMarkup(state.uiState) : '') + diagnostics;
+    els.uiState.innerHTML = (['partial', 'offline', 'stale', 'incomplete'].includes(state.uiState) ? stateMarkup(state.uiState) : '') + relayContext + diagnostics;
     let list = relayActive ? relayState.entries : filteredTools();
     if (!relayActive && state.uiState === 'partial') list = list.slice(0, 7);
     els.resultCount.textContent = t('explorer.count', {count: list.length});
@@ -378,8 +467,8 @@
   function renderToolDetail(context, shouldOpen = true) {
     const tool = findTool(context.toolId);
     if (!tool) return;
-    // リレー由来のエントリは説明文・NIP・レビューを観測していない。埋め合わせず「不明」「なし」で出す。
-    const description = relayEntry(tool) ? t('unknown') : toolDescription(tool);
+    // リレー由来の説明文は 32267 の署名済み content の summary だけ。NIP・レビューは観測していないので埋め合わせない。
+    const description = relayEntry(tool) ? (tool.summary || t('unknown')) : toolDescription(tool);
     const records = (tool.nips || []).slice(0, 7);
     const reviews = allReviews(tool);
     const basisList = records.length
@@ -394,8 +483,9 @@
     const tool = findTool(context.toolId);
     if (!tool) return;
     const typeLabel = t(`explorer.${context.resourceType}`);
-    // resourceUrl は data.js サンプル用の生成 URL。リレー由来のエントリには観測された URL がないので出さない。
-    const url = relayEntry(tool) ? '' : resourceUrl(tool, context.resourceType);
+    // resourceUrl は data.js サンプル用の生成 URL。リレー由来で観測できる URL は
+    // 32267 content の homepage だけなので、site 以外は出さない。
+    const url = relayEntry(tool) ? (context.resourceType === 'site' ? (tool.homepage || '') : '') : resourceUrl(tool, context.resourceType);
     els.evidenceDialog.setAttribute('aria-label', t('explorer.linkDetails', {type: typeLabel}));
     els.evidenceContent.innerHTML = `${dialogHead(t('explorer.linkDetails', {type: typeLabel}), tool.name)}<dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.displayUrl'))}</dt><dd>${esc(url || t('unknown'))}</dd></div><div><dt>${esc(t('explorer.checkedAt'))}</dt><dd>${esc(observedText(tool))}</dd></div></dl>`;
     if (shouldOpen) openDialog(els.evidenceDialog, context);
@@ -423,8 +513,9 @@
       }), `<span class="feature-symbol" aria-hidden="true">${iconSvg(definition.icon)}</span>`);
     });
     const basics = [
-      comparisonItem(t('explorer.os'), selected.map(tool => (tool.os || [tool.platform]).join('/')), selected.map(tool => `<div class="comparison-value">${esc((tool.os || [tool.platform]).join(' / '))}</div>`)),
-      comparisonItem(t('explorer.category'), selected.map(tool => tool.category), selected.map(tool => `<div class="comparison-value">${esc(category(tool.category).name)}</div>`)),
+      // OS / カテゴリも observedText と同じ扱い: 観測がない欄は「不明」語彙で埋め、空欄にも捏造にもしない。
+      comparisonItem(t('explorer.os'), selected.map(tool => osText(tool)), selected.map(tool => `<div class="comparison-value">${esc(osText(tool))}</div>`)),
+      comparisonItem(t('explorer.category'), selected.map(tool => categoryText(tool)), selected.map(tool => `<div class="comparison-value">${esc(categoryText(tool))}</div>`)),
       comparisonItem('OSS', selected.map(tool => displayLicense(tool)), selected.map(tool => `<div class="comparison-value">${esc(displayLicense(tool))}</div>`)),
       // observed が空のリレー由来エントリでも空欄にせず、observedText の「不明」語彙で出す。
       comparisonItem(t('explorer.observed'), selected.map(tool => observedText(tool)), selected.map(tool => `<div class="comparison-value">${esc(observedText(tool).split(' ')[0])}</div>`))
@@ -563,6 +654,9 @@
     if (event.target.closest('[data-find-alternative]')) { state.includeDead = false; renderAll(); return; }
     if (event.target.closest('[data-show-feature-basis]')) { renderFeatureBasis(); return; }
     const relayAction = event.target.closest('[data-relay-action]'); if (relayAction) { if (relayAction.dataset.relayAction === 'reload') loadRelayCatalog(); return; }
+    // §6.5.4 の二つの手段。どちらも並び順と推薦数にしか効かず、行の集合は動かない (I7)。
+    if (event.target.closest('[data-graph-connect]')) { loadRelayCatalog({useNip07: true}); return; }
+    if (event.target.closest('[data-graph-apply]')) { loadRelayCatalog({viewerPubkey: $('#graph-npub')?.value || '', useNip07: false}); return; }
     const setState = event.target.closest('[data-set-state]'); if (setState) { state.uiState = setState.dataset.setState; renderAll(); }
   });
 

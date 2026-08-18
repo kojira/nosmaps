@@ -44,10 +44,10 @@ test('browser language detection, visible switch, session memory, and no localSt
   const page = await jaContext.newPage();
   await page.goto('index.html');
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
-  await expect(page.getByRole('heading', {name: /Nostrの道具/})).toBeVisible();
+  await expect(page.getByRole('heading', {name: /Nostrの地図/})).toBeVisible();
   await page.getByRole('button', {name: 'English'}).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.getByRole('heading', {name: /How do you want/})).toBeVisible();
+  await expect(page.getByRole('heading', {name: /map of Nostr/})).toBeVisible();
   expect(await page.evaluate(() => ({session: sessionStorage.getItem('nosmaps.language'), localCount: localStorage.length}))).toEqual({session: 'en', localCount: 0});
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
@@ -61,54 +61,10 @@ test('browser language detection, visible switch, session memory, and no localSt
   await enContext.close();
 });
 
-test('all four concepts and canonical URLs remain available with visible localized category choices', async ({page}) => {
-  const errors = collectErrors(page);
-  await page.goto('index.html');
-  expect(await page.evaluate(() => window.NOSMAPS_DATA.tools.length)).toBe(36);
-  for (const mode of ['A', 'B', 'C']) await expect(page.getByRole('button', {name: `Open ${mode}`})).toBeVisible();
-  await expect(page.getByRole('link', {name: 'Open D'})).toHaveAttribute('href', 'nip-explorer.html');
-  await page.getByRole('button', {name: 'Open C'}).click();
-  const categories = page.locator('.category-tree .category-icon');
-  await expect(categories).toHaveCount(7);
-  await expect(categories.locator('.material-icon')).toHaveCount(7);
-  await expect(categories.first().locator('.category-title')).toHaveText('All');
-  await expect(categories.first().locator('.category-description')).toHaveText('Browse tools from every category.');
-  await expect(categories.nth(1).locator('.category-title')).toHaveText('Clients');
-  await expect(categories.nth(1).locator('.category-description')).toHaveText('Clients for timelines and publishing.');
-  await expect(categories.nth(1)).toHaveAttribute('aria-label', 'Clients: Clients for timelines and publishing.');
-  await expect(categories.nth(1)).toHaveAttribute('title', 'Clients: Clients for timelines and publishing.');
-  await categories.nth(2).click();
-  await expect(categories.nth(2)).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', {name: '日本語'}).click();
-  const localized = page.locator('.category-tree .category-icon');
-  await expect(localized.first().locator('.category-title')).toHaveText('すべて');
-  await expect(localized.first().locator('.category-description')).toHaveText('すべてのカテゴリから探します。');
-  await expect(localized.nth(1).locator('.category-title')).toHaveText('クライアント');
-  await expect(localized.nth(1).locator('.category-description')).toHaveText('タイムラインや投稿を扱うクライアント。');
-  await expect(localized.nth(1)).toHaveAttribute('aria-label', 'クライアント: タイムラインや投稿を扱うクライアント。');
-  await expect(localized.nth(2)).toHaveAttribute('aria-pressed', 'true');
-  expect(errors).toEqual([]);
-});
-
 test('category titles and descriptions wrap without clipping or overflow on desktop and 375x812', async ({page}) => {
   const errors = collectErrors(page);
   for (const viewport of [{width: 1280, height: 900}, {width: 375, height: 812}]) {
     await page.setViewportSize(viewport);
-    await page.goto('index.html#concept-c');
-    for (const language of ['en', 'ja']) {
-      const switchName = language === 'ja' ? '日本語' : 'English';
-      await page.getByRole('button', {name: switchName}).click();
-      const choices = page.locator('.category-tree .category-icon');
-      await expect(choices).toHaveCount(7);
-      const layout = await choices.evaluateAll(elements => elements.map(element => {
-        const title = element.querySelector('.category-title');
-        const description = element.querySelector('.category-description');
-        const fits = node => node.scrollHeight <= node.clientHeight && node.scrollWidth <= node.clientWidth;
-        return {button: fits(element), title: fits(title), description: fits(description), titleText: title.textContent.trim(), descriptionText: description.textContent.trim()};
-      }));
-      expect(layout.every(item => item.button && item.title && item.description && item.titleText && item.descriptionText), `${viewport.width}/${language}`).toBe(true);
-      await expectNoOverflow(page);
-    }
     await page.goto('nip-explorer.html');
     await page.locator('#filter-details > summary').click();
     for (const language of ['en', 'ja']) {
@@ -133,52 +89,8 @@ test('category titles and descriptions wrap without clipping or overflow on desk
   expect(errors).toEqual([]);
 });
 
-test('A/B/C common dialogs trap focus, restore opener, and translate dynamic copy', async ({page}) => {
+test('explorer search records descriptions and tags in either UI language', async ({page}) => {
   const errors = collectErrors(page);
-  await page.goto('index.html');
-  const opener = page.getByRole('button', {name: 'Suggest a tool'});
-  await opener.click();
-  await expect(page.locator('#contribute-dialog')).toBeVisible();
-  await expectDialogTrap(page, '#contribute-dialog');
-  await page.locator('#contribute-dialog').getByRole('button', {name: '日本語'}).click();
-  await expect(page.locator('#contribute-dialog')).toContainText('候補を提案');
-  await page.keyboard.press('Escape');
-  await expect(page.locator('[data-kind="submit"]')).toBeFocused();
-  await page.getByRole('button', {name: 'Aを開く'}).click();
-  const detail = page.locator('[data-action="detail"]').first();
-  await detail.click();
-  await expectDialogTrap(page, '#detail-dialog');
-  await page.keyboard.press('Escape');
-  await expect(detail).toBeFocused();
-  expect(errors).toEqual([]);
-});
-
-test('A/B/C and explorer search record descriptions and tags in either UI language, and A/B/C use tool basis', async ({page}) => {
-  const errors = collectErrors(page);
-  await page.goto('index.html');
-  await page.getByRole('button', {name: 'Open A'}).click();
-  for (const language of ['en', 'ja']) {
-    if (language === 'ja') await page.getByRole('button', {name: '日本語'}).click();
-    for (const mode of ['A', 'B', 'C']) {
-      await page.locator('.mode-switch').getByRole('button', {name: mode, exact: true}).click();
-      await page.locator('#search').fill('迷わない導線');
-      await expect.poll(() => page.locator('.tool-card').count(), {message: `${mode}/${language} description`}).toBeGreaterThan(0);
-      await page.locator('#search').fill('セルフホスト');
-      await expect.poll(() => page.locator('.tool-card').count(), {message: `${mode}/${language} tag`}).toBeGreaterThan(0);
-    }
-  }
-  await page.locator('.mode-switch').getByRole('button', {name: 'A', exact: true}).click();
-  await page.locator('#search').fill('LumaPost');
-  const basis = await page.evaluate(() => window.NOSMAPS_DATA.tools.find(tool => tool.id === 'tool-1').basis);
-  await page.locator('[data-tool-id="tool-1"] [data-action="detail"]').click();
-  await expect(page.locator('#detail-dialog')).toContainText(basis);
-  await page.keyboard.press('Escape');
-  await page.locator('[data-tool-id="tool-1"] [data-action="compare"]').check();
-  await page.locator('#search').fill('ZapNest');
-  await page.locator('[data-tool-id="tool-2"] [data-action="compare"]').check();
-  await page.getByRole('button', {name: '比較する'}).click();
-  await expect(page.locator('#detail-dialog')).toContainText(basis);
-
   await page.goto('nip-explorer.html');
   for (const [language, switchName] of [['ja', null], ['en', 'English']]) {
     if (switchName) await page.getByRole('button', {name: switchName}).click();
@@ -187,30 +99,6 @@ test('A/B/C and explorer search record descriptions and tags in either UI langua
     await page.locator('#feature-query').fill('セルフホスト');
     await expect.poll(() => page.locator('.feature-tool-card').count(), {message: `explorer/${language} tag`}).toBeGreaterThan(0);
   }
-  expect(errors).toEqual([]);
-});
-
-test('nested correction keeps its draft and rerenders the underlying detail in one language', async ({page}) => {
-  const errors = collectErrors(page);
-  await page.goto('index.html');
-  await page.getByRole('button', {name: 'Open A'}).click();
-  await page.locator('[data-tool-id="tool-1"] [data-action="detail"]').click();
-  await page.locator('#detail-dialog').getByRole('button', {name: 'Correct information'}).click();
-  const contribution = page.locator('#contribute-dialog');
-  await contribution.locator('#con-name').fill('Draft tool name');
-  await contribution.locator('#con-category').selectOption('relay');
-  await contribution.locator('#con-note').fill('Keep this correction draft');
-  await contribution.locator('#con-author').check();
-  await contribution.getByRole('button', {name: '日本語'}).click();
-  await expect(page.locator('#detail-dialog')).toBeVisible();
-  await expect(page.locator('#detail-dialog')).toContainText('最終観測日時');
-  await expect(contribution.locator('#con-name')).toHaveValue('Draft tool name');
-  await expect(contribution.locator('#con-category')).toHaveValue('relay');
-  await expect(contribution.locator('#con-note')).toHaveValue('Keep this correction draft');
-  await expect(contribution.locator('#con-author')).toBeChecked();
-  await contribution.getByRole('button', {name: '閉じる'}).click();
-  await expect(page.locator('#detail-dialog')).toBeVisible();
-  await expect(page.locator('#detail-dialog')).toContainText('最終観測日時');
   expect(errors).toEqual([]);
 });
 

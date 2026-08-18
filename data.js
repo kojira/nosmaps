@@ -1,4 +1,4 @@
-/* Shared fictional dataset for all nosmaps concepts. NIP metadata follows the official NIPs repository; tool support records are mock data. */
+/* Shared sample dataset for the landing page and the feature explorer. NIP metadata follows the official NIPs repository; tool support records are sample data. */
 (function(){
 const categories=[["clients", "クライアント", "📱"], ["relay", "リレー運用", "📡"], ["identity", "ID・鍵管理", "🔑"], ["media", "画像・動画", "🎞️"], ["analytics", "観測・分析", "📊"], ["dev", "開発者向け", "🧰"]];
 const purposes=["まず読む", "仲間と話す", "作品を公開", "コミュニティ運営", "自分の鍵を守る", "リレーを管理", "データを観測", "アプリを作る"];

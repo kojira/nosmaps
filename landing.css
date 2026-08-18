@@ -1,0 +1,26 @@
+/* Landing page: hero and the sample carousel. */
+.landing-page main{display:grid;gap:2rem}
+.hero-actions{margin:1.6rem 0 .6rem}
+.hero-help{color:var(--muted);margin:0;max-width:640px}
+.landing-page .link-button.primary{padding:.85rem 1.4rem;font-size:1.05rem}
+
+.carousel{display:grid;gap:1rem;min-width:0;padding:1.25rem;border:1px solid var(--line);border-radius:1rem;background:var(--card);box-shadow:var(--shadow)}
+.carousel-head{display:grid;gap:.4rem;min-width:0}
+.carousel-head h2{margin:0;font-size:1.35rem}
+.carousel-sample{margin:0;padding:.55rem .8rem;border:1px solid #dfc769;border-radius:.6rem;background:#fff7d6;color:#604800;font-size:.85rem;font-weight:650;overflow-wrap:anywhere}
+.carousel-viewport{min-width:0}
+.carousel-slide{display:grid;gap:.5rem;min-width:0;min-height:11rem;align-content:start;padding:1rem;border:1px solid var(--line);border-radius:.85rem;background:#fbfcfa}
+.carousel-slide[hidden]{display:none}
+.slide-icon{display:grid;place-items:center;width:2.5rem;height:2.5rem;border-radius:.65rem;background:#edf0ec;font-size:1.25rem}
+.slide-name{margin:0;font-size:1.15rem;overflow-wrap:anywhere}
+.slide-description{margin:0;color:var(--muted);overflow-wrap:anywhere}
+.slide-facts{display:flex;flex-wrap:wrap;gap:.5rem}
+.slide-fact{display:grid;gap:.1rem;padding:.4rem .6rem;border-radius:.5rem;background:#edf0ec;min-width:0}
+.slide-fact-label{color:var(--muted);font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.slide-fact-value{font-weight:700;overflow-wrap:anywhere}
+.carousel-controls{display:flex;align-items:center;justify-content:center;gap:.75rem}
+.carousel-nav{display:grid;place-items:center;width:2.75rem;height:2.75rem;border:1px solid var(--line);border-radius:.65rem;background:#fff;font-size:1.35rem;line-height:1}
+.carousel-nav:hover{border-color:#7866d3}
+.carousel-position{min-width:5rem;text-align:center;color:var(--muted);font-variant-numeric:tabular-nums;font-weight:700}
+
+@media(max-width:580px){.carousel{padding:.9rem}.carousel-slide{padding:.85rem}}
