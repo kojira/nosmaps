@@ -1047,18 +1047,19 @@
   }
 
   function reviewForm(tool) {
-    // seed 画像は data.js サンプル用。リレー由来のエントリでは選択肢に出さない（送信時の seed 参照も走らない）。
-    const seeds = relayEntry(tool) ? [] : seedReviews(tool).slice(0, 3);
+    /* issue #8: かつてここに seed 画像の選択肢があったが、それはモック時代の作り物の SVG だった。カタログは
+       実データになり、正当なプリセットレビュー画像の出所は一つも無いので、選択 UI ごと消した。
+       残るのは「自分の端末から選んだ画像」だけ。 */
     const draft = state.reviewDrafts[tool.id] || {};
     const localPreview = draft.localImage ? `<img src="${esc(draft.localImage)}" alt="${esc(t('explorer.imageTitle'))}">${draft.localFilename ? `<small>${esc(draft.localFilename)}</small>` : ''}` : '';
-    return `<form class="review-form" data-review-form="${tool.id}" data-local-image="${esc(draft.localImage || '')}" data-local-filename="${esc(draft.localFilename || '')}"><h3>${esc(t('explorer.writeReview'))}</h3><label class="review-body">${esc(t('explorer.body'))}<textarea name="body" placeholder="${esc(t('explorer.bodyPlaceholder'))}">${esc(draft.body || '')}</textarea></label><fieldset class="image-picker"><legend>${esc(t('explorer.chooseImage'))}</legend><div class="shot-choices">${seeds.map((review, index) => `<label class="shot-choice"><input type="radio" name="imageChoice" value="${index}" ${String(draft.imageChoice) === String(index) ? 'checked' : ''}><span>${screenshotMarkup(review.image, true, review.image.label)}</span></label>`).join('')}</div><label class="local-file">${esc(t('explorer.deviceImage'))}<input type="file" name="deviceImage" accept="image/*"></label><div class="local-image-preview">${localPreview}</div></fieldset><label>${esc(t('explorer.osOptional'))}<input name="os" value="${esc(draft.os || '')}"></label><label>${esc(t('explorer.versionOptional'))}<input name="version" value="${esc(draft.version || '')}"></label><label>${esc(t('explorer.useOptional'))}<input name="use" value="${esc(draft.use || '')}"></label><label>${esc(t('explorer.ratingOptional'))}<select name="rating"><option value="">${esc(t('optional'))}</option>${[5, 4, 3, 2, 1].map(value => `<option ${String(draft.rating) === String(value) ? 'selected' : ''}>${value}</option>`).join('')}</select></label><div class="review-preview" aria-live="polite"></div><button class="primary" type="submit">${esc(t('explorer.createReview'))}</button></form>`;
+    return `<form class="review-form" data-review-form="${tool.id}" data-local-image="${esc(draft.localImage || '')}" data-local-filename="${esc(draft.localFilename || '')}"><h3>${esc(t('explorer.writeReview'))}</h3><label class="review-body">${esc(t('explorer.body'))}<textarea name="body" placeholder="${esc(t('explorer.bodyPlaceholder'))}">${esc(draft.body || '')}</textarea></label><div class="local-image-field"><label class="local-file">${esc(t('explorer.deviceImage'))}<input type="file" name="deviceImage" accept="image/*"></label><div class="local-image-preview">${localPreview}</div></div><label>${esc(t('explorer.osOptional'))}<input name="os" value="${esc(draft.os || '')}"></label><label>${esc(t('explorer.versionOptional'))}<input name="version" value="${esc(draft.version || '')}"></label><label>${esc(t('explorer.useOptional'))}<input name="use" value="${esc(draft.use || '')}"></label><label>${esc(t('explorer.ratingOptional'))}<select name="rating"><option value="">${esc(t('optional'))}</option>${[5, 4, 3, 2, 1].map(value => `<option ${String(draft.rating) === String(value) ? 'selected' : ''}>${value}</option>`).join('')}</select></label><div class="review-preview" aria-live="polite"></div><button class="primary" type="submit">${esc(t('explorer.createReview'))}</button></form>`;
   }
   function captureReviewDraft() {
     const form = els.reviewDialog.querySelector('[data-review-form]');
     if (!form) return;
     const toolId = form.dataset.reviewForm;
     state.reviewDrafts[toolId] = {
-      body: form.elements.body.value, imageChoice: form.querySelector('input[name="imageChoice"]:checked')?.value ?? '',
+      body: form.elements.body.value,
       localImage: form.dataset.localImage || '', localFilename: form.dataset.localFilename || '', os: form.elements.os.value,
       version: form.elements.version.value, use: form.elements.use.value, rating: form.elements.rating.value
     };
@@ -1209,18 +1210,8 @@
     if (event.target.id === 'saved-only') { state.savedOnly = event.target.checked; renderAll(); return; }
     if (event.target.matches('[data-compare-tool]')) { toggleCompare(event.target.dataset.compareTool, event.target.checked); return; }
     if (event.target.matches('[data-public-bookmark]')) { const bookmark = state.bookmarks[event.target.dataset.publicBookmark]; if (bookmark) bookmark.public = event.target.checked; renderResults(); rerenderOpenDialogs(); toast(t('explorer.toastPublic')); return; }
-    if (event.target.matches('input[name="imageChoice"]')) {
-      const form = event.target.closest('[data-review-form]');
-      captureReviewDraft();
-      form.dataset.localImage = '';
-      form.dataset.localFilename = '';
-      form.elements.deviceImage.value = '';
-      form.querySelector('.local-image-preview').replaceChildren();
-      Object.assign(state.reviewDrafts[form.dataset.reviewForm], {localImage: '', localFilename: '', imageChoice: event.target.value});
-      return;
-    }
     const file = event.target.closest('input[name="deviceImage"]');
-    if (file) { const form = file.closest('form'); const selected = file.files?.[0]; if (!selected?.type.startsWith('image/')) return; const reader = new FileReader(); reader.onload = () => { const image = String(reader.result); form.dataset.localImage = image; form.dataset.localFilename = selected.name; form.querySelectorAll('input[name="imageChoice"]').forEach(input => { input.checked = false; }); form.querySelector('.local-image-preview').innerHTML = `<img src="${esc(image)}" alt="${esc(t('explorer.imageTitle'))}"><small>${esc(selected.name)}</small>`; captureReviewDraft(); }; reader.readAsDataURL(selected); }
+    if (file) { const form = file.closest('form'); const selected = file.files?.[0]; if (!selected?.type.startsWith('image/')) return; const reader = new FileReader(); reader.onload = () => { const image = String(reader.result); form.dataset.localImage = image; form.dataset.localFilename = selected.name; form.querySelector('.local-image-preview').innerHTML = `<img src="${esc(image)}" alt="${esc(t('explorer.imageTitle'))}"><small>${esc(selected.name)}</small>`; captureReviewDraft(); }; reader.readAsDataURL(selected); }
   });
   document.addEventListener('input', event => { if (event.target.id === 'nip-query') { state.nipQuery = event.target.value; renderResults(); } });
   const PUBLISH_FIELDS = {'publish-d': 'dLocal', 'publish-name': 'name', 'publish-summary': 'summary', 'publish-homepage': 'homepage', 'publish-topics': 'topics'};
@@ -1233,9 +1224,8 @@
   document.addEventListener('submit', event => {
     if (event.target.closest('[data-publish-form]')) { event.preventDefault(); submitPublish(); return; }
     const form = event.target.closest('[data-review-form]'); if (!form) return; event.preventDefault();
-    const data = new FormData(form); const body = String(data.get('body') || '').trim(); const selectedIndex = data.get('imageChoice');
-    const seedImage = selectedIndex === null ? null : seedReviews(tools.find(tool => tool.id === form.dataset.reviewForm))[Number(selectedIndex)]?.image;
-    const image = form.dataset.localImage ? {label: form.dataset.localFilename || t('explorer.imageTitle'), src: form.dataset.localImage} : seedImage;
+    const data = new FormData(form); const body = String(data.get('body') || '').trim();
+    const image = form.dataset.localImage ? {label: form.dataset.localFilename || t('explorer.imageTitle'), src: form.dataset.localImage} : null;
     const preview = form.querySelector('.review-preview');
     if (!body && !image) { preview.textContent = t('explorer.chooseBodyOrImage'); return; }
     const toolId = form.dataset.reviewForm; const seed = i18n.value('explorer.reviewsSeed');

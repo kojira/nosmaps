@@ -10,7 +10,18 @@
    `favicon.ico` to the handler and the load fails instead — seven of the recorded URLs are such a
    file, and without interception all seven load in both Chromium and WebKit. A stub would have
    reported a failure the page does not have. The one test that *wants* a failure turns interception
-   on for exactly that reason. */
+   on for exactly that reason.
+
+   The rest of the suite now stubs those hosts (tests/support/stub-external-images.js) so no test
+   result rides on a remote server. This file deliberately does NOT use that stub, and the reason is
+   the same quirk, re-measured on both engines: with any route registered, a request whose filename
+   is exactly `favicon.ico` never reaches the handler and fails (naturalWidth 0 with a route, 32
+   without one), and Playwright emits no `request` event for it at all. Seven recorded icon URLs are
+   exactly that file. Elsewhere those seven falling back to the placeholder is silent and harmless;
+   here it is the subject under test -- those entries carry a URL and must render an <img> -- so a
+   stub would make this file assert a failure the page does not have. The runtime-fallback test below
+   keeps its own `route.abort()`, which is interception used to *cause* a failure rather than to hide
+   one, and is unaffected. */
 const {test, expect} = require('@playwright/test');
 
 const PHONE = {width: 375, height: 812};

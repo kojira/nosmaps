@@ -5,6 +5,12 @@
    「言語を切り替えても開いているダイアログ・レビュー下書き・選択中の機能が消えない」という
    既存の保証は落とさない。 */
 const {test, expect} = require('@playwright/test');
+const {stubExternalImages} = require('./support/stub-external-images');
+
+/* Icons in the catalogue point at ~25 real third-party hosts. Serve those bytes locally so a remote
+   host having a bad day cannot turn this file red; the URLs themselves are untouched. See
+   tests/support/stub-external-images.js. */
+test.beforeEach(async ({context}) => { await stubExternalImages(context); });
 
 /* issue #6 で公式情報リンクとレビュー入口はカードから詳細ビュー (#evidence-dialog) へ移った。
    保証は変わらないので、入口を一段開いてから同じことを確かめる。カード側には「アンカーを
@@ -189,7 +195,8 @@ test('the single page-level control still switches language and preserves dialog
   await form.locator('input[name="version"]').fill('9.9');
   await form.locator('input[name="use"]').fill('Draft use');
   await form.locator('select[name="rating"]').selectOption('4');
-  await form.locator('input[name="imageChoice"]').nth(1).check();
+  /* issue #8: かつてここでプリセット画像を選んでいた。選択盤は撤去したので、画像を含む下書きが
+     言語切り替えを越えて残ることは tests/review-local-image.spec.js が端末の画像で見ている。 */
 
   /* モーダルが開いている間、ページ上部の言語ボタンはポインタで押せない (dialog が上層を覆う)。
      押されたときと同じハンドラを通すため、ここではクリックイベントを直接送る。 */
@@ -203,7 +210,7 @@ test('the single page-level control still switches language and preserves dialog
   await expect(form.locator('input[name="version"]')).toHaveValue('9.9');
   await expect(form.locator('input[name="use"]')).toHaveValue('Draft use');
   await expect(form.locator('select[name="rating"]')).toHaveValue('4');
-  await expect(form.locator('input[name="imageChoice"]').nth(1)).toBeChecked();
+  await expect(page.locator('#review-dialog .image-picker, #review-dialog input[name="imageChoice"]')).toHaveCount(0);
   await expect(page.locator('[data-select-feature="media"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#compare-summary')).toContainText('2');
   // 焦点はモーダルの中に残る。body は inert なので、外に落ちるとキーボードが行き場を失う。

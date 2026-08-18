@@ -1,4 +1,10 @@
 const {test, expect} = require('@playwright/test');
+const {stubExternalImages} = require('./support/stub-external-images');
+
+/* Icons in the catalogue point at ~25 real third-party hosts. Serve those bytes locally so a remote
+   host having a bad day cannot turn this file red; the URLs themselves are untouched. See
+   tests/support/stub-external-images.js. */
+test.beforeEach(async ({context}) => { await stubExternalImages(context); });
 
 function collectErrors(page) {
   const errors = [];
@@ -41,6 +47,8 @@ async function expectDialogTrap(page, selector) {
 
 test('browser language detection, visible switch, session memory, and no localStorage', async ({browser}) => {
   const jaContext = await browser.newContext({locale: 'ja-JP'});
+  /* Contexts made by hand miss the beforeEach above, which stubs the `context` fixture. */
+  await stubExternalImages(jaContext);
   const page = await jaContext.newPage();
   await page.goto('index.html');
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
@@ -54,6 +62,7 @@ test('browser language detection, visible switch, session memory, and no localSt
   await jaContext.close();
 
   const enContext = await browser.newContext({locale: 'en-GB'});
+  await stubExternalImages(enContext);
   const enPage = await enContext.newPage();
   await enPage.goto('nip-explorer.html');
   await expect(enPage.locator('html')).toHaveAttribute('lang', 'en');
@@ -272,44 +281,10 @@ test('comparison distinguishes no record from explicit unknown and evidence foll
   expect(errors).toEqual([]);
 });
 
-test('review language rerenders preserve draft fields and images, and a seeded image overrides a local image', async ({page}) => {
-  const errors = collectErrors(page);
-  await page.goto('nip-explorer.html');
-  await page.locator('[data-tool-id="tool-1"] [data-review-tool]').click();
-  const form = page.locator('[data-review-form="tool-1"]');
-  await form.locator('textarea[name="body"]').fill('Keep this review draft');
-  await form.locator('input[name="os"]').fill('Draft OS');
-  await form.locator('input[name="version"]').fill('9.9');
-  await form.locator('input[name="use"]').fill('Draft use');
-  await form.locator('select[name="rating"]').selectOption('4');
-  await form.locator('input[name="imageChoice"]').nth(1).check();
-  await page.locator('#compact-identity [data-language="ja"]').dispatchEvent('click');
-  await expect(form.locator('textarea[name="body"]')).toHaveValue('Keep this review draft');
-  await expect(form.locator('input[name="os"]')).toHaveValue('Draft OS');
-  await expect(form.locator('input[name="version"]')).toHaveValue('9.9');
-  await expect(form.locator('input[name="use"]')).toHaveValue('Draft use');
-  await expect(form.locator('select[name="rating"]')).toHaveValue('4');
-  await expect(form.locator('input[name="imageChoice"]').nth(1)).toBeChecked();
-
-  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
-  await form.locator('input[name="deviceImage"]').setInputFiles({name: 'draft-image.png', mimeType: 'image/png', buffer: png});
-  await expect(form.locator('.local-image-preview img')).toBeVisible();
-  await expect(form.locator('.local-image-preview')).toContainText('draft-image.png');
-  await page.locator('#compact-identity [data-language="en"]').dispatchEvent('click');
-  await expect(form.locator('textarea[name="body"]')).toHaveValue('Keep this review draft');
-  await expect(form.locator('.local-image-preview img')).toBeVisible();
-  await expect(form.locator('.local-image-preview')).toContainText('draft-image.png');
-  await expect(form.locator('input[name="imageChoice"]:checked')).toHaveCount(0);
-
-  await form.locator('input[name="imageChoice"]').nth(2).check();
-  await expect(form.locator('.local-image-preview')).toBeEmpty();
-  expect(await form.getAttribute('data-local-image')).toBe('');
-  await form.getByRole('button', {name: 'Add review'}).click();
-  const addedImage = page.locator('.review-item').last().locator('img');
-  await expect(addedImage).toBeVisible();
-  expect(await addedImage.getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
-  expect(errors).toEqual([]);
-});
+/* issue #8: このテストは元々「seeded image が local image を上書きする」を固定していた。
+   プリセット画像の選択盤はモック時代の残骸として撤去されたので、上書きの主張も一緒に取り下げる。
+   残る保証 -- 下書きの各欄と端末からの添付画像が言語切り替えを越えて生き残ること、そして
+   選択盤がどこにも無いこと -- は tests/review-local-image.spec.js へ移した。 */
 
 test('reviewer history gathers reviews from every tool before applying its display limit', async ({page}) => {
   const errors = collectErrors(page);
@@ -341,7 +316,9 @@ test('likes, bookmarks, text/image reviews, profiles, history, gallery, and imag
   await form.locator('textarea[name="body"]').fill('Text-only review');
   await form.getByRole('button', {name: 'Add review'}).click();
   await expect(page.locator('.review-item')).toHaveCount(5);
-  await page.locator('[data-review-form] input[name="imageChoice"]').first().check();
+  /* issue #8: 画像付きレビューの画像は、プリセットではなく自分で添付したものだけになった。 */
+  await page.locator('[data-review-form] input[name="deviceImage"]').setInputFiles({name: 'attached.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')});
+  await expect(page.locator('[data-review-form] .local-image-preview img')).toBeVisible();
   await page.locator('[data-review-form]').getByRole('button', {name: 'Add review'}).click();
   await expect(page.locator('.review-item')).toHaveCount(6);
   await page.locator('.review-item').first().locator('[data-review-vote="helpful"]').click();

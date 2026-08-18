@@ -11,6 +11,12 @@
    capabilities と、ページが「この機能はどの NIP を指すか」として描いた #nip-list から毎回導く。
    書き写せば、それはカタログではなく写し間違いを検査することになる。 */
 const {test, expect} = require('@playwright/test');
+const {stubExternalImages} = require('./support/stub-external-images');
+
+/* Icons in the catalogue point at ~25 real third-party hosts. Serve those bytes locally so a remote
+   host having a bad day cannot turn this file red; the URLs themselves are untouched. See
+   tests/support/stub-external-images.js. */
+test.beforeEach(async ({context}) => { await stubExternalImages(context); });
 
 const PHONE = {width: 375, height: 812};
 const UNSTATED = ['unknown', 'out_of_family'];

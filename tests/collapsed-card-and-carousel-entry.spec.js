@@ -12,6 +12,12 @@
    #2: a carousel item on the top page was inert. It is now a link to the explorer opened on that
    entry, and these tests pin that it lands on *that* entry rather than merely on the explorer. */
 const {test, expect} = require('@playwright/test');
+const {stubExternalImages} = require('./support/stub-external-images');
+
+/* Icons in the catalogue point at ~25 real third-party hosts. Serve those bytes locally so a remote
+   host having a bad day cannot turn this file red; the URLs themselves are untouched. See
+   tests/support/stub-external-images.js. */
+test.beforeEach(async ({context}) => { await stubExternalImages(context); });
 
 const PHONE = {width: 375, height: 812};
 
