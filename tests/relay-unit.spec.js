@@ -25,7 +25,7 @@ function installHelpers() {
     PUB_A, PUB_B, CUR_A, CUR_B, VIEWER, NOW_SEC, hexKey,
     OPTS: {nowSec: NOW_SEC, receivedAtSec: NOW_SEC},
 
-    // A canonical, fully self-consistent kind 32267 record. `over.content` merges
+    // A canonical, fully self-consistent kind 30078 record. `over.content` merges
     // content-field overrides and the `state` tag is regenerated to match, so the
     // fixture is correct by construction and only the intentionally-broken field
     // differs.
@@ -49,7 +49,7 @@ function installHelpers() {
       return {
         id: over.id || 'e'.repeat(64),
         pubkey,
-        kind: 32267,
+        kind: 30078,
         created_at: 'created_at' in over ? over.created_at : NOW_SEC - 1000,
         content: 'rawContent' in over ? over.rawContent : JSON.stringify(content),
         tags: over.tags || tags,
@@ -112,145 +112,101 @@ function installHelpers() {
 
 const EXPLORER = 'nip-explorer.html';
 
-// A real, unmodified kind-30078 event fetched from wss://yabu.me on 2026-08-17.
-// Revision 2 does not read kind 30078 at all; the event is kept as a live sample
-// of a foreign record so `validateSoftwareEvent` can be shown to reject a wrong
-// kind outright rather than trying to interpret it.
-const FOREIGN_APP_EVENT = {
-  content: '',
-  created_at: 1786953266,
-  id: '803d89f822ca7c284c4668c2af8c46a2e8a2907456535b84ea6e0cc6aa35d1b2',
+// A real, unmodified kind-30267 event fetched from wss://x.kojira.io on
+// 2026-08-18 (`{"kinds":[30267],"limit":10}`). Kind 30267 is NIP-51's App
+// curation set, which revision 2 does read — but never as a canonical record.
+// It is kept as a live sample of a wrong kind so `validateSoftwareEvent` can be
+// shown to reject it outright rather than trying to interpret it.
+const FOREIGN_KIND_EVENT = {
+  id: "54aed11ebc14a4dfa06cf737c916f8bfd48999f7eae37a5f9a440134f3823ad0",
+  pubkey: "659a74f6cfbc7c252c58d93452b9d9575e36c464aa6544c6375227c9166a6ed9",
+  kind: 30267,
+  created_at: 1784204478,
+  tags: [
+    ["name","Saved Apps"],
+    ["d","zapstore-bookmarks"],
+    ["f","android-arm64-v8a"]
+  ],
+  content: "5d+W7FLeGPck/8fOE/BLeTi8ceQ6/vShxZRc4L+StbILwXfBHiV7X1Y225a+Mgra0+k66rDWw2PW4IdiTH47GGHuA57SklRKa2ZYzAdO9wxstw3UP9wMGM8HQ+29nT/TvcZt8Ji8kcG9JcIfxGTLGg6+rjNLb0Duvr8xSDM2i+n9pNrBZorTR5P2YHxoZkDnGPkN8+CR3IJnAxeF1YcnQpqOjZRfRmk5lglPVNdvOzjz2yoqRdepqQ5aQ+oOg2vT?iv=glOAyEqd5j2g4OFgmbHRQA==",
+  sig: "d5d87f0c3c7f720287b6240c3128dea452017a79c5d9d28ed33e5e8bc311224895ee493fce4f72057fcf851ee549d8567d399114de09e199d5cd231b985f5de7"
+};
+
+// Four real, unmodified kind-30078 events fetched from wss://x.kojira.io on
+// 2026-08-18 (`{"kinds":[30078],"limit":80,"until":1786900000}`). NIP-78 defines
+// 30078 as application-specific data that every application shares, so foreign
+// records on this kind are the specified normal state and not an anomaly: these
+// are four other applications' perfectly valid records, and §4.2 requires that we
+// never read them as ours. Emitted verbatim from the relay response —
+// id/pubkey/sig/tags/content bytes are untouched, so the `sig` over each one still
+// verifies. Three carry `content` that is not a JSON object at all (two empty, one
+// NIP-44 ciphertext); the fourth is a JSON object that carries no `schema` key.
+
+const REAL_30078_NOSTTER = {
+  id: "95e2c4e7d65056f09e4c94416e90d2ad8c7baf570250497a5c09b1de8a48653b",
+  pubkey: "272d2bf9fe82a32a9c71001b736fb48ed08aac73529c8ee4ef2ce3f950bb7919",
   kind: 30078,
-  pubkey: '4d39c23b3b03bf99494df5f3a149c7908ae1bc7416807fdd6b34a31886eaae25',
-  sig: '8f2723a6462e8fb6f1eae323e74bad29dc5d10e4fbf46c9d992bc1d9999f526c63213e16e37ee9bda9897160a32c7888d89514ff03c92a28accbb87a3b422eb9',
-  tags: [['d', 'nostter-read']]
+  created_at: 1786869343,
+  tags: [
+    ["d","nostter-read"]
+  ],
+  content: "",
+  sig: "ce42d9b89c1bc6d18d2c3fa3ddd390dfac13e039ff706be8773739067b36fe7309a88a2361dbcbaffd7236c67a4c1b77e8453ec35ff459068c6aa6c6cba36193"
 };
 
-// Four real, unmodified kind-32267 events fetched from wss://x.kojira.io on
-// 2026-08-17 (`{"kinds":[32267],"limit":10}`). Kind 32267 has no NIP assignment, so
-// these are not malformed anything — they are other applications' perfectly valid
-// records, and §4.2 requires that we never read them as ours. Emitted verbatim
-// from the relay response: id/pubkey/sig/tags/content bytes are untouched, so the
-// `sig` over each one still verifies. The first three are zapstore-style app
-// records with plain-text `content`; the fourth is a second family whose
-// `content` is JSON but carries no `schema` key at all.
-
-const REAL_32267_ARMADA = {
-  id: "5f46d8e20f7e0ab9e06be8625129c6d2365b84da5d31888ec413787567bddef9",
-  pubkey: "781a1527055f74c1f70230f10384609b34548f8ab6a0a6caa74025827f9fdae5",
-  kind: 32267,
-  created_at: 1786896564,
+const REAL_30078_AMETHYST = {
+  id: "3bd0e939d05fd5c39e0042f2cfe147c2c43edb4df55aa395e7fdb859aa106ba6",
+  pubkey: "21b196587f141cd964878c5ba2f0268fd9a208bd00242babac20964b4167248a",
+  kind: 30078,
+  created_at: 1786887555,
   tags: [
-    ["d","buzz.armada.app"],
-    ["name","Armada"],
-    ["summary","Encrypted communities with text and voice. No host required. Your keys, your fleet."],
-    ["icon","https://blossom.ditto.pub/df96d86a45f4ae18367cd640a99e3af5f4f745bb94c7c3e1eb08bacea73cf2d9"],
-    ["t","nostr"],
-    ["t","chat"],
-    ["t","messaging"],
-    ["t","voice"],
-    ["t","encrypted"],
-    ["t","decentralized"],
-    ["url","https://armada.buzz"],
-    ["repository","https://nostrhub.io/soapbox@ditto.pub/armada"],
-    ["f","android-arm64-v8a"],
-    ["f","android-armeabi-v7a"],
-    ["license","AGPL-3.0"],
-    ["h","acfeaea6e51420e8068fac446ca9d17d7a9ef6a5d20d93894e50fee3d4902a84"]
+    ["d","AmethystSettings"],
+    ["client","Amethyst"]
   ],
-  content: "Armada is a community chat app with servers, channels, and voice, where your\nkeys are your identity and no one has to run anything.\n\nSpin up a Concord: a serverless, end-to-end encrypted community. Nothing to\nset up, nobody in the middle, and only members can read it. Text channels,\nlive voice rooms, and invites, all without a host.\n\nPrefer full control? Self-host an Armada server on your own infrastructure\nand own the whole stack: membership, moderation, and data.\n\nFeatures:\n- End-to-end encrypted communities (Concord), no server to run\n- Voice rooms with encrypted group calls and DM calls\n- Discord-style servers and channels, self-hostable\n- Portable identity: sign in with your key on any device\n",
-  sig: "efdc1dca5ccb2a4a52a8d8286dc154cef09e7d6798a4802e086d6d694ee12b80d71cfba2a705ee9ebe7f772541f3c184e32af980c3b00a3410802600ac61ae6e"
+  content: "AsaGcrRoKwAy1ZXyBgI3U/7CPfcVriWXf45DNDlcxuIQVZlZmIeaGdr8HmPZ+60QDRa0FLtiLlja5iKvztJJ0gflweAnW5dXU1EhnPPR12MhsCp/zDofJOWjjbVopb7AjOOLfY9q26Q2DF7fKjQ8iIAj71nFIWWtc6NUiatJGo4X9UccWkxrmBlWMVNHHToro4NyhS9Z7o2+LRkBKUJaubX/7RfsikidiRwvdjoU39THKuOFAqt9UeOONG0dZDNEhbS+9NGmJfaKckwPQW7vUXXUVVDxT704QSsLrOPMql6/TckFP1h+5Pz+I+ksQ908ZfGta3hmYG11S5R95PUmUaWgZexxHylvv2jbDzt+FApuw32/2W2RU9cFpcZZcpv6gdkJwmvFA6Co4qbBUf3CELvSz+YM/FrGTYQEtXa1HZQnSyKyDAYH3g9uGXht9uklmwBw+mQS8NIVcYs4cywv5MDkxui2b9CAPlUeqLYtoIqXxcHyBqG00XUpBCtOC1tSIHNORBwEe+EL3u4RGR63W9oiHgAd+0EOV3IxzCbcBfBxC3I7oyi4nCFG8VDMX3jjLCOPjovtBlCg7IwBl/vEJ0DclQ==",
+  sig: "1446a11ae7a2f12fd240e819bb26c06150ad6177ee5e22e0d6829866523455a544a6ff3bbf00d3f58073cb985fe2e365e9f1dc2c7e66a77bd5024d13d1a09dc3"
 };
 
-const REAL_32267_AMBER = {
-  id: "0be400b243e48358f1b12d3b0664c5e3c12aa81532fe4ada187848b08b154da5",
-  pubkey: "7579076d9aff0a4cfdefa7e2045f2486c7e5d8bc63bfc6b45397233e1bbfcb19",
-  kind: 32267,
-  created_at: 1786728487,
+const REAL_30078_NYM = {
+  id: "4577bb0fe429aec39af3ba267cdc250b33b7e162304ee3552c22a7f9be7aaab5",
+  pubkey: "da6749efe87ee8e932e4fe6c150a620a0d1762dc0fa537901fd803e0c4741057",
+  kind: 30078,
+  created_at: 1786892230,
   tags: [
-    ["d","com.greenart7c3.nostrsigner"],
-    ["name","Amber"],
-    ["icon","https://cdn.zapstore.dev/dee157a2c82467208087ec333ee1c53bd28caf33efb0c725b14460dbbc6b1b47"],
-    ["t","fdroid"],
-    ["t","nostr"],
-    ["repository","https://github.com/greenart7c3/Amber"],
-    ["f","android-arm64-v8a"],
-    ["license","MIT"],
-    ["h","acfeaea6e51420e8068fac446ca9d17d7a9ef6a5d20d93894e50fee3d4902a84"]
+    ["d","nym-presence"],
+    ["t","nym-presence"],
+    ["n","RegnumUmbrae"],
+    ["status","online"],
+    ["avatar-update","https://npub1mfn5nmlg0m5wjvhylekp2znzpgx3wckup7jn0yqlmqp7p3r5zpts9fmfg6.blossom.band/ba53a2c35893d08ea406228670e9705a3fbc3cbffbd9706ac0664ccce9600f08.jpg"]
   ],
-  content: "Amber is a nostr event signer for Android. It allows users to keep their nsec segregated in a single, dedicated app. The goal of Amber is to have your smartphone act as a NIP-46 signing device without any need for servers or additional hardware. \"Private keys should be exposed to as few systems as possible as each system adds to the attack surface,\" as the rationale of said NIP states.",
-  sig: "702760d27408016da4b0212cc9d67dc1883a26657e511d27bfeab52fbea3f75dce5e3e0d9d835dfc14e0ad825173f610fe5be107edd041c5475856ed3eceed6b"
+  content: "",
+  sig: "21dcb2b374fa87cea5bab4f694c2d188f9b7eb4c34a13b8b01f234ef69139ad40a592f48e5f4d57edae681ba65eee45c2f3ff59275d6cadb347238dac10ec77b"
 };
 
-const REAL_32267_DITTO = {
-  id: "76e388c3660c55e67b2a2f2007a9623dbfa20ea5d46ea32ad1656a4b0d7bcd96",
-  pubkey: "781a1527055f74c1f70230f10384609b34548f8ab6a0a6caa74025827f9fdae5",
-  kind: 32267,
-  created_at: 1786724631,
+const REAL_30078_HEAT = {
+  id: "3d77298dd5d85e3b253fe336ae06db2e40329743301b96f0ee80350261cafb6c",
+  pubkey: "a021ff9a40de4f0faec848b1ac4bdc03d1d26758aa19691b91ae1fb4d5562041",
+  kind: 30078,
+  created_at: 1786869513,
   tags: [
-    ["d","pub.ditto.app"],
-    ["name","Ditto"],
-    ["summary","Your content. Your vibe. Your rules."],
-    ["icon","https://blossom.ditto.pub/78daab1d2d93c4afc2ad00a313c042522648f7c6cd0ec78b4d31788c6c002ad9"],
-    ["image","https://blossom.ditto.pub/0e427cfa4833a2ea2255742394ae254e658903dd1ce1b424170a5747b559ee2e"],
-    ["image","https://blossom.ditto.pub/fb21cef430295237710de4260174a1a44a28b13394764705233f24faa9d68bdb"],
-    ["image","https://blossom.ditto.pub/7b74764fc7c613cc5faf764d6d68228892651c51c886697f57811b2020fc34ff"],
-    ["image","https://blossom.ditto.pub/a13ffcd2ebb513590437a68ca5f5c51b38054fac66feaca3a10c60316f0c4f63"],
-    ["image","https://blossom.ditto.pub/504962eec979fe4eae1e4b51da9a2d2bc5bbdcef7e766b19b85ddaef043a301b"],
-    ["image","https://blossom.ditto.pub/4d99c39e445f3733a063b5616c1c61277dbb3069c2111021ba7fc6b1ccd76514"],
-    ["image","https://blossom.ditto.pub/bc93340c97140d6812fe4d29ffe4b7aa0ff7b33f323033f3bf0325ff8f345258"],
-    ["image","https://blossom.ditto.pub/194bb131624ccd6fce78a2bb107a4ff80518a9c27ac363384a1c4e157d5e9616"],
-    ["t","nostr"],
-    ["t","social"],
-    ["t","messaging"],
-    ["t","lightning"],
-    ["t","decentralized"],
-    ["url","https://ditto.pub"],
-    ["repository","https://gitlab.com/soapbox-pub/ditto"],
-    ["f","android-arm64-v8a"],
-    ["f","android-armeabi-v7a"],
-    ["f","android-x86"],
-    ["f","android-x86_64"],
-    ["license","AGPL-3.0"],
-    ["h","acfeaea6e51420e8068fac446ca9d17d7a9ef6a5d20d93894e50fee3d4902a84"]
+    ["d","heat:user:90d:v2"],
+    ["t","fish2018-home-v1"],
+    ["app","fongmi-webhome"],
+    ["expiration","1794645513"]
   ],
-  content: "Ditto is an open-source Nostr client. Your content. Your vibe. Your rules,\nand all the other stuff: games, treasure hunts, magic decks, live streams,\ncolor moments, and more.\n\nFeatures:\n- Theming — 9 built-in presets, shareable themes\n- Infinite content types — notes, articles, short videos (Shorts), live streams,\n  polls, follow packs, color moments, magic decks, geocaching, Webxdc mini-apps\n- Lightning payments — zap posts and profiles via NWC or WebLN\n- Comments on anything — posts, URLs, profiles, hashtags, books, and more\n",
-  sig: "f19a7494e3a496aaf07f3cf39494669351dc4aca63ff5f3855fa3ccbe95488fbd4bf7407c80bf83a8f346463774a02b89ab93569d03d68b2ed097cf2b6d02407"
-};
-
-const REAL_32267_SATSTOUSD = {
-  id: "6873792f92c4ad34ad1f524db4b6fca10cb874f1feff40ba14f52fecaad3f6ca",
-  pubkey: "1bc70a0148b3f316da33fe3c89f23e3e71ac4ff998027ec712b905cd24f6a411",
-  kind: 32267,
-  created_at: 1749196790,
-  tags: [
-    ["d","sats-to-usd-mbkiltxe"],
-    ["title","Sats to USD"],
-    ["description","Dead simple, mobile friendly USD to BTC to Sats converter. Also supports EUR and GBP. Check bitcoin price and convert to USD super fast. No ads, no tracking."],
-    ["url","https://satstousd.com/"],
-    ["image","https://blossom.primal.net/190c680573b7204c8744f1e22f3080de0ce3f987b54740a1caa5b3aab4c28680.png"],
-    ["t","toos"],
-    ["t","calculator"],
-    ["t","bitcoin price"],
-    ["t","bitcoin"],
-    ["published_at","1749196790"],
-    ["lud16","fd5ce42fc3e44e17@coinos.io"],
-    ["client","localhost"]
-  ],
-  content: "{\"gallery\":[\"https://blossom.primal.net/190c680573b7204c8744f1e22f3080de0ce3f987b54740a1caa5b3aab4c28680.png\"],\"tags\":[\"toos\",\"calculator\",\"bitcoin price\",\"bitcoin\"],\"lightning_address\":\"fd5ce42fc3e44e17@coinos.io\"}",
-  sig: "9da4a56f22266fc2dba49bd72eb5c380ba4d9804ecae67b81b6e13cf352368f9c3ca3447f73871277a83b29d61e74bf1c40b46b6bafa5356eec2106d4bcbd95b"
+  content: "{\"v\":5,\"i\":[[\"m\",1745149,20681,\"猎虎贰\",\"/jUdZnyCzqGmbcFcDqGNnuoOBAyk.jpg\"]]}",
+  sig: "1169a08aa043322572eb15804c0d45229cb8af5ce2819ecb1eedcd97902149a3e2373811380f92d5c276786cebc98d04388b99c255a75b78178824745a535b0f"
 };
 
 // Ours, for contrast, so the gate is provably not just rejecting everything: the
 // same shape with a `d` inside the `nosmaps:` namespace and the
 // `org.nosmaps.software` profile. Hand-authored rather than fetched, because
-// Nosmaps publishes no kind 32267 records yet and there is no real one to fetch;
+// Nosmaps publishes no kind 30078 records yet and there is no real one to fetch;
 // `sig` is a placeholder, which is sound here because `validateSoftwareEvent` never
 // looks at it (rx-nostr's verifier owns signatures, invariant I1).
-const OUR_32267_EVENT = {
+const OUR_30078_EVENT = {
   id: 'a'.repeat(64),
   pubkey: 'b'.repeat(64),
-  kind: 32267,
+  kind: 30078,
   created_at: 1786999000,
   tags: [
     ['d', 'nosmaps:io.kojira.nosmaps'],
@@ -277,7 +233,7 @@ function registerUnit() {
     await page.goto(EXPLORER);
     const r = await page.evaluate(() => {
       const {selectAddressableWinner} = window.NOSMAPS_CATALOG;
-      const mk = (id, created_at) => ({id, created_at, pubkey: 'p'.repeat(64), kind: 32267, tags: [['d', 'x']]});
+      const mk = (id, created_at) => ({id, created_at, pubkey: 'p'.repeat(64), kind: 30078, tags: [['d', 'x']]});
       const greater = selectAddressableWinner([mk('ffff', 10), mk('0000', 20)]);
       const a = mk('aaaa', 50);
       const b = mk('bbbb', 50);
@@ -328,7 +284,7 @@ function registerUnit() {
     expect(errors).toEqual([]);
   });
 
-  // ---- B. kind 32267 validation (§4.2) ----
+  // ---- B. kind 30078 validation (§4.2) ----
   test('B. validateSoftwareEvent accepts the v1 profile and echoes the parsed record', async ({page}) => {
     const errors = collectErrors(page);
     await page.goto(EXPLORER);
@@ -341,9 +297,9 @@ function registerUnit() {
         wrongKind: V(foreign, T.OPTS),
         pub: good.pubkey
       };
-    }, FOREIGN_APP_EVENT);
+    }, FOREIGN_KIND_EVENT);
     expect(r.ok.ok).toBe(true);
-    expect(r.ok.record.coordinate).toBe(`32267:${r.pub}:nosmaps:com.example.tool`);
+    expect(r.ok.record.coordinate).toBe(`30078:${r.pub}:nosmaps:com.example.tool`);
     expect(r.ok.record.publisher).toBe(r.pub);
     expect(r.ok.record.d).toBe('nosmaps:com.example.tool');
     expect(r.ok.record.state).toBe('active');
@@ -352,7 +308,8 @@ function registerUnit() {
     expect(r.ok.record.homepage).toBe('https://example.com/tool');
     expect(r.ok.record.supersededBy).toBeNull();
     expect(r.ok.record.topics).toEqual(['nosmaps', 'relay-client']);
-    // A kind 30078 record is not a 32267 record. Revision 2 never reads 30078.
+    // Kind 30267 is read as a curation signal, never as a canonical record, so
+    // the software gate must reject it on the kind alone.
     expect(r.wrongKind.ok).toBe(false);
     expect(r.wrongKind.reason).toBe('bad-kind');
     expect(errors).toEqual([]);
@@ -367,7 +324,7 @@ function registerUnit() {
       const mk = T.makeSoftware;
       const reason = (event) => V(event, T.OPTS).reason;
       return {
-        // §4.2 "Foreign 32267 events": another app's valid record, quarantined
+        // §4.2 "Foreign 30078 events": another app's valid record, quarantined
         // with a reason and never reported as nonexistent.
         foreignProfile: reason(mk({rawContent: JSON.stringify({schema: 'com.other.app', version: 1})})),
         nonJsonContent: reason(mk({rawContent: 'not json'})),
@@ -400,7 +357,7 @@ function registerUnit() {
         stateTagMismatch: reason(mk({stateTag: 'withdrawn'})),
         // §11: superseded_by must be a real coordinate and never a self-loop.
         badSuperseded: reason(mk({content: {superseded_by: 'not-a-coordinate'}})),
-        selfSuperseded: reason(mk({content: {superseded_by: `32267:${T.PUB_A}:nosmaps:com.example.tool`}})),
+        selfSuperseded: reason(mk({content: {superseded_by: `30078:${T.PUB_A}:nosmaps:com.example.tool`}})),
         // §12.3
         future: reason(mk({created_at: T.NOW_SEC + 100000})),
         horizon: reason(mk({created_at: T.NOW_SEC + 40 * 24 * 3600})),
@@ -436,14 +393,15 @@ function registerUnit() {
     expect(errors).toEqual([]);
   });
 
-  // §4.2 rule 1b. Kind 32267 has no NIP assignment and other applications really
-  // do publish on it, so this runs the gate against four real, signature-valid
-  // events taken verbatim off wss://x.kojira.io. The two separations are asserted
-  // independently: a foreign `d` is rejected without content ever being read, and a
-  // foreign content profile is rejected even from inside our namespace. The last
-  // case is ours and MUST be accepted, so the gate cannot pass by rejecting
-  // everything.
-  test('B. real foreign 32267 events are rejected by the d namespace and ours is accepted', async ({page}) => {
+  // §4.2 rule 1b. NIP-78 specifies kind 30078 as application-specific data shared
+  // by every application, so foreign records on it are the normal state the spec
+  // describes. This runs the primary separation against four real,
+  // signature-valid events taken verbatim off wss://x.kojira.io. The two
+  // separations are asserted independently: a foreign `d` is rejected without
+  // content ever being read, and a foreign content profile is rejected even from
+  // inside our namespace. The last case is ours and MUST be accepted, so the gate
+  // cannot pass by rejecting everything.
+  test('B. real foreign 30078 events are separated by the d namespace and ours is accepted', async ({page}) => {
     const errors = collectErrors(page);
     await page.goto(EXPLORER);
     const r = await page.evaluate(async (fx) => {
@@ -473,15 +431,15 @@ function registerUnit() {
 
       return {
         prefix: CAT.SOFTWARE_D_PREFIX,
-        armada: await probe(fx.armada),
-        amber: await probe(fx.amber),
-        ditto: await probe(fx.ditto),
-        satsToUsd: await probe(fx.satsToUsd),
+        nostter: await probe(fx.nostter),
+        amethyst: await probe(fx.amethyst),
+        nym: await probe(fx.nym),
+        heat: await probe(fx.heat),
         ours: await probe(fx.ours),
         oursRecord: CAT.validateSoftwareEvent(fx.ours, T.OPTS).record,
         // Their `d`, our content profile: the namespace rejects it with no help
         // from the schema check.
-        ourSchemaTheirD: CAT.validateSoftwareEvent(T.makeSoftware({d: 'pub.ditto.app'}), T.OPTS).reason,
+        ourSchemaTheirD: CAT.validateSoftwareEvent(T.makeSoftware({d: 'AmethystSettings'}), T.OPTS).reason,
         // Our namespace, their content profile: the schema check rejects it with
         // no help from the namespace gate.
         theirSchemaOurD: CAT.validateSoftwareEvent(
@@ -489,53 +447,53 @@ function registerUnit() {
           T.OPTS
         ).reason,
         // A foreign coordinate is not a coordinate we can even address (§5.2).
-        foreignCoordValid: CAT.isValidCoordinate('32267:' + fx.ditto.pubkey + ':pub.ditto.app'),
-        ourCoordValid: CAT.isValidCoordinate('32267:' + fx.ours.pubkey + ':nosmaps:io.kojira.nosmaps')
+        foreignCoordValid: CAT.isValidCoordinate('30078:' + fx.amethyst.pubkey + ':AmethystSettings'),
+        ourCoordValid: CAT.isValidCoordinate('30078:' + fx.ours.pubkey + ':nosmaps:io.kojira.nosmaps')
       };
     }, {
-      armada: REAL_32267_ARMADA, amber: REAL_32267_AMBER, ditto: REAL_32267_DITTO,
-      satsToUsd: REAL_32267_SATSTOUSD, ours: OUR_32267_EVENT
+      nostter: REAL_30078_NOSTTER, amethyst: REAL_30078_AMETHYST, nym: REAL_30078_NYM,
+      heat: REAL_30078_HEAT, ours: OUR_30078_EVENT
     });
 
     expect(r.prefix).toBe('nosmaps:');
 
     // All four are genuine unmodified events, not something we typed.
-    for (const key of ['armada', 'amber', 'ditto', 'satsToUsd']) {
+    for (const key of ['nostter', 'amethyst', 'nym', 'heat']) {
       expect(r[key].sigValid, key).toBe(true);
       expect(r[key].idValid, key).toBe(true);
     }
 
     // Separation 1: `d` outside our namespace, so `foreign-d` — a distinct reason
     // from `foreign-profile`, decided from tags alone.
-    expect(r.armada.d).toBe('buzz.armada.app');
-    expect(r.armada.ok).toBe(false);
-    expect(r.armada.reason).toBe('foreign-d');
+    expect(r.nostter.d).toBe('nostter-read');
+    expect(r.nostter.ok).toBe(false);
+    expect(r.nostter.reason).toBe('foreign-d');
 
-    expect(r.amber.d).toBe('com.greenart7c3.nostrsigner');
-    expect(r.amber.ok).toBe(false);
-    expect(r.amber.reason).toBe('foreign-d');
+    expect(r.amethyst.d).toBe('AmethystSettings');
+    expect(r.amethyst.ok).toBe(false);
+    expect(r.amethyst.reason).toBe('foreign-d');
 
-    expect(r.ditto.d).toBe('pub.ditto.app');
-    expect(r.ditto.ok).toBe(false);
-    expect(r.ditto.reason).toBe('foreign-d');
+    expect(r.nym.d).toBe('nym-presence');
+    expect(r.nym.ok).toBe(false);
+    expect(r.nym.reason).toBe('foreign-d');
 
-    // A second family, not zapstore-style: `content` is a JSON object here, so
-    // this one is rejected on the namespace while being well-formed JSON.
-    expect(r.satsToUsd.d).toBe('sats-to-usd-mbkiltxe');
-    expect(r.satsToUsd.ok).toBe(false);
-    expect(r.satsToUsd.reason).toBe('foreign-d');
-    expect(r.satsToUsd.contentIsJsonObject).toBe(true);
+    // A fourth application whose `content` is a well-formed JSON object, so this
+    // one is rejected on the namespace alone while parsing perfectly well.
+    expect(r.heat.d).toBe('heat:user:90d:v2');
+    expect(r.heat.ok).toBe(false);
+    expect(r.heat.reason).toBe('foreign-d');
+    expect(r.heat.contentIsJsonObject).toBe(true);
 
     // Separation 2 holds for the same four events on its own: none of them claims
     // our schema, so the content check would reject every one of them too.
-    for (const key of ['armada', 'amber', 'ditto', 'satsToUsd']) {
+    for (const key of ['nostter', 'amethyst', 'nym', 'heat']) {
       expect(r[key].contentSchema, key).not.toBe('org.nosmaps.software');
     }
-    // The three zapstore-style records are not JSON at all — which is exactly why
-    // the namespace gate must not depend on parsing content.
-    expect(r.armada.contentIsJsonObject).toBe(false);
-    expect(r.amber.contentIsJsonObject).toBe(false);
-    expect(r.ditto.contentIsJsonObject).toBe(false);
+    // Three of the four are not JSON objects at all — empty, or NIP-44 ciphertext
+    // — which is exactly why the namespace gate must not depend on parsing content.
+    expect(r.nostter.contentIsJsonObject).toBe(false);
+    expect(r.amethyst.contentIsJsonObject).toBe(false);
+    expect(r.nym.contentIsJsonObject).toBe(false);
 
     // Each separation fires on its own when the other one would let the event by.
     expect(r.ourSchemaTheirD).toBe('foreign-d');
@@ -545,7 +503,7 @@ function registerUnit() {
     expect(r.ours.ok).toBe(true);
     expect(r.ours.reason).toBeNull();
     expect(r.oursRecord.d).toBe('nosmaps:io.kojira.nosmaps');
-    expect(r.oursRecord.coordinate).toBe(`32267:${'b'.repeat(64)}:nosmaps:io.kojira.nosmaps`);
+    expect(r.oursRecord.coordinate).toBe(`30078:${'b'.repeat(64)}:nosmaps:io.kojira.nosmaps`);
     expect(r.oursRecord.name).toBe('Nosmaps');
     expect(r.oursRecord.state).toBe('active');
 
@@ -611,8 +569,8 @@ function registerUnit() {
     const r = await page.evaluate(() => {
       const V = window.NOSMAPS_CATALOG.validateCurationSetEvent;
       const T = window.__T;
-      const coordA = `32267:${T.PUB_A}:nosmaps:com.example.app1`;
-      const coordB = `32267:${T.PUB_B}:nosmaps:com.example.app2`;
+      const coordA = `30078:${T.PUB_A}:nosmaps:com.example.app1`;
+      const coordB = `30078:${T.PUB_B}:nosmaps:com.example.app2`;
       const good = V(T.makeSet({
         members: [coordA, coordB, coordA, '30023:' + T.PUB_A + ':article', 'garbage'],
         extraTags: [['title', 'My picks'], ['image', 'https://example.com/i.png']]
@@ -654,8 +612,8 @@ function registerUnit() {
     const r = await page.evaluate(() => {
       const CAT = window.NOSMAPS_CATALOG;
       const T = window.__T;
-      const coord = `32267:${T.PUB_A}:nosmaps:com.example.tool`;
-      const other = `32267:${T.PUB_B}:nosmaps:com.example.other`;
+      const coord = `30078:${T.PUB_A}:nosmaps:com.example.tool`;
+      const other = `30078:${T.PUB_B}:nosmaps:com.example.other`;
 
       // Nine sets from one curator, every one listing the same tool.
       const many = [];
@@ -806,8 +764,8 @@ function registerUnit() {
       const otherPub = T.makeSoftware({id: 'a3'.padEnd(64, '0'), pubkey: T.PUB_B, d: 'nosmaps:com.example.other', created_at: T.NOW_SEC - 1000, content: {name: 'Other publisher'}});
       const software = [topical, untagged, otherPub];
       const sets = [
-        T.makeSet({pubkey: T.CUR_A, id: 'b1'.padEnd(64, '0'), members: [`32267:${T.PUB_A}:nosmaps:com.example.untagged`]}),
-        T.makeSet({pubkey: T.CUR_B, id: 'b2'.padEnd(64, '0'), members: [`32267:${T.PUB_A}:nosmaps:com.example.untagged`, `32267:${T.PUB_A}:nosmaps:com.example.topical`]})
+        T.makeSet({pubkey: T.CUR_A, id: 'b1'.padEnd(64, '0'), members: [`30078:${T.PUB_A}:nosmaps:com.example.untagged`]}),
+        T.makeSet({pubkey: T.CUR_B, id: 'b2'.padEnd(64, '0'), members: [`30078:${T.PUB_A}:nosmaps:com.example.untagged`, `30078:${T.PUB_A}:nosmaps:com.example.topical`]})
       ];
 
       const bigFollows = [T.CUR_A, T.CUR_B];
@@ -865,7 +823,7 @@ function registerUnit() {
       // Older record, one recommendation. Newer record, zero recommendations.
       const older = T.makeSoftware({id: 'c1'.padEnd(64, '0'), d: 'nosmaps:com.example.older', created_at: T.NOW_SEC - 9000, content: {name: 'Older recommended'}});
       const newer = T.makeSoftware({id: 'c2'.padEnd(64, '0'), d: 'nosmaps:com.example.newer', created_at: T.NOW_SEC - 100, content: {name: 'Newer unrecommended'}});
-      const set = T.makeSet({pubkey: T.CUR_A, members: [`32267:${T.PUB_A}:nosmaps:com.example.older`]});
+      const set = T.makeSet({pubkey: T.CUR_A, members: [`30078:${T.PUB_A}:nosmaps:com.example.older`]});
       const follows = T.makeFollows({follows: [T.CUR_A]});
       const events = [older, newer, set];
 
@@ -949,7 +907,7 @@ function registerUnit() {
       // coordinate and cannot touch the first publisher's record (I2).
       const impostor = T.makeSoftware({id: 'f4'.padEnd(64, '0'), pubkey: T.PUB_B, created_at: T.NOW_SEC - 10, content: {state: 'withdrawn'}});
       // A curator recommending it cannot resurrect a withdrawn row either.
-      const set = T.makeSet({pubkey: T.CUR_A, members: [`32267:${T.PUB_A}:nosmaps:com.example.tool`]});
+      const set = T.makeSet({pubkey: T.CUR_A, members: [`30078:${T.PUB_A}:nosmaps:com.example.tool`]});
       const follows = T.makeFollows({follows: [T.CUR_A]});
       return {
         activeOnly: build([active]).entries.map(e => e.coordinate),
@@ -965,10 +923,10 @@ function registerUnit() {
         pubA: T.PUB_A, pubB: T.PUB_B
       };
     });
-    expect(r.activeOnly).toEqual([`32267:${r.pubA}:nosmaps:com.example.tool`]);
+    expect(r.activeOnly).toEqual([`30078:${r.pubA}:nosmaps:com.example.tool`]);
     expect(r.afterWithdraw).toEqual([]);
     expect(r.afterWithdrawReversed).toEqual([]);
-    expect(r.afterReactivate).toEqual([`32267:${r.pubA}:nosmaps:com.example.tool`]);
+    expect(r.afterReactivate).toEqual([`30078:${r.pubA}:nosmaps:com.example.tool`]);
     // The impostor's own coordinate is withdrawn too, so neither row is listable.
     expect(r.withImpostor).toEqual([]);
     // The recommended-but-withdrawn coordinate shows up as unresolved, not a row.
@@ -984,7 +942,7 @@ function registerUnit() {
     const r = await page.evaluate(() => {
       const CAT = window.NOSMAPS_CATALOG;
       const T = window.__T;
-      const coord = `32267:${T.PUB_A}:nosmaps:com.example.tool`;
+      const coord = `30078:${T.PUB_A}:nosmaps:com.example.tool`;
       const older = T.makeSoftware({id: 'aa'.padEnd(64, '1'), created_at: 1000, content: {name: 'Older'}});
       const newer = T.makeSoftware({id: 'bb'.padEnd(64, '2'), created_at: 3000, content: {name: 'Newer'}});
       const select = events => CAT.selectSoftwareWinners(events, {
@@ -992,7 +950,7 @@ function registerUnit() {
       });
 
       // `a` request at 2000 covers the 1000 version and nothing later.
-      const upTo = select([older, newer, T.makeDeletion({addresses: [coord], created_at: 2000, k: 32267})]);
+      const upTo = select([older, newer, T.makeDeletion({addresses: [coord], created_at: 2000, k: 30078})]);
       // A deletion request from another pubkey names our address: ignored (I2).
       const foreign = select([older, newer, T.makeDeletion({pubkey: T.PUB_B, addresses: [coord], created_at: 4000})]);
       // An `e` request for the newest id by its own author suppresses that version.
@@ -1036,7 +994,7 @@ function registerUnit() {
     const r = await page.evaluate(() => {
       const CAT = window.NOSMAPS_CATALOG;
       const T = window.__T;
-      const ghost = `32267:${T.PUB_B}:nosmaps:com.example.ghost`;
+      const ghost = `30078:${T.PUB_B}:nosmaps:com.example.ghost`;
       const events = [
         T.makeSoftware({id: 'g1'.padEnd(64, '0')}),
         T.makeSet({pubkey: T.CUR_A, members: [ghost]}),
@@ -1044,7 +1002,7 @@ function registerUnit() {
       ];
       const result = CAT.buildCatalog({events, viewerPubkey: T.VIEWER, nowMs: T.NOW_SEC * 1000, coverage: {'wss://r1': {status: 'eose', observedAt: 1}}});
       // §5.2 grouping: exact fetch filters are grouped by author, never Cartesian.
-      const grouped = CAT.groupByAuthor([`32267:${T.PUB_A}:nosmaps:tool-a`, `32267:${T.PUB_A}:nosmaps:tool-b`, ghost]);
+      const grouped = CAT.groupByAuthor([`30078:${T.PUB_A}:nosmaps:tool-a`, `30078:${T.PUB_A}:nosmaps:tool-b`, ghost]);
       return {
         rows: result.entries.map(e => e.coordinate),
         unresolved: result.unresolved,
@@ -1053,7 +1011,7 @@ function registerUnit() {
         ghost, pubA: T.PUB_A, pubB: T.PUB_B
       };
     });
-    expect(r.rows).toEqual([`32267:${r.pubA}:nosmaps:com.example.tool`]);
+    expect(r.rows).toEqual([`30078:${r.pubA}:nosmaps:com.example.tool`]);
     expect(r.unresolved).toEqual([r.ghost]);
     expect(r.diagnostics).toContain('recommended-coordinate-not-observed:1');
     expect(r.grouped).toHaveLength(2);
@@ -1084,7 +1042,7 @@ function registerUnit() {
         out['c' + C] = {chunks: chunked.chunks.length, maxBytes, covered: seen.size};
       }
       // A scalar-only filter that cannot fit fails visibly rather than silently.
-      const tooBig = CAT.chunkFilters([{kinds: [32267], search: 'x'.repeat(200)}], {maxBytes: 40});
+      const tooBig = CAT.chunkFilters([{kinds: [30078], search: 'x'.repeat(200)}], {maxBytes: 40});
       // An array cap is applied independently of the byte budget.
       const capped = CAT.chunkFilters([{kinds: [5], '#a': Array.from({length: 300}, (_, i) => 'a' + i)}], {maxBytes: 1000000});
       return {
@@ -1145,7 +1103,7 @@ function registerUnit() {
       const cache = CAT.cache;
       const T = window.__T;
       const event = T.makeSoftware({id: 'ca'.padEnd(64, '0')});
-      const coordinate = `32267:${T.PUB_A}:nosmaps:com.example.tool`;
+      const coordinate = `30078:${T.PUB_A}:nosmaps:com.example.tool`;
       const record = {coordinate, eventId: event.id, createdAt: event.created_at, receivedAtSec: T.NOW_SEC, verifiedAt: Date.now(), event};
 
       await cache.wipe();

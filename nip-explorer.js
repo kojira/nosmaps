@@ -206,7 +206,7 @@
   function categoryText(tool) { return relayEntry(tool) && !tool.categoryObserved ? t('unknown') : category(tool.category).name; }
   function osText(tool) { const list = (tool.os || []).filter(Boolean); if (list.length) return list.join(' / '); return tool.platform || t('unknown'); }
   function platformTags(tool) {
-    // 32267 は OS / 配布形態を観測しない。data.js サンプルだけが実データを持つ。
+    // 30078 は OS / 配布形態を観測しない。data.js サンプルだけが実データを持つ。
     if (relayEntry(tool) && !(tool.os || []).length && !tool.platform) return `<span class="tag">${esc(t('explorer.os'))}: ${esc(t('unknown'))}</span>`;
     return `<span class="tag">${esc(tool.platform)}</span><span class="tag">${esc((tool.os || []).filter(value => value !== tool.platform).join(' / ') || deliveryLabel(delivery(tool)))}</span>`;
   }
@@ -287,7 +287,7 @@
     return `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
   }
   function relayCoverageLabel(value) { const key = value && typeof value === 'object' ? value.status : value; return i18n.has(`explorer.coverage.${key}`) ? t(`explorer.coverage.${key}`) : String(key); }
-  // kind 32267 の v1 content にカテゴリ・OS・ライセンスの欄はない。`t` トピックが
+  // kind 30078 の v1 content にカテゴリ・OS・ライセンスの欄はない。`t` トピックが
   // UI のカテゴリ id と一致したときだけ観測値として使い、それ以外は不明のまま出す。
   function categoryFromTopics(topics) { return (Array.isArray(topics) ? topics.find(value => categories.includes(value)) : null) || null; }
   function relayEntryToTool(entry, asOf) {
@@ -467,7 +467,7 @@
   function renderToolDetail(context, shouldOpen = true) {
     const tool = findTool(context.toolId);
     if (!tool) return;
-    // リレー由来の説明文は 32267 の署名済み content の summary だけ。NIP・レビューは観測していないので埋め合わせない。
+    // リレー由来の説明文は 30078 の署名済み content の summary だけ。NIP・レビューは観測していないので埋め合わせない。
     const description = relayEntry(tool) ? (tool.summary || t('unknown')) : toolDescription(tool);
     const records = (tool.nips || []).slice(0, 7);
     const reviews = allReviews(tool);
@@ -484,7 +484,7 @@
     if (!tool) return;
     const typeLabel = t(`explorer.${context.resourceType}`);
     // resourceUrl は data.js サンプル用の生成 URL。リレー由来で観測できる URL は
-    // 32267 content の homepage だけなので、site 以外は出さない。
+    // 30078 content の homepage だけなので、site 以外は出さない。
     const url = relayEntry(tool) ? (context.resourceType === 'site' ? (tool.homepage || '') : '') : resourceUrl(tool, context.resourceType);
     els.evidenceDialog.setAttribute('aria-label', t('explorer.linkDetails', {type: typeLabel}));
     els.evidenceContent.innerHTML = `${dialogHead(t('explorer.linkDetails', {type: typeLabel}), tool.name)}<dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.displayUrl'))}</dt><dd>${esc(url || t('unknown'))}</dd></div><div><dt>${esc(t('explorer.checkedAt'))}</dt><dd>${esc(observedText(tool))}</dd></div></dl>`;

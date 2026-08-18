@@ -1,7 +1,7 @@
 /* Nosmaps relay-native catalog data layer — revision 2 (curation as signal).
    Classic browser script (no modules). Exposes window.NOSMAPS_CATALOG.
 
-   The publisher-signed kind 32267 addressable event is the only canonical record
+   The publisher-signed kind 30078 addressable event is the only canonical record
    (D2). There is no pointer, no manifest, no blob, no mirror, no curator
    allowlist, and no HTTP anywhere in this file. Kind 30267 NIP-51 App curation
    sets are a presentation-layer signal only: they contribute a recommendation
@@ -28,7 +28,12 @@
 
   const POLICY = {
     // The canonical record (§4.2) and the presentation-only signal (§6.1).
-    SOFTWARE_KIND: 32267,
+    // 30078 is NIP-78 application-specific data. Kind 32267 ("Software
+    // Application") was considered and rejected: its semantics sit close enough to
+    // ours — an app-store listing record — that our listing policy would inherit
+    // another project's curation rules. Sharing 30078 with unrelated apps costs
+    // nothing, because NIP-78 specifies the kind as shared by construction.
+    SOFTWARE_KIND: 30078,
     CURATION_KIND: 30267,
     FOLLOW_KIND: 3,
     DELETION_KIND: 5,
@@ -61,11 +66,12 @@
 
   const SOFTWARE_SCHEMA = 'org.nosmaps.software';
   // §4.2 rule 1: every canonical Nosmaps `d` is namespaced with this literal
-  // prefix. Kind 32267 has no NIP and other applications really do publish on it
-  // (observed on wss://x.kojira.io: `buzz.armada.app`, `pub.ditto.app`,
-  // `com.greenart7c3.nostrsigner`), so the namespace is the separation that does
-  // not depend on reading `content` at all. It is deliberately independent of the
-  // `org.nosmaps.software` content check: either one alone rejects a foreign
+  // prefix. Kind 30078 is NIP-78 application-specific data, so records published
+  // by other applications on the same kind are the specified normal state, not an
+  // anomaly (observed on wss://x.kojira.io: `nostter-read`, `AmethystSettings`,
+  // `circl-settings`). The namespace is therefore the primary separation, and it
+  // does not depend on reading `content` at all. It is deliberately independent of
+  // the `org.nosmaps.software` content check: either one alone rejects a foreign
   // record, and they fail with different reasons.
   const SOFTWARE_D_PREFIX = 'nosmaps:';
   const D_MAX_BYTES = 192;
@@ -241,7 +247,7 @@
     return hex;
   }
 
-  // ---- kind 32267: the canonical record (§4.2) ----
+  // ---- kind 30078: the canonical record (§4.2) ----
   // NOTE: signature verification is NOT done here. It is asynchronous and handled
   // in the relay layer by rx-nostr's verifier (createRxNostr({verifier})). This
   // function is pure and synchronous so it can be unit-tested without crypto/IO.
@@ -260,13 +266,13 @@
     if (dTags.length !== 1 || typeof dTags[0][1] !== 'string') return fail('bad-d');
     const d = dTags[0][1];
 
-    // §4.2 "Foreign 32267 events", separation 1 of 2 — the address namespace.
-    // Kind 32267 has no NIP, so another application's perfectly valid record is
-    // the normal case, not an error. A `d` outside our namespace is theirs: it is
-    // neither malformed (`bad-d`) nor a content-profile mismatch
-    // (`foreign-profile`), so it gets its own reason and is decided before
-    // `content` is even parsed. Checked here rather than at the call sites so it
-    // cannot be bypassed by a path that forgets it.
+    // §4.2 "Foreign 30078 events", separation 1 of 2 — the address namespace.
+    // NIP-78 specifies 30078 as shared application-specific data, so another
+    // application's perfectly valid record is the normal case, not an error. A `d`
+    // outside our namespace is theirs: it is neither malformed (`bad-d`) nor a
+    // content-profile mismatch (`foreign-profile`), so it gets its own reason and
+    // is decided before `content` is even parsed. Checked here rather than at the
+    // call sites so it cannot be bypassed by a path that forgets it.
     if (d.indexOf(SOFTWARE_D_PREFIX) !== 0) return fail('foreign-d');
     // A bare prefix names nothing. Keep this after the namespace check so it is
     // reported as our own malformed `d`, which is what it is.
@@ -376,7 +382,7 @@
     const future = futureCheck(event.created_at, opts);
     if (future) return fail(future);
 
-    // Members are `a` tags that parse as 32267:<64-hex>:<d>. Other `a` values
+    // Members are `a` tags that parse as 30078:<64-hex>:<d>. Other `a` values
     // (a set may reference anything) are ignored, not errors.
     const members = [];
     let ignored = 0;
@@ -1141,7 +1147,7 @@
   // ---- IndexedDB derived cache (D14: discardable acceleration, never evidence) ----
   const DB_NAME = 'nosmaps-catalog';
   // v1 held manifest blobs keyed by curator:scope. Revision 2 caches signed
-  // 32267 events keyed by coordinate, so the store changes with the version.
+  // 30078 events keyed by coordinate, so the store changes with the version.
   const DB_VERSION = 2;
   const STORE = 'records';
   const LEGACY_STORE = 'manifests';

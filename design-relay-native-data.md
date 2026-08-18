@@ -30,7 +30,7 @@ publishing the next version of the set without that member. Revision 1 kept that
 parallel manifest with per-entry `active | withdrawn`. Two mechanisms expressing one fact is two
 mechanisms that can disagree, and revision 1 spent §4.4 and §5.2 specifying what to do when they did.
 
-Revision 2 removes the manifest, makes the publisher-signed `32267` record the only canonical record,
+Revision 2 removes the manifest, makes the publisher-signed `30078` record the only canonical record,
 and demotes curation from an inclusion gate to a presentation-layer signal derived from the viewer's
 own social graph. The result has no HTTP in the catalog data path, a fixed three-round cold start per
 relay, and no notion of a globally trusted curator.
@@ -40,7 +40,7 @@ relay, and no notion of a globally trusted curator.
 **D1 — No backend.** There is no Nosmaps server, index, aggregator, or API. Every fact displayed
 comes from a signed Nostr event observed on a relay the user configured.
 
-**D2 — Signed events are the only source of truth.** The publisher-signed kind `32267` addressable
+**D2 — Signed events are the only source of truth.** The publisher-signed kind `30078` addressable
 event is the only canonical record of a tool. No blob, file, pointer, manifest, or third-party
 assertion contributes to what a record *is*.
 
@@ -183,35 +183,46 @@ MAX_DETAIL_PAGES_PER_RELAY       = 8
 | `7` | NIP-25 reaction | regular; app reduces per user/target | read lazily |
 | `1063` | NIP-94 media metadata | regular | read lazily |
 | `10003` | NIP-51 bookmark list | pubkey | private write/read |
+| `30078` | NIP-78 application-specific data; the software record | `(30078, publisher, d)` | **the canonical record** |
 | `30267` | NIP-51 App curation set | `(30267, curator, d)` | **core** — ranking and count only |
 | `30368` | taxonomy record | `(30368, author, d)` | cached/lazy |
 | `30369` | conformance claim; exact tool `a` index required | `(30369, author, d)` | detail |
 | `30370` | observation; exact tool `a` required when tool-subject/linked | `(30370, author, d)` | detail only when tool-indexed |
 | `30371` | evidence relation; related-tool `a` required for detail | `(30371, author, d)` | tool-indexed detail; not migration authority |
 | `30372` | review | `(30372, reviewer, d)` | review tab |
-| `32267` | software application | `(32267, publisher, d)` | **the canonical record** |
 | `1111` | NIP-22 comment | regular | future only |
 
-Kinds `30367` and `30078` do not appear in this design. Revision 1's catalog pointer is deleted
-(§18); NIP-78's kind `30078` is explicitly a home for data belonging to "apps that do not care about
-interoperability" (§19), which is the opposite of what a public catalog record needs.
+Kind `30367` does not appear in this design: revision 1's catalog pointer is deleted (§18). Kind
+`30078` does appear, but in a different role — it is no longer a pointer to an off-relay manifest, it
+is the canonical record itself (§4.2).
 
 Candidate kinds `30368`–`30372` are namespaced by required `L`/`l` tags, but those tags are indexing
 aids, not schema negotiation or registry ownership. On a later registry collision, old signed events
 remain readable under their original candidate schema; publication moves to a newly selected
 kind/schema major, and cross-kind migration is explicit rather than reinterpretation.
 
-### 4.2 The canonical record: kind `32267`
+### 4.2 The canonical record: kind `30078`
 
-Kind `32267` ("Software Application") appears in the NIPs event-kind registry **with an empty NIP
-column** — there is no specification for its content (§19). The only interoperable contract Nosmaps
-relies on is its *coordinate form*, `32267:<publisher-hex>:<d>`, which is exactly what NIP-51's App
-curation sets use as members. Everything below is therefore a **Nosmaps-local content profile**, and
-§16.3 records that as residual centralisation.
+Kind `30078` is NIP-78 **application-specific data** (§19). NIP-78 hands the kind to every
+application that needs somewhere to keep its own data, so records published on it by unrelated
+applications are the **specified normal state, not an anomaly**. Nosmaps records are separated from
+them by the `d` namespace prefix `nosmaps:` (rule 1b) together with the `t` tag `nosmaps` used for
+discovery (§5.1). NIP-01 makes single-letter tag filters mandatory, so querying `#t` is ordinary
+protocol usage rather than a workaround for sharing the kind.
+
+Kind `32267` ("Software Application") was considered and rejected. It is assigned in the event-kind
+registry with an empty NIP column, and its semantics — an app-store listing record — sit close enough
+to ours that adopting it would make our listing policy depend on another project's curation rules. A
+kind whose meaning is deliberately generic carries no such dependency.
+
+The content profile below is therefore a **Nosmaps-local** one, and §16.3 records that as residual
+centralisation. The coordinate form is `30078:<publisher-hex>:<d>`; NIP-51 App curation sets carry
+arbitrary addressable coordinates in their `a` tags, so they can reference it (§6.1) even though the
+worked example in NIP-51 uses a `32267` coordinate.
 
 ```json
 {
-  "kind": 32267,
+  "kind": 30078,
   "created_at": 1786896000,
   "pubkey": "<publisher-hex>",
   "tags": [
@@ -230,8 +241,8 @@ Normative rules:
 1. Exactly one `d` tag. `d` grammar is ASCII, maximum 192 UTF-8 bytes; reverse-DNS is recommended but
    is not ownership proof.
 1b. `d` MUST begin with the literal prefix `nosmaps:`, so the canonical coordinate form is
-   `32267:<publisher-hex>:nosmaps:<local>`. The 192-byte ceiling covers the whole `d`, so `<local>` has
-   at most 184 bytes and MUST be non-empty. A `32267` event whose `d` lacks the prefix is another
+   `30078:<publisher-hex>:nosmaps:<local>`. The 192-byte ceiling covers the whole `d`, so `<local>` has
+   at most 184 bytes and MUST be non-empty. A `30078` event whose `d` lacks the prefix is another
    application's record and is recorded as `quarantined: foreign-d` — a **distinct** reason from
    `foreign-profile`, decided from tags alone without parsing `content`. The prefix is not ownership
    proof either; it is a namespace, and it is enforced in exactly one place
@@ -247,11 +258,14 @@ Normative rules:
 6. Signature and event id MUST validate. `created_at` is subject to future-timestamp quarantine
    (§12.3).
 
-**Foreign `32267` events.** Because `32267` has no NIP, other applications publish it with their own
-content, and they demonstrably do: a live probe of `wss://x.kojira.io` returned zapstore-style records
-under `d` values `buzz.armada.app`, `com.greenart7c3.nostrsigner` and `pub.ditto.app` (tags `name`,
-`summary`, `icon`, `image`, `url`, `repository`, `license`, `f`, `t`), plus a second family under
-`d` values like `sats-to-usd-mbkiltxe`. None of them are ours and none must ever be read as ours.
+**Foreign `30078` events.** NIP-78 specifies the kind as shared, so other applications publish it
+with their own content, and they demonstrably do: a live probe of `wss://x.kojira.io` on 2026-08-18
+returned records under `d` values `nostter-read`, `AmethystSettings`, `nym-presence`,
+`circl-settings`, `seen_notifications_at`, `ditto/metadata`, `armada/read-state` and
+`heat:user:90d:v2`, with `content` ranging from empty through NIP-44 ciphertext to plain JSON
+objects. None of them are ours and none must ever be read as ours — and their presence is the kind
+working as specified, so the separations below are the **primary mechanism**, not a compensation for
+occupying someone else's number.
 
 Two **independent** separations enforce that, both in `validateSoftwareEvent`, each with its own
 reason. Either one alone is sufficient; neither is trusted to be the only one:
@@ -269,7 +283,7 @@ nonexistent. This is a known limitation, not a claim about the event.
 
 ### 4.3 Tool identity and claim levels
 
-Tool identity is the full coordinate `32267:<publisher-hex>:<d>`. Similar `d` values under different
+Tool identity is the full coordinate `30078:<publisher-hex>:<d>`. Similar `d` values under different
 pubkeys are distinct and MUST NOT be auto-merged.
 
 The UI MUST NOT say "official" solely because `d` resembles reverse DNS, because a profile has
@@ -279,7 +293,7 @@ Closed claim levels:
 
 | level | machine meaning | UI wording | scope |
 |---|---|---|---|
-| `self_asserted` | publisher signed the `32267` event | "publisher-signed" | global |
+| `self_asserted` | publisher signed the `30078` event | "publisher-signed" | global |
 | `nip05_linked` | current NIP-05 lookup maps the displayed identifier to the publisher key | "NIP-05 linked"; not ownership proof | global, lazy |
 | `socially_recommended` | at least one pubkey in the **viewer's** `G` has an observed `30267` winner containing this coordinate | "recommended by N in your network" | **viewer-relative** |
 | `evidence_linked` | valid `30371` evidence references the coordinate | "evidence available" | global |
@@ -301,7 +315,7 @@ NIP-01 indexes single-letter tags and NIP-24 defines `t` as a hashtag whose valu
 (§19). Discovery therefore uses `#t`:
 
 ```json
-{"kinds":[32267],"#t":["nosmaps"],"limit":500}
+{"kinds":[30078],"#t":["nosmaps"],"limit":500}
 ```
 
 Normative details:
@@ -319,7 +333,7 @@ Normative details:
    `MAX_DISCOVERY_PAGES_PER_RELAY`, `MAX_DISCOVERY_RAW_EVENTS_PER_RELAY`, and
    `DISCOVERY_LIMIT_PER_RELAY`. Hitting a bound marks the relay `incomplete: discovery-cap`. An empty
    page proves only "no more events returned in this round".
-5. **Discovery is opt-in and therefore lossy by construction.** A `32267` record that carries no
+5. **Discovery is opt-in and therefore lossy by construction.** A `30078` record that carries no
    queried `t` tag is invisible to §5.1. The UI MUST label discovery results as "records that
    published topic `nosmaps` on your relays", never as "all tools". §5.2 is the compensating path.
 
@@ -331,8 +345,8 @@ of whether it carries a discovery topic:
 
 ```json
 [
-  {"kinds":[32267],"authors":["<publisher-A>"],"#d":["tool-a","tool-b"],"limit":8},
-  {"kinds":[32267],"authors":["<publisher-B>"],"#d":["tool-c"],"limit":4}
+  {"kinds":[30078],"authors":["<publisher-A>"],"#d":["tool-a","tool-b"],"limit":8},
+  {"kinds":[30078],"authors":["<publisher-B>"],"#d":["tool-c"],"limit":4}
 ]
 ```
 
@@ -345,14 +359,14 @@ This is what makes curation a *recall* mechanism rather than a gate (§6.6): a r
 
 ### 5.3 Winner selection among replaceable versions
 
-`32267` is in the addressable range `30000 <= n < 40000`, so a coordinate is `(kind, pubkey, d)` and
+`30078` is in the addressable range `30000 <= n < 40000`, so a coordinate is `(kind, pubkey, d)` and
 relays keep only the latest per coordinate (§19). Clients MUST NOT rely on that: a partitioned relay
 set will hand back different versions from different relays.
 
 Selection is a pure function over the union of everything observed for the coordinate:
 
 ```text
-candidates = observed events at (32267, pubkey, d)
+candidates = observed events at (30078, pubkey, d)
   filtered by valid event id and signature
   filtered by schema validity (§4.2)
   filtered by future-timestamp eligibility (§12.3)
@@ -393,13 +407,13 @@ participates. Specifically:
 
 NIP-51 defines kind `30267` as *App curation sets*: "references to multiple software applications",
 with expected tag items `"a"` (software application event), and NIP-51's own example shows a set with
-a `d` tag and `a` tags of the form `32267:<pubkey>:<d>` (§19).
+a `d` tag and `a` tags of the form `30078:<pubkey>:<d>` (§19).
 
 Nosmaps uses it exactly as specified and adds no custom schema:
 
 - The set is addressable at `(30267, curator, d)`; the winner (§5.3 rules, minus the
   `org.nosmaps.software` schema check, which does not apply) is the whole current set.
-- Members are the values of `a` tags that parse as `32267:<64-hex>:<d>`. Other `a` values are ignored,
+- Members are the values of `a` tags that parse as `30078:<64-hex>:<d>`. Other `a` values are ignored,
   not errors.
 - `content` is free text (NIP-51's example uses `"My nostr app selection"`). Nosmaps neither requires
   nor validates it.
@@ -488,7 +502,7 @@ For a listable coordinate `X`:
 
 ```text
 members(p) = ∪ over the ≤ GRAPH_MAX_SETS_PER_CURATOR selected winners of (30267, p, *)
-             of the 32267 coordinates in their `a` tags
+             of the 30078 coordinates in their `a` tags
 
 rec1(X) = | { p ∈ G   : X ∈ members(p) } |          # each curator counted at most once
 rec2(X) = | { p ∈ G2  : X ∈ members(p) } |          # only when tier 2 is enabled; disjoint from G
@@ -564,12 +578,12 @@ found without ever being able to *decrease* it.
 
 ### 7.1 Publisher retraction
 
-A publisher retracts their own record by publishing a **newer valid `32267` event at the same
+A publisher retracts their own record by publishing a **newer valid `30078` event at the same
 coordinate with `state:"withdrawn"`**:
 
 ```json
 {
-  "kind": 32267,
+  "kind": 30078,
   "created_at": 1786982400,
   "pubkey": "<publisher-hex>",
   "tags": [["d", "com.example.tool"], ["state", "withdrawn"], ["v", "1"]],
@@ -659,7 +673,7 @@ Every "No" row above has a corresponding UI state in §3 (`stale`, `incomplete`,
 Under relay or network partition, availability is preferred over global consistency. The client
 guarantees only:
 
-> For each coordinate, the displayed state is derived deterministically from the valid `32267`
+> For each coordinate, the displayed state is derived deterministically from the valid `30078`
 > events, `30267` sets, kind `3` follow lists, and kind `5` deletion requests actually observed from
 > the configured relay set by the shown as-of time.
 
@@ -693,7 +707,7 @@ state.
 
 ### 8.3 Partition examples
 
-**A — newest withdrawal hidden.** R1 holds `32267 X state=withdrawn` at `created_at = t2`; R2 holds
+**A — newest withdrawal hidden.** R1 holds `30078 X state=withdrawn` at `created_at = t2`; R2 holds
 only the older `active` version at `t1 < t2`. A client seeing only R2 lists X with relay coverage
 `incomplete` and MUST NOT call it globally active or latest. Once R1 is observable, the withdrawn
 winner is selected and X is suppressed. No manifest, generation, or blob participates.
@@ -740,7 +754,7 @@ multiply per §9.4.
 
 ```json
 [
-  {"kinds":[32267],"#t":["nosmaps"],"limit":500},
+  {"kinds":[30078],"#t":["nosmaps"],"limit":500},
   {"kinds":[3],"authors":["<viewer-hex>"],"limit":1}
 ]
 ```
@@ -761,14 +775,14 @@ needs 67 bytes per curator inside a filter that was going to be sent anyway.
 
 ```json
 [
-  {"kinds":[32267],"authors":["<publisher-A>"],"#d":["tool-a","tool-b"],"limit":8},
-  {"kinds":[32267],"authors":["<publisher-B>"],"#d":["tool-c"],"limit":4},
+  {"kinds":[30078],"authors":["<publisher-A>"],"#d":["tool-a","tool-b"],"limit":8},
+  {"kinds":[30078],"authors":["<publisher-B>"],"#d":["tool-c"],"limit":4},
   {"kinds":[5],"authors":["<publisher-A>","<publisher-B>","<curator-C>"],
-   "#a":["32267:<publisher-A>:tool-a","30267:<curator-C>:nostr"],"limit":256}
+   "#a":["30078:<publisher-A>:tool-a","30267:<curator-C>:nostr"],"limit":256}
 ]
 ```
 
-The `32267` filters cover coordinates learned from R2 sets but not returned by R1's topic query — the
+The `30078` filters cover coordinates learned from R2 sets but not returned by R1's topic query — the
 §6.6 recall path. The kind-5 filter is the single coalesced cleanup for everything learned in R1 and
 R2; there is at most one such filter per relay per target round, never one per event.
 
@@ -783,7 +797,7 @@ cleanup follow-up" shape.
 
 | scenario | Nostr logical REQs / relay | HTTP | notes |
 |---|---:|---:|---|
-| R1 cold discovery + identity | `1` (+ up to `MAX_DISCOVERY_PAGES_PER_RELAY - 1` pages) | `0` | `{32267 #t}` + optional `{3 authors:[viewer]}` |
+| R1 cold discovery + identity | `1` (+ up to `MAX_DISCOVERY_PAGES_PER_RELAY - 1` pages) | `0` | `{30078 #t}` + optional `{3 authors:[viewer]}` |
 | R2 curation | `1` | `0` | `{30267 authors:G}`; curators are array elements, not filters |
 | R3 gap-fill + cleanup | `1` | `0` | author-grouped `#d` for R2-learned coordinates + one coalesced kind-5 filter |
 | **cold catalog total** | **`3`** | **`0`** | independent of curator count and tool count; pages and chunks per §9.4 |
@@ -877,7 +891,7 @@ physical Nostr REQs = sum(chunks per relay and dependency round)
 ```
 
 Since revision 2 has no event that carries a payload, there is no relay message-size coupling on the
-write path beyond ordinary `32267` and `30267` event limits, and no separate upload-size constraint
+write path beyond ordinary `30078` and `30267` event limits, and no separate upload-size constraint
 of any kind.
 
 ## 10. Candidate-kind normative schema contract
@@ -940,11 +954,11 @@ old content under a third party's schema.
 ### 10.3 `30369` conformance claim
 
 - `d=conformance:<tool-coordinate-sha256>:<feature-key>`; hash the exact UTF-8 bytes of the canonical
-  `32267:<publisher-hex>:<d>` coordinate; derive the feature key by §10.1.
+  `30078:<publisher-hex>:<d>` coordinate; derive the feature key by §10.1.
 - required: `schema=org.nosmaps.conformance`, `version=1`, `state`, `tool`, `feature`, `result`,
   `environment_hash`.
 - `tool` is one canonical software coordinate and the event MUST contain exactly one
-  `["a", "32267:<publisher>:<d>"]` whose value equals content `tool` byte-for-byte. Mismatch, missing
+  `["a", "30078:<publisher>:<d>"]` whose value equals content `tool` byte-for-byte. Mismatch, missing
   tag, duplicate differing tool tag, or a noncanonical coordinate fails validation.
 - `feature` is the complete NFC feature identifier, maximum 512 UTF-8 bytes; reverse-DNS ASCII plus
   version remains recommended, e.g. `org.nosmaps.nip.65-v1`. The `d` uses its bounded feature key,
@@ -964,9 +978,9 @@ old content under a third party's schema.
   `observed_at`, `value`; optional `tool`, `environment_hash`.
 - `subject` uses §10.5 syntax; `observation_type` is the complete NFC identifier, maximum 512 UTF-8
   bytes; `observed_at` is an integer; `value` is a scalar or object up to 4 KiB canonical bytes.
-- If `subject` is an `address:32267:<publisher>:<d>`, content `tool` is required and MUST equal that
+- If `subject` is an `address:30078:<publisher>:<d>`, content `tool` is required and MUST equal that
   embedded coordinate. Any observation intended for tool detail or comparison MUST carry content
-  `tool` and exactly one matching canonical `["a", "32267:<publisher>:<d>"]`. Observations without a
+  `tool` and exactly one matching canonical `["a", "30078:<publisher>:<d>"]`. Observations without a
   tool index are outside standard tool-detail retrieval.
 
 ### 10.5 `30371` evidence relation
@@ -978,8 +992,8 @@ old content under a third party's schema.
 - subject grammar is exactly one of `event:<64hex>`, `address:<kind>:<64hex>:<d>`,
   `url:<absolute-https-url>`, `sha256:<64hex>`. `object` uses the same grammar.
 - relation closed enum v1: `supports | contradicts | documents | reproduces | supersedes`.
-- `summary` max 500. `tools`, when present, is a sorted unique array of at most 16 canonical `32267`
-  coordinates. If either `subject` or `object` is an `address:32267:<publisher>:<d>`, that coordinate
+- `summary` max 500. `tools`, when present, is a sorted unique array of at most 16 canonical `30078`
+  coordinates. If either `subject` or `object` is an `address:30078:<publisher>:<d>`, that coordinate
   MUST occur in `tools`. The set of software-coordinate `a` tags MUST equal `tools` exactly.
 - A `30371` is eligible for a tool's detail or comparison only when that exact coordinate occurs in
   both content `tools` and an `a` tag. Evidence with no related tool index is outside standard
@@ -999,8 +1013,8 @@ old content under a third party's schema.
 
 ## 11. Coordinate migration authority
 
-Only a newer valid `32267` winner at the **old coordinate**, signed by the same publisher key as that
-coordinate, may authoritatively set `superseded_by` to another valid `32267` coordinate. The field is
+Only a newer valid `30078` winner at the **old coordinate**, signed by the same publisher key as that
+coordinate, may authoritatively set `superseded_by` to another valid `30078` coordinate. The field is
 optional and effective only when the old winner is `state:"withdrawn"` or explicitly marks migration.
 
 1. Parse the exact destination coordinate; a self-loop is invalid.
@@ -1023,7 +1037,7 @@ optional and effective only when the old winner is `state:"withdrawn"` or explic
 
 ### 12.1 Winner-before-display pagination
 
-Pipeline order is mandatory, and applies to `32267` discovery pages (§5.1) as well as `30372` reviews:
+Pipeline order is mandatory, and applies to `30078` discovery pages (§5.1) as well as `30372` reviews:
 
 1. Fetch raw events with the exact filter for the class, overfetching
    `RAW_LIMIT = min(relay max_limit, max(60, desiredUnique * 3))`.
@@ -1085,7 +1099,7 @@ receipt history. Tests freeze wall clock and receipt times.
 | screen / action | immediate dependencies | cache prerequisite / lazy dependencies |
 |---|---|---|
 | cold catalog | R1 discovery + viewer kind `3`; R2 `30267` for `G`; R3 gap-fill + cleanup | taxonomy labels may use cache; profiles, reviews, reactions, media are lazy |
-| re-rank after follow change | R2 only, with the new `G` | row set unchanged (I7), so no `32267` refetch is required |
+| re-rank after follow change | R2 only, with the new `G` | row set unchanged (I7), so no `30078` refetch is required |
 | search / filter | local observed events only | no network |
 | tool detail shell | round 1: exact tool winner filters plus one coalesced `{"kinds":[30369,30370,30371],"#a":[selectedToolCoordinates]}` filter; round 2: at most one coalesced kind-5 cleanup REQ per relay | candidate-kind and `#a` probes must pass; failures are excluded and marked incomplete; caps apply; unrelated evidence is not fetched |
 | comparison | union selected coordinates into the same coalesced `#a` filter, same single cleanup bound | same probes, caps, and lazy tabs; no per-tool or per-card N+1 |
@@ -1101,7 +1115,7 @@ marking `incomplete: detail-cap` rather than scanning beyond the bound.
 
 NIP-01 permits querying indexed single-letter tags such as `#t`, `#a`, and `#d`, but each configured
 relay's candidate-kind acceptance and generic tag indexing MUST be live-probed immediately before
-implementation. **`#t` indexing on kind `32267` is the single most load-bearing probe in this
+implementation. **`#t` indexing on kind `30078` is the single most load-bearing probe in this
 design**: if a relay does not index it, discovery on that relay is impossible and the relay is marked
 `incomplete: t-index-unsupported`. Curation-derived exact fetches (§5.2) still work there, so the
 relay degrades to recall-only rather than being useless. Broad kind scans, arbitrary author
@@ -1152,7 +1166,7 @@ pool.setDefaultRelays(["wss://x.kojira.io", "wss://nos.lol"])
 // backwardPerRelay, byteChunk, validateDeleteReduce, and markIncomplete are app-owned helpers.
 async function coldCatalog(relay, viewerPubkey) {
   const r1 = await backwardPerRelay(relay, byteChunk([
-    { kinds: [32267], "#t": policy.discoveryTopics, limit: policy.discoveryLimit },
+    { kinds: [30078], "#t": policy.discoveryTopics, limit: policy.discoveryLimit },
     ...(viewerPubkey ? [{ kinds: [3], authors: [viewerPubkey], limit: 1 }] : []),
   ]))
 
@@ -1273,13 +1287,16 @@ the viewer's social graph are fetched regardless of `t` (§6.6), and the visibil
 rather than hidden. **This is not removable without a global index, which is the thing we refuse to
 build.**
 
-**16.3 Kind `32267` has no NIP, so its content schema is ours.** Verified: the event-kind registry
-lists `32267` as "Software Application" with an empty NIP column (§19). `org.nosmaps.software` is a
-Nosmaps-local profile, so a record another client considers perfectly valid is quarantined here
-(§4.2). Mitigation: quarantine carries a reason, the raw event stays inspectable, and the only
-interoperable contract we depend on is the coordinate form that NIP-51 `a` tags already use. This is
-the largest remaining piece of unilateral authority in the design and it should be revisited if a
-`32267` specification ever lands.
+**16.3 Kind `30078` has no content schema, so ours is Nosmaps-local.** Verified: NIP-78 defines
+`30078` as application-specific data and specifies no content schema for it at all (§19).
+`org.nosmaps.software` is therefore a Nosmaps-local profile, and a record another client considers
+perfectly valid is quarantined here (§4.2). That follows from the kind rather than from occupying
+someone else's number: NIP-78 shares `30078` by construction, and the `nosmaps:` `d` namespace plus
+the `nosmaps` `t` tag are exactly the separation the spec expects. Mitigation: quarantine carries a
+reason, the raw event stays inspectable, and the only interoperable contract we depend on is the
+addressable coordinate form that NIP-51 `a` tags already carry. Authority over the content profile
+remains unilateral, which is the largest such piece left in the design; it should be revisited if a
+registered kind with a published schema ever fits.
 
 **16.4 Candidate kinds `30368`–`30372` and the `org.nosmaps.schema` `L`/`l` namespace are
 self-assigned.** Same reasoning and the same collision-migration plan as §10.1.
@@ -1391,8 +1408,8 @@ never implemented it.
 Grep-verified absences in the current tree:
 
 - **kind `30267` appears nowhere.** No curation set fetching, no membership parsing, no count.
-- **kind `32267` is never fetched.** It appears only at `nostr-catalog.js:52` as
-  `COORD_RE = /^32267:([0-9a-f]{64}):(.{1,192})$/`, used by `isValidCoordinate` (`:147-154`) to
+- **kind `30078` is never fetched.** It appears only at `nostr-catalog.js:52` as
+  `COORD_RE = /^30078:([0-9a-f]{64}):(.{1,192})$/`, used by `isValidCoordinate` (`:147-154`) to
   shape-check a manifest entry string. The coordinate is an opaque display id today — it becomes a
   card id at `nip-explorer.js:276` and is never resolved to an event. **The canonical record of
   revision 2 is currently not retrieved at all.**
@@ -1421,7 +1438,7 @@ if (Array.isArray(trusted) && trusted.length > 0) { /* … fail('untrusted-curat
 
 So in production today, with no `?curators=` in the URL, the wide filter at `:775` accepts a catalog
 pointer from **any pubkey at all**. Revision 2 makes this moot rather than fixing it: there is no
-pointer, and a `32267` record's authority derives entirely from the coordinate it is signed at
+pointer, and a `30078` record's authority derives entirely from the coordinate it is signed at
 (invariant I2), so "who may publish" stops being a question the client has to answer.
 
 ### 17.5 Test blast radius
@@ -1431,9 +1448,9 @@ pointer, and a `32267` record's authority derives entirely from the coordinate i
   F (`:461` IndexedDB rebuild, including `:484` "full rebuild from pointer + Blossom bytes alone")
   are deleted. Group A (`:96`, winner selection) and group C (`:240`, RFC 8785) survive — group A
   becomes more important, since §5.3 is now the core of the design.
-- `tests/relay-render.spec.js`: `BLOSSOM_ORIGIN` (`:11`), the signed kind-30078 fixture builder
-  (`:67-113`), and the mock Blossom route (`:140`) are deleted and replaced by signed `32267` and
-  `30267` fixtures plus a mock kind `3`.
+- `tests/relay-render.spec.js`: `BLOSSOM_ORIGIN` (`:11`), the signed kind-`30078` **pointer** fixture
+  builder (`:67-113`), and the mock Blossom route (`:140`) are deleted and replaced by signed
+  canonical `30078` record and `30267` fixtures plus a mock kind `3`.
 - New tests required: invariant I7 (logged-out and logged-in row sets are byte-identical), invariant
   I8 (unknown count never renders or sorts as `0`), the §9.2 budget assertions, and graph truncation
   reporting.
@@ -1459,8 +1476,9 @@ Deleted, not deprecated and not made optional. None of these appears anywhere ab
   pointer-vs-Blossom size reconciliation and the 413 handling note.
 
 **The pointer**
-- Kind `30078` (and its predecessor `30367`) as a catalog pointer, the coordinate
-  `nosmaps:catalog:v1:<scope>`, the scope grammar, `DEFAULT_SCOPE`.
+- Kind `30078` **in its pointer role** (and its predecessor `30367`): the coordinate
+  `nosmaps:catalog:v1:<scope>`, the scope grammar, `DEFAULT_SCOPE`. The kind survives revision 2 as
+  the canonical record (§4.2); this role does not.
 - Pointer winner selection as a distinct concept, pointer `state`, `generation`, `count`,
   `generated_at`, `size`, `m`/MIME, `x`/`sha256`, `url` mirror tags, and the tag↔content duplication
   rule for those fields.
@@ -1512,10 +1530,10 @@ commit.
 | `t` is a hashtag and MUST be lowercase | NIP-24 `24.md:43` | "`t`: a hashtag. The value MUST be a lowercase string." |
 | kind `7` reaction; `+`/empty means like | NIP-25 `25.md:10,14` | "A reaction is a `kind 7` event"; "A reaction with `content` set to `+` or an empty string MUST be interpreted as a 'like' or 'upvote'." |
 | kind `30267` is *App curation sets*, members are software-application `a` tags | NIP-51 `51.md:72` | `\| App curation sets \| 30267 \| references to multiple software applications \| "a" (software application event) \|` |
-| a `30267` set's members look like `32267:<pubkey>:<d>` | NIP-51 `51.md:156-168` | example event with `["d","nostr"]` and `["a","32267:7579…:com.example.app1"]` |
+| a `30267` set's members are `a` tags holding addressable coordinates | NIP-51 `51.md:156-168` | example event with `["d","nostr"]` and `["a","32267:7579…:com.example.app1"]` |
 | sets are replaceable; editing means publishing a new version; sets are distinguished by `d` and may carry `title`/`image`/`description` | NIP-51 | "Sets are lists with well-defined meaning… users are expected to have more than one set of each kind", each with "a different `\"d\"` identifier" |
-| kind `30078` is app-specific data, explicitly for apps that do not want interoperability — **cited only to record why it was the wrong home for a catalog pointer** | NIP-78 | "arbitrary custom app data"; "some apps do not want or do not need interoperability" |
-| the event-kind registry: `3` Follows [02]; `30078` Application-specific Data [78]; `30267` App curation sets [51]; **`32267` Software Application with an empty NIP column** | NIPs `README.md:128, 262, 264, 285` | `\| \`32267\` \| Software Application \| \|` |
+| kind `30078` is application-specific data with no content schema of its own, shared by every application — **the canonical record's kind (§4.2); foreign records on it are the specified normal state** | NIP-78 | "arbitrary custom app data"; "some apps do not want or do not need interoperability" |
+| the event-kind registry: `3` Follows [02]; **`30078` Application-specific Data [78]**; `30267` App curation sets [51]; `32267` Software Application with an empty NIP column — assigned, and rejected for our use (§4.2) | NIPs `README.md:128, 262, 264, 285` | `\| \`32267\` \| Software Application \| \|` |
 
 Revision 1's separate citation of `nostr-protocol/registry-of-kinds` at commit
 `8d3fa7e252452e30fdf4e2917a487c239ef350cf` is **dropped**. It was not re-verified; the kind facts
@@ -1574,7 +1592,7 @@ claim that depended on it (§18).
 5. **Discovery contract**: `t` values must be lowercase; a multi-value `["t","a","b"]` tag is
    rejected with the indexing reason; discovery pagination boundary saturation marks
    `incomplete: discovery-cap`; an empty page never sets `fresh`.
-6. **Recall path (§6.6)**: a `32267` record with **no** `t` tag, recommended by one pubkey in `G`, is
+6. **Recall path (§6.6)**: a `30078` record with **no** `t` tag, recommended by one pubkey in `G`, is
    fetched by coordinate in R3 and listed; the same record with an empty `G` is absent from discovery
    and reported as such — not as nonexistent.
 7. **Graph derivation**: kind `3` union-then-select across relays; malformed `p` tags dropped and
@@ -1622,7 +1640,7 @@ claim that depended on it (§18).
 22. **Candidate-kind `d` fixtures** for `30368`–`30372`: each grammar's maximum legal value and a
     one-byte-over value, plus common-envelope 191/192/193 UTF-8-byte boundaries; non-ASCII byte
     counting, no truncation, deterministic feature/type key derivation.
-23. **Foreign `32267`**: a signature-valid `32267` with non-Nosmaps content is quarantined with
+23. **Foreign `30078`**: a signature-valid `30078` with non-Nosmaps content is quarantined with
     `foreign-profile`, remains inspectable, and is never reported as nonexistent.
 
 ### 20.3 Implementation preflight
@@ -1631,9 +1649,9 @@ Live-probe both default relays for reachability, NIP-11 fields, AUTH behaviour, 
 message and event limits, query limits, and read-back visibility. Probe generic tag indexing
 specifically for:
 
-- **`#t` on kind `32267`** — load-bearing for discovery (§13.1); failure marks the relay
+- **`#t` on kind `30078`** — load-bearing for discovery (§13.1); failure marks the relay
   `incomplete: t-index-unsupported` and degrades it to recall-only;
-- `#d` on kinds `32267` and `30267`;
+- `#d` on kinds `30078` and `30267`;
 - `#a` on kinds `30369`–`30371`, plus uppercase-tag behaviour for the §15 future work;
 - `authors`-array size behaviour with 128, 512, and 2,048 entries, which is what §9.3 depends on;
 - candidate-kind reads and writes in a safe test namespace.

@@ -1,7 +1,7 @@
 const {test, expect} = require('@playwright/test');
 
 // Regression coverage for the relay -> UI boundary under revision 2 of
-// design-relay-native-data.md: signature-valid kind 32267 winners must reach the
+// design-relay-native-data.md: signature-valid kind 30078 winners must reach the
 // card list; kind 30267 curation must only reorder and count; and nothing the
 // relays did not serve may appear as a value.
 
@@ -104,7 +104,7 @@ async function buildFixtures(page, keys) {
     // literally here rather than read from NOSMAPS_CATALOG, so a change to the
     // constant shows up as a test failure instead of following it silently.
     const D = slug => `nosmaps:${slug}`;
-    const coord = (pub, slug) => `32267:${pub}:${D(slug)}`;
+    const coord = (pub, slug) => `30078:${pub}:${D(slug)}`;
 
     async function software(signer, slug, over) {
       over = over || {};
@@ -117,7 +117,7 @@ async function buildFixtures(page, keys) {
       for (const topic of (over.topics || ['nosmaps'])) tags.push(['t', topic]);
       tags.push(['state', content.state], ['v', '1']);
       const event = await signers[signer].signEvent({
-        kind: 32267, content: over.rawContent || JSON.stringify(content), tags,
+        kind: 30078, content: over.rawContent || JSON.stringify(content), tags,
         created_at: now - over.age
       });
       events.push(event);
@@ -147,7 +147,7 @@ async function buildFixtures(page, keys) {
     await software('publisherP', 'com.example.gone', {name: 'Gone Tool', age: 50, content: {state: 'withdrawn', summary: 'No longer maintained.'}});
     // §7.3 cleanup: a valid same-author kind 5 covering this coordinate.
     const dead = await software('publisherQ', 'com.example.dead', {name: 'Deleted Tool', age: 600});
-    // §4.2 foreign 32267, separation 2: signature-valid and inside our `d`
+    // §4.2 foreign 30078, separation 2: signature-valid and inside our `d`
     // namespace, but another application's content profile — so only the schema
     // check stops it. (Separation 1, a foreign `d` prefix, is covered against real
     // relay events in relay-unit.spec.js.)
@@ -155,7 +155,7 @@ async function buildFixtures(page, keys) {
 
     events.push(await signers.publisherQ.signEvent({
       kind: 5, content: 'cleanup',
-      tags: [['a', coord(Q, 'com.example.dead')], ['k', '32267']],
+      tags: [['a', coord(Q, 'com.example.dead')], ['k', '30078']],
       created_at: now - 10
     }));
 
@@ -236,7 +236,7 @@ async function viewerHex(page) {
   }, KEYS.viewer);
 }
 
-test('relay-observed 32267 winners render as tool cards, ordered by recommendation count', async ({page}) => {
+test('relay-observed 30078 winners render as tool cards, ordered by recommendation count', async ({page}) => {
   const errors = collectErrors(page);
   await page.goto(EXPLORER);
   const viewer = await viewerHex(page);
@@ -279,7 +279,7 @@ test('a withdrawn winner, a deleted coordinate, and a foreign profile never beco
   expect(result.unresolved).toEqual([fixtures.coordinates.ghost]);
 
   const quarantined = result.quarantined.map(item => item.reason);
-  // §4.2: another application's 32267 is quarantined with a reason, retained, and
+  // §4.2: another application's 30078 is quarantined with a reason, retained, and
   // never reported as nonexistent.
   expect(quarantined).toContain('foreign-profile');
   expect(quarantined).toContain('deleted');
@@ -397,7 +397,7 @@ test('the cold catalog costs 3 logical REQ per relay and 0 HTTP, with no per-cur
 
   // R1: discovery by #t plus the viewer's kind 3, in one REQ.
   expect(reqs[0].filters).toHaveLength(2);
-  expect(reqs[0].filters[0]).toMatchObject({kinds: [32267], '#t': ['nosmaps'], limit: 500});
+  expect(reqs[0].filters[0]).toMatchObject({kinds: [30078], '#t': ['nosmaps'], limit: 500});
   expect(reqs[0].filters[1]).toMatchObject({kinds: [3], authors: [viewer], limit: 1});
   // R2: every pubkey in G is an array element, not a filter. This is the whole point.
   expect(reqs[1].filters).toHaveLength(1);
@@ -409,7 +409,7 @@ test('the cold catalog costs 3 logical REQ per relay and 0 HTTP, with no per-cur
   // Two coordinates were learned from R2 sets and not returned by R1's topic
   // query, under two different publishers, so §5.2 grouping yields two filters —
   // both inside the same single REQ.
-  const recall = reqs[2].filters.filter(filter => filter.kinds && filter.kinds[0] === 32267);
+  const recall = reqs[2].filters.filter(filter => filter.kinds && filter.kinds[0] === 30078);
   expect(recall).toHaveLength(2);
   for (const filter of recall) expect(filter.authors).toHaveLength(1);
   // §4.2 rule 1b: the recall filter carries the whole namespaced `d`, prefix
@@ -445,7 +445,7 @@ test('relay-derived cards invent no like count, category, OS, or URL', async ({p
   await expect(cards.locator('[data-like-tool]').first()).toHaveText('♥ —');
   await expect(cards.locator('[data-like-tool]').first()).toHaveAttribute('aria-pressed', 'true');
 
-  // 32267 v1 content has no category field. Only a `t` topic that matches a known
+  // 30078 v1 content has no category field. Only a `t` topic that matches a known
   // category is observed data; "Mock Relay" has one, "Mock Client" does not.
   const categoryOf = name => cards.filter({has: page.locator('h2', {hasText: name})}).locator('.tool-facts div').first().locator('dd');
   await expect(categoryOf('Mock Client')).toHaveText('Unknown');
@@ -459,7 +459,7 @@ test('relay-derived cards invent no like count, category, OS, or URL', async ({p
   await expect(cards.first().locator('[data-review-tool]')).toHaveText('Reviews 0');
   await expect(cards.first().locator('.basis-nips')).toHaveCount(0);
 
-  // The only URL a 32267 record observes is content.homepage, and only for "site".
+  // The only URL a 30078 record observes is content.homepage, and only for "site".
   await cards.first().locator('[data-resource-type="docs"]').click();
   await expect(page.locator('#evidence-dialog .nip-evidence-grid dd').first()).toHaveText('Unknown');
   await page.locator('#evidence-dialog [data-close-dialog]').click();
