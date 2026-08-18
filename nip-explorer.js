@@ -68,7 +68,14 @@
   const featureList = language => featureDefinitions.map(feature => localizedFeature(feature.id, language));
   /* §21.5 R5: `""` is the normative absent form for `summary`, and it renders as an explicit
      "no summary published", never as a blank line that reads like a missing row. */
-  const toolDescription = (tool, language = i18n.language) => tool.summaryAbsent ? i18n.t('explorer.summaryAbsent', undefined, language) : tool.summary;
+  /* `descriptions` is a plain language-code -> text map. The collected original (`summary`) stays
+     canonical: a language with no recorded text falls back to it, so the description is never empty
+     and never the string `undefined`. An entry whose original is absent still says so in words. */
+  const toolDescription = (tool, language = i18n.language) => {
+    if (tool.summaryAbsent) return i18n.t('explorer.summaryAbsent', undefined, language);
+    const recorded = tool.descriptions && tool.descriptions[language];
+    return typeof recorded === 'string' && recorded ? recorded : tool.summary;
+  };
   const metadataValues = value => value == null ? [] : Array.isArray(value) ? value.flatMap(metadataValues) : typeof value === 'object' ? Object.values(value).flatMap(metadataValues) : [String(value)];
   /* The licence is whatever GitHub's own detection reported for the project. `NOASSERTION` and
      "reports none" are not "not open source": they are the absence of a machine-readable licence,
@@ -278,7 +285,10 @@
       return [record.key, `${record.family.toUpperCase()}-${record.id}`, `${record.family.toUpperCase()} ${record.id}`, record.id, record.registryTitle || '', nip?.title || '', record.sourceText || ''];
     });
     const terms = [tool.name, tool.id, tool.platformText || '', displayLicense(tool), isOss(tool) ? 'OSS open source オープンソース' : '',
-      ...metadataValues(tool.summary), ...metadataValues(tool.homepage), ...metadataValues(tool.sourceRepo), ...metadataValues(tool.distribution),
+      /* Every recorded language, not the one on screen: a query is answered by what the catalogue
+         holds, so switching the UI language never changes which entries match. */
+      ...metadataValues(tool.summary), ...metadataValues(tool.descriptions),
+      ...metadataValues(tool.homepage), ...metadataValues(tool.sourceRepo), ...metadataValues(tool.distribution),
       ...topicTerms, ...featureTerms, ...nipTerms];
     return terms.join(' ').toLowerCase().includes(query);
   }
@@ -755,6 +765,31 @@
     busy: false, result: null, error: null
   };
   const PUBLISH_D_MAX_BYTES = 192;
+  /* §W1.4 下書きの保持。publish が失敗する理由は利用者の手の届かないところにいくらでもある
+     (§W8) ので、打った文字を失わせない。鍵も署名も入っていない5つのフィールドだけを、
+     localStorage に1件だけ持つ。書けない環境 (プライベートモード等) でも画面は動き続ける。
+     消すのは「公開を観測できたとき」だけ。失敗・拒否・未確定では消さない。 */
+  const DRAFT_STORAGE_KEY = 'nosmaps.publish.draft';
+  const DRAFT_FIELDS = ['dLocal', 'name', 'summary', 'homepage', 'topics'];
+  function saveDraft() {
+    try {
+      const stored = {};
+      for (const field of DRAFT_FIELDS) stored[field] = publish[field];
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(stored));
+    } catch (_) {}
+  }
+  function clearStoredDraft() {
+    try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch (_) {}
+  }
+  function restoreDraft() {
+    let raw = null;
+    try { raw = localStorage.getItem(DRAFT_STORAGE_KEY); } catch (_) { raw = null; }
+    if (!raw) return;
+    let stored = null;
+    try { stored = JSON.parse(raw); } catch (_) { return; }
+    if (!stored || typeof stored !== 'object') return;
+    for (const field of DRAFT_FIELDS) if (typeof stored[field] === 'string') publish[field] = stored[field];
+  }
   /* §W0.2 の既定値。テストは待ち時間を潰したいだけなので URL から縮められるようにしてあるが、
      出荷時の値は設計のままで、コードのほうが設計より短気になることはない。 */
   const publishReadbackAttempts = (() => { const value = Number(params.get('readbackattempts')); return Number.isFinite(value) && value > 0 ? value : 3; })();
@@ -891,6 +926,9 @@
     }
     publish.busy = false;
     publish.result = result;
+    /* §W1.4: 保存した下書きを捨ててよいのは、公開を実際に観測できたときだけ。
+       failed / blocked / invalid / unconfirmed では打った文字をそのまま残す。 */
+    if (result && (result.state === 'published' || result.state === 'published-partial')) clearStoredDraft();
     renderPublish();
     // §W5.6: 一覧に出るのは観測できたレコードだけ。読み戻せたときにだけ読み直す。
     if (result && result.state === 'published') await loadRelayCatalog();
@@ -1219,6 +1257,7 @@
     const field = PUBLISH_FIELDS[event.target.id];
     if (!field) return;
     publish[field] = event.target.value;
+    saveDraft();
     refreshPublishState();
   });
   document.addEventListener('submit', event => {
@@ -1251,6 +1290,7 @@
   // 読み込み時に getPublicKey() は呼ばない。プロンプトはページを開いた行為への同意ではない。
   // 同じタブで既にサインインしていたときだけ、保存した公開鍵から状態を復元する。
   restoreViewerSession();
+  restoreDraft();
   renderAll();
   window.__NOSMAPS_RELAY_LOAD__ = loadRelayCatalog;
   if (relayRequested) {

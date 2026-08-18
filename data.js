@@ -716,6 +716,10 @@ window.NOSMAPS_DATA={
    "name": "Damus",
    "summary": "A twitter-like nostr client for iPhone, iPad and MacOS.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "A twitter-like nostr client for iPhone, iPad and MacOS.",
+    "ja": "iPhone・iPad・macOS向けの、Twitterに似たNostrクライアント。"
+   },
    "homepage": "https://damus.io/",
    "icon": {
     "url": "https://damus.io/logo_icon.png",
@@ -947,6 +951,10 @@ window.NOSMAPS_DATA={
    "name": "Amethyst",
    "summary": "Nostr client for Android",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Nostr client for Android",
+    "ja": "Android向けのNostrクライアント。"
+   },
    "homepage": "https://amethyst.social",
    "icon": {
     "url": "https://amethyst.social/amethyst-logo.jpg",
@@ -2429,6 +2437,10 @@ window.NOSMAPS_DATA={
    "name": "Primal Web App",
    "summary": "Primal's web app for Nostr, as experienced on primal.net.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Primal's web app for Nostr, as experienced on primal.net.",
+    "ja": "primal.netで使われているものと同じ、PrimalのNostrウェブアプリ。"
+   },
    "homepage": "https://primal.net",
    "icon": {
     "url": "https://primal.net/assets/favicon-85332ee3.ico",
@@ -2497,6 +2509,10 @@ window.NOSMAPS_DATA={
    "name": "Coracle",
    "summary": "An experimental Nostr client focused on unlocking the full potential of multiple relays. Browse, filter, zap, and create custom feeds to create a curated Nostr experience.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "An experimental Nostr client focused on unlocking the full potential of multiple relays. Browse, filter, zap, and create custom feeds to create a curated Nostr experience.",
+    "ja": "複数リレーの潜在能力を引き出すことに主眼を置いた実験的なNostrクライアント。閲覧、絞り込み、Zap、カスタムフィードの作成により、自分好みのNostr体験を組み立てられる。"
+   },
    "homepage": "https://app.coracle.social",
    "icon": {
     "url": "https://app.coracle.social/icons/favicon.ico",
@@ -2801,6 +2817,10 @@ window.NOSMAPS_DATA={
    "name": "Snort",
    "summary": "Feature packed nostr web UI",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Feature packed nostr web UI",
+    "ja": "機能を詰め込んだNostrのウェブUI。"
+   },
    "homepage": "https://phoenix.social",
    "icon": {
     "url": "https://phoenix.social/favicon.png",
@@ -3600,6 +3620,10 @@ window.NOSMAPS_DATA={
    "name": "Iris",
    "summary": "Highly performant and normie-friendly offline-first Nostr web client that is not dependent on any single relay or other server. Featuring a Cashu wallet, secure DMs and social graph based content filtering.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Highly performant and normie-friendly offline-first Nostr web client that is not dependent on any single relay or other server. Featuring a Cashu wallet, secure DMs and social graph based content filtering.",
+    "ja": "単一のリレーやサーバーに依存しない、高速でとっつきやすいオフラインファーストのNostrウェブクライアント。Cashuウォレット、安全なDM、ソーシャルグラフに基づく内容の絞り込みを備える。"
+   },
    "homepage": "https://iris.to",
    "icon": {
     "url": "https://iris.to/favicon.svg",
@@ -3676,6 +3700,10 @@ window.NOSMAPS_DATA={
    "name": "nostter",
    "summary": "Nostr client for web.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Nostr client for web.",
+    "ja": "ウェブ向けのNostrクライアント。"
+   },
    "homepage": "https://nostter.app",
    "icon": {
     "url": "https://nostter.app/favicon.svg",
@@ -3735,6 +3763,10 @@ window.NOSMAPS_DATA={
    "name": "Gossip",
    "summary": "Gossip is a nostr client",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Gossip is a nostr client",
+    "ja": "GossipはNostrクライアント。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -3848,6 +3880,10 @@ window.NOSMAPS_DATA={
    "name": "noStrudel",
    "summary": "A sandbox for exploring nostr",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "A sandbox for exploring nostr",
+    "ja": "Nostrを探索するための砂場。"
+   },
    "homepage": "https://nostrudel.ninja/",
    "icon": {
     "url": "https://nostrudel.ninja/favicon.ico",
@@ -3915,6 +3951,10 @@ window.NOSMAPS_DATA={
    "name": "Rabbit",
    "summary": "🐰 A nostr client like TweetDeck",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "🐰 A nostr client like TweetDeck",
+    "ja": "🐰 TweetDeckのようなNostrクライアント。"
+   },
    "homepage": "https://rabbit.syusui.net",
    "icon": {
     "url": "https://rabbit.syusui.net/images/rabbit_256.png",
@@ -3974,6 +4014,10 @@ window.NOSMAPS_DATA={
    "name": "0xchat",
    "summary": "A secure, open-source chat app built on the Nostr protocol. Available on Android, iOS, macOS, Linux and Windows.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "A secure, open-source chat app built on the Nostr protocol. Available on Android, iOS, macOS, Linux and Windows.",
+    "ja": "Nostrプロトコル上に作られた、安全でオープンソースのチャットアプリ。Android、iOS、macOS、Linux、Windowsで利用できる。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -4036,6 +4080,10 @@ window.NOSMAPS_DATA={
    "name": "YakiHonne Web App",
    "summary": "A decentralized social payment client on Nostr & Bitcoin.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "A decentralized social payment client on Nostr & Bitcoin.",
+    "ja": "Nostrとビットコイン上の分散型ソーシャルペイメントクライアント。"
+   },
    "homepage": "https://yakihonne.com",
    "icon": {
     "url": "https://yakihonne.com/icon-512x512.png",
@@ -4284,6 +4332,7 @@ window.NOSMAPS_DATA={
    "name": "Olas",
    "summary": "",
    "summaryAbsent": true,
+   "descriptions": {},
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -4352,6 +4401,10 @@ window.NOSMAPS_DATA={
    "name": "Habla",
    "summary": "Habla allows you to read, write, curate and monetize long form content over Nostr, a censorship-resistant protocol for social media.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Habla allows you to read, write, curate and monetize long form content over Nostr, a censorship-resistant protocol for social media.",
+    "ja": "HablaはNostr上で長文コンテンツを読み、書き、集め、収益化できるようにする。Nostrはソーシャルメディアのための検閲耐性のあるプロトコル。"
+   },
    "homepage": "https://habla.news",
    "icon": null,
    "recordState": "active",
@@ -4414,6 +4467,10 @@ window.NOSMAPS_DATA={
    "name": "zap.stream",
    "summary": "Nostr live streaming",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Nostr live streaming",
+    "ja": "Nostrのライブ配信。"
+   },
    "homepage": "https://zap.stream",
    "icon": {
     "url": "https://zap.stream/logo_32.png",
@@ -4491,6 +4548,10 @@ window.NOSMAPS_DATA={
    "name": "Ditto",
    "summary": "Your content. Your vibe. Your rules.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Your content. Your vibe. Your rules.",
+    "ja": "あなたのコンテンツ。あなたの雰囲気。あなたのルール。"
+   },
    "homepage": "https://ditto.pub",
    "icon": {
     "url": "https://ditto.pub/logo.svg",
@@ -4570,6 +4631,10 @@ window.NOSMAPS_DATA={
    "name": "Shopstr",
    "summary": "A global, permissionless Nostr marketplace for Bitcoin commerce",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "A global, permissionless Nostr marketplace for Bitcoin commerce",
+    "ja": "ビットコイン商取引のための、世界規模で許可の要らないNostrマーケットプレイス。"
+   },
    "homepage": "https://shopstr.market",
    "icon": {
     "url": "https://shopstr.market/shopstr.ico",
@@ -5064,6 +5129,10 @@ window.NOSMAPS_DATA={
    "name": "Amber",
    "summary": "Amber is a nostr event signer for Android. It allows users to keep their nsec segregated in a single, dedicated app. The goal of Amber is to have your smartphone act as a NIP-46 signing device without any need for servers or additional hardware.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Amber is a nostr event signer for Android. It allows users to keep their nsec segregated in a single, dedicated app. The goal of Amber is to have your smartphone act as a NIP-46 signing device without any need for servers or additional hardware.",
+    "ja": "AmberはAndroid向けのNostrイベント署名アプリ。nsecを専用のアプリひとつに隔離しておける。Amberの目的は、サーバーも追加のハードウェアも要らずに、手元のスマートフォンをNIP-46の署名デバイスとして働かせること。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -5160,6 +5229,10 @@ window.NOSMAPS_DATA={
    "name": "nos2x",
    "summary": "nostr signer extension",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "nostr signer extension",
+    "ja": "Nostrの署名拡張機能。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -5240,6 +5313,10 @@ window.NOSMAPS_DATA={
    "name": "nsec.app (noauth)",
    "summary": "Noauth Nostr key manager.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Noauth Nostr key manager.",
+    "ja": "Noauth Nostr鍵マネージャー。"
+   },
    "homepage": "https://use.nsec.app",
    "icon": {
     "url": "https://use.nsec.app/favicon.ico",
@@ -5318,6 +5395,10 @@ window.NOSMAPS_DATA={
    "name": "Alby Browser Extension",
    "summary": "The Bitcoin Lightning Browser Extension that brings deep Lightning & Nostr integration to the web. Wallet interface to multiple lightning nodes and key signer for Nostr, Liquid and onchain use.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "The Bitcoin Lightning Browser Extension that brings deep Lightning & Nostr integration to the web. Wallet interface to multiple lightning nodes and key signer for Nostr, Liquid and onchain use.",
+    "ja": "ウェブに深いLightningとNostrの統合をもたらすビットコインLightningブラウザ拡張機能。複数のLightningノードへのウォレットインターフェースであり、Nostr・Liquid・オンチェーンで使う鍵の署名役でもある。"
+   },
    "homepage": "https://getalby.com/#extension",
    "icon": {
     "url": "https://framerusercontent.com/images/M1y26zs7Y5u5rQ1fy2kVJB5U.svg",
@@ -5380,6 +5461,10 @@ window.NOSMAPS_DATA={
    "name": "Pokey",
    "summary": "Display live notifications for your nostr events and allow other apps to receive and interact with them.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Display live notifications for your nostr events and allow other apps to receive and interact with them.",
+    "ja": "自分のNostrイベントの通知をその場で表示し、他のアプリがそれを受け取って操作できるようにする。"
+   },
    "homepage": "https://njump.me/npub1h2685kkxa4q50qpexuae9geqep7frr0u8t8pcy9zj0xnza9phvtsnkd9tm",
    "icon": null,
    "recordState": "active",
@@ -5441,6 +5526,10 @@ window.NOSMAPS_DATA={
    "name": "strfry",
    "summary": "strfry is a relay for the nostr protocol. No external database required: all data is stored locally on the filesystem in LMDB.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "strfry is a relay for the nostr protocol. No external database required: all data is stored locally on the filesystem in LMDB.",
+    "ja": "strfryはNostrプロトコルのリレー。外部データベースは不要で、データはすべてLMDBを使ってファイルシステム上にローカルに保存される。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -5681,6 +5770,10 @@ window.NOSMAPS_DATA={
    "name": "nostr-rs-relay",
    "summary": "A nostr relay written in Rust.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "A nostr relay written in Rust.",
+    "ja": "Rustで書かれたNostrリレー。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -6031,6 +6124,10 @@ window.NOSMAPS_DATA={
    "name": "khatru",
    "summary": "a framework for making custom Nostr relays",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "a framework for making custom Nostr relays",
+    "ja": "独自のNostrリレーを作るためのフレームワーク。"
+   },
    "homepage": "https://khatru.nostr.technology/",
    "icon": {
     "url": "https://khatru.nostr.technology/logo.png",
@@ -6110,6 +6207,10 @@ window.NOSMAPS_DATA={
    "name": "nostream",
    "summary": "A Nostr Relay written in TypeScript",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "A Nostr Relay written in TypeScript",
+    "ja": "TypeScriptで書かれたNostrリレー。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -6545,6 +6646,10 @@ window.NOSMAPS_DATA={
    "name": "Nostrcheck server",
    "summary": "The community's Nostr brain: The only server with relay, File Hosting (NIP-96 & Blossom), Nostr Address (NIP-05), Lightning Redirects, NWC, WoT, and much more.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "The community's Nostr brain: The only server with relay, File Hosting (NIP-96 & Blossom), Nostr Address (NIP-05), Lightning Redirects, NWC, WoT, and much more.",
+    "ja": "コミュニティのNostrの頭脳。リレー、ファイルホスティング（NIP-96とBlossom）、Nostrアドレス（NIP-05）、Lightningリダイレクト、NWC、WoT、その他多数を備えた唯一のサーバー。"
+   },
    "homepage": "https://nostrcheck.me/",
    "icon": {
     "url": "https://nostrcheck.me/favicon.ico",
@@ -6997,6 +7102,10 @@ window.NOSMAPS_DATA={
    "name": "HAVEN",
    "summary": "High Availability Vault for Events on Nostr",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "High Availability Vault for Events on Nostr",
+    "ja": "Nostrのイベントのための高可用性の保管庫。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -7059,6 +7168,10 @@ window.NOSMAPS_DATA={
    "name": "Blossom server",
    "summary": "A blossom server written in Deno",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "A blossom server written in Deno",
+    "ja": "Denoで書かれたBlossomサーバー。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -7250,6 +7363,10 @@ window.NOSMAPS_DATA={
    "name": "Blossom",
    "summary": "Blobs stored simply on mediaservers — the specification documents (BUDs) for the Blossom protocol.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Blobs stored simply on mediaservers — the specification documents (BUDs) for the Blossom protocol.",
+    "ja": "メディアサーバー上に素朴に保管されるブロブ ― Blossomプロトコルの仕様文書（BUD）。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -7313,6 +7430,10 @@ window.NOSMAPS_DATA={
    "name": "nostr.build",
    "summary": "nostr.build media uploader — media hosting for Nostr.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "nostr.build media uploader — media hosting for Nostr.",
+    "ja": "nostr.buildのメディアアップローダー ― Nostrのためのメディアホスティング。"
+   },
    "homepage": "https://nostr.build/",
    "icon": {
     "url": "https://nostr.build/favicon-32x32.png",
@@ -7387,6 +7508,10 @@ window.NOSMAPS_DATA={
    "name": "void.cat",
    "summary": "Free, simple file hosting.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Free, simple file hosting.",
+    "ja": "無料で単純なファイルホスティング。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -7465,6 +7590,10 @@ window.NOSMAPS_DATA={
    "name": "Zeus",
    "summary": "A mobile Bitcoin wallet fit for the gods.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "A mobile Bitcoin wallet fit for the gods.",
+    "ja": "神々にふさわしいモバイルビットコインウォレット。"
+   },
    "homepage": "https://zeusln.com",
    "icon": {
     "url": "https://zeusln.com/favicon.ico",
@@ -7533,6 +7662,10 @@ window.NOSMAPS_DATA={
    "name": "Alby Hub",
    "summary": "Alby Hub - Your own Bitcoin Lightning node: easy, connectable, feature-rich. Run anywhere. Become self-sovereign.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Alby Hub - Your own Bitcoin Lightning node: easy, connectable, feature-rich. Run anywhere. Become self-sovereign.",
+    "ja": "Alby Hub ― 自分だけのビットコインLightningノード。手軽で、つながりやすく、機能豊富。どこででも動かせる。自分で主権を持つ。"
+   },
    "homepage": "https://albyhub.com",
    "icon": {
     "url": "https://framerusercontent.com/images/M1y26zs7Y5u5rQ1fy2kVJB5U.svg",
@@ -7610,6 +7743,10 @@ window.NOSMAPS_DATA={
    "name": "Mutiny Wallet",
    "summary": "Mutiny is a self-custodial lightning wallet that runs in the browser.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Mutiny is a self-custodial lightning wallet that runs in the browser.",
+    "ja": "Mutinyはブラウザの中で動く自己管理型のLightningウォレット。"
+   },
    "homepage": "https://app.mutinywallet.com",
    "icon": {
     "url": "https://app.mutinywallet.com/favicon.ico",
@@ -7693,6 +7830,10 @@ window.NOSMAPS_DATA={
    "name": "nostr-tools",
    "summary": "Tools for developing Nostr clients.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Tools for developing Nostr clients.",
+    "ja": "Nostrクライアントを開発するための道具一式。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -7768,6 +7909,10 @@ window.NOSMAPS_DATA={
    "name": "NDK (Nostr Development Kit)",
    "summary": "Nostr Development Kit with outbox-model support",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Nostr Development Kit with outbox-model support",
+    "ja": "アウトボックスモデルに対応したNostr開発キット。"
+   },
    "homepage": "https://nostr-dev-kit.github.io/ndk/",
    "icon": null,
    "recordState": "active",
@@ -8179,6 +8324,10 @@ window.NOSMAPS_DATA={
    "name": "rust-nostr",
    "summary": "Rust implementation of the nostr protocol, high-level client library, Nostr Wallet Connect and more.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "Rust implementation of the nostr protocol, high-level client library, Nostr Wallet Connect and more.",
+    "ja": "NostrプロトコルのRust実装。高水準のクライアントライブラリ、Nostr Wallet Connectなどを含む。"
+   },
    "homepage": "https://nostrdevkit.org",
    "icon": {
     "url": "https://nostrdevkit.org/assets/logo.svg",
@@ -8258,6 +8407,10 @@ window.NOSMAPS_DATA={
    "name": "nak",
    "summary": "a command line tool for doing all things nostr",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "a command line tool for doing all things nostr",
+    "ja": "Nostrに関することを何でもやるためのコマンドラインツール。"
+   },
    "homepage": null,
    "icon": null,
    "recordState": "active",
@@ -8319,6 +8472,10 @@ window.NOSMAPS_DATA={
    "name": "nostr.watch",
    "summary": "nostr.watch provides the infrastructure for observing the Nostr relay network.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "nostr.watch provides the infrastructure for observing the Nostr relay network.",
+    "ja": "nostr.watchはNostrリレーネットワークを観測するための基盤を提供する。"
+   },
    "homepage": "https://nostr.watch",
    "icon": {
     "url": "https://nostr.watch/favicon-32x32.png",
@@ -8396,6 +8553,10 @@ window.NOSMAPS_DATA={
    "name": "Zapstore",
    "summary": "The open app store where users meet builders. Curated by communities. Android apps.",
    "summaryAbsent": false,
+   "descriptions": {
+    "en": "The open app store where users meet builders. Curated by communities. Android apps.",
+    "ja": "利用者と作り手が出会うオープンなアプリストア。コミュニティが選ぶ。Androidアプリ。"
+   },
    "homepage": "https://zapstore.dev",
    "icon": {
     "url": "https://zapstore.dev/favicon.ico",

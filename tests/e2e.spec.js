@@ -38,7 +38,7 @@ function catalogueSearchTerms(data, tool) {
       record.id, record.registryTitle || '', nip ? nip.title : '', record.sourceText || ''];
   });
   return [tool.name, tool.id, tool.platformText || '', tool.license || '', oss ? 'OSS open source オープンソース' : '',
-    ...flatten(tool.summary), ...flatten(tool.homepage), ...flatten(tool.sourceRepo), ...flatten(tool.distribution),
+    ...flatten(tool.summary), ...flatten(tool.descriptions), ...flatten(tool.homepage), ...flatten(tool.sourceRepo), ...flatten(tool.distribution),
     ...(tool.topics || []).filter(topic => !data.seedTopics.includes(topic)),
     ...nipTerms].join(' ').toLowerCase();
 }
@@ -68,6 +68,29 @@ function catalogueSearchMatches(data, query) {
    exactly one entry. `LumaPost` -- a name from the sample fixtures, absent from the 41 collected
    records -- is what used to be typed here, and a query nothing can match is a query that proves
    nothing about search. */
+/* An entry with a recorded description in every language the catalogue uses, plus one that records
+   only the collected original. Both are read out of data.js: `descriptions` is a plain language ->
+   text map and the original stays canonical, so an unrecorded language is a fallback, never a blank. */
+function describedEntries(data) {
+  const languages = [...new Set(data.tools.flatMap(tool => Object.keys(tool.descriptions || {})))].sort();
+  expect(languages, 'catalogue records descriptions in ja and en').toEqual(['en', 'ja']);
+  const translated = data.tools.find(tool => tool.descriptions?.ja && tool.descriptions.ja !== tool.summary);
+  expect(translated, 'catalogue records a description that differs from the collected original').toBeTruthy();
+  /* The fallback case, taken from the catalogue rather than arranged: an entry with no recorded
+     text for the language on screen. Today the only one is the record whose summary is absent
+     altogether (R5), and what it must show is the explicit absent wording -- never "" and never
+     the string `undefined`. See the FINDING in the report. */
+  const noRecordedText = data.tools.find(tool => !tool.descriptions?.ja);
+  expect(noRecordedText, 'catalogue has an entry with no recorded ja description').toBeTruthy();
+  return {languages, translated, noRecordedText};
+}
+
+/* What each card must read, per language, computed from data.js alone: the recorded text for that
+   language, else the collected original, else the explicit absent wording. */
+function expectedDescriptions(data, language, absentLabel) {
+  return data.tools.map(tool => tool.descriptions?.[language] || (tool.summaryAbsent ? absentLabel : tool.summary));
+}
+
 function uniqueCatalogueName(data) {
   const name = data.tools.map(tool => tool.name).find(candidate => catalogueSearchMatches(data, candidate).length === 1);
   expect(name, 'catalogue has an entry whose name matches only itself').toBeTruthy();
@@ -184,15 +207,50 @@ test('category titles and descriptions wrap without clipping or overflow on desk
   expect(errors).toEqual([]);
 });
 
+/* A record's description is a plain language-code -> text map, and the collected original stays the
+   canonical fallback. `迷わない導線` and `セルフホスト` were what this typed: phrases from the sample
+   fixtures that no collected record holds, so both queries matched nothing and the test was waiting
+   on a page that could never arrive. The queries below are read out of the catalogue instead. */
 test('explorer search records descriptions and tags in either UI language', async ({page}) => {
   const errors = collectErrors(page);
+  const data = catalogueData();
+  const {languages, translated, noRecordedText} = describedEntries(data);
   await page.goto('nip-explorer.html');
-  for (const [language, switchName] of [['ja', null], ['en', 'English']]) {
-    if (switchName) await page.getByRole('button', {name: switchName}).click();
-    await page.locator('#feature-query').fill('迷わない導線');
-    await expect.poll(() => page.locator('.feature-tool-card').count(), {message: `explorer/${language} description`}).toBeGreaterThan(0);
-    await page.locator('#feature-query').fill('セルフホスト');
-    await expect.poll(() => page.locator('.feature-tool-card').count(), {message: `explorer/${language} tag`}).toBeGreaterThan(0);
+  const absentLabel = await page.evaluate(() => window.NOSMAPS_I18N.t('explorer.summaryAbsent'));
+  expect(absentLabel, 'the absent-summary wording is a real label').toBeTruthy();
+
+  /* (a) A query taken from a recorded description brings back exactly the entries data.js says it
+     should, and the answer does not move when the UI language does: search reads every recorded
+     language, so the result set is a property of the catalogue, not of the switch. One query per
+     recorded language, each a phrase only the subject's own text holds. */
+  const queries = languages.map(language => translated.descriptions[language].slice(0, 24));
+  for (const [language, switchName] of [['ja', '日本語'], ['en', 'English']]) {
+    await page.getByRole('button', {name: switchName}).first().click();
+    await expect(page.locator('html')).toHaveAttribute('lang', language);
+    for (const query of queries) {
+      const expected = catalogueSearchMatches(data, query);
+      expect(expected.length, `${query} matches something in data.js`).toBeGreaterThan(0);
+      await page.locator('#feature-query').fill(query);
+      await expect.poll(() => page.locator('.feature-tool-card h2').allTextContents().then(names => names.sort()),
+        {message: `explorer/${language} description query ${query}`}).toEqual(expected);
+    }
+    /* A free topic is rendered verbatim, so it is searchable as itself in either language. */
+    const freeTopic = [...new Set(data.tools.flatMap(tool => tool.topics || []).filter(topic => !data.seedTopics.includes(topic)))].sort()[0];
+    expect(freeTopic, 'catalogue has a free topic').toBeTruthy();
+    await page.locator('#feature-query').fill(freeTopic);
+    await expect.poll(() => page.locator('.feature-tool-card h2').allTextContents().then(names => names.sort()),
+      {message: `explorer/${language} tag ${freeTopic}`}).toEqual(catalogueSearchMatches(data, freeTopic));
+
+    /* (b) and (c): every card shows the text recorded for the language on screen, falling back to
+       the collected original -- and the entry with no recorded ja text is in that list, so the
+       fallback is exercised rather than assumed. No card is blank and none says `undefined`. */
+    await page.locator('#feature-query').fill('');
+    await expect(page.locator('.feature-tool-card')).toHaveCount(data.tools.length);
+    await expect(page.locator('.feature-tool-card .tool-summary')).toHaveText(expectedDescriptions(data, language, absentLabel));
+    const fallbackCard = page.locator(`[data-tool-id="${noRecordedText.id}"] .tool-summary`);
+    await expect(fallbackCard).toHaveText(noRecordedText.summaryAbsent ? absentLabel : noRecordedText.summary);
+    const shown = await page.locator('.feature-tool-card .tool-summary').allTextContents();
+    expect(shown.filter(text => !text.trim() || text.includes('undefined')), `explorer/${language} descriptions`).toEqual([]);
   }
   expect(errors).toEqual([]);
 });

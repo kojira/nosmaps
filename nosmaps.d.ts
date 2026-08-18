@@ -164,6 +164,10 @@ interface NosmapsTool {
   /** §21.5 R5: "" is the normative absent form, paired with summaryAbsent. */
   readonly summary: string;
   readonly summaryAbsent: boolean;
+  /** Language code -> description text. `summary` above stays canonical: a language
+      with no recorded text falls back to it, so a missing language is never an
+      empty string. Empty for a record whose summary is absent. */
+  readonly descriptions: Readonly<Record<string, string>>;
   /** Null for 14 of 41 — those primary sources state no homepage. */
   readonly homepage: string | null;
   /** Null for 17 of 41 — the probe recorded in icons-probe.md found no URL for
