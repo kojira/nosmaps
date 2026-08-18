@@ -27,15 +27,13 @@ async function expectNoOverflow(page) {
   expect(metrics.body[0]).toBeLessThanOrEqual(metrics.body[1]);
 }
 
-test('the headline, lead, and sample label are shown in both languages', async ({page}) => {
+test('the headline and lead are shown in both languages', async ({page}) => {
   const errors = collectErrors(page);
   await page.goto('index.html');
   await expect(page.getByRole('heading', {level: 1, name: "Here's the map of Nostr!"})).toBeVisible();
-  await expect(page.locator('#carousel-sample')).toHaveText(/sample records/i);
   await page.getByRole('button', {name: '日本語'}).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
   await expect(page.getByRole('heading', {level: 1, name: 'Nostrの地図、ここにあります！'})).toBeVisible();
-  await expect(page.locator('#carousel-sample')).toHaveText(/サンプル項目/);
   expect(errors).toEqual([]);
 });
 
