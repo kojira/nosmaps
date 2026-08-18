@@ -286,7 +286,7 @@
     if (!Number.isFinite(ms) || ms <= 0) return '';
     return `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
   }
-  function relayCoverageLabel(value) { const key = value && typeof value === 'object' ? value.status : value; const label = i18n.value(`explorer.coverage.${key}`); return typeof label === 'string' ? label : String(key); }
+  function relayCoverageLabel(value) { const key = value && typeof value === 'object' ? value.status : value; return i18n.has(`explorer.coverage.${key}`) ? t(`explorer.coverage.${key}`) : String(key); }
   // kind 32267 の v1 content にカテゴリ・OS・ライセンスの欄はない。`t` トピックが
   // UI のカテゴリ id と一致したときだけ観測値として使い、それ以外は不明のまま出す。
   function categoryFromTopics(topics) { return (Array.isArray(topics) ? topics.find(value => categories.includes(value)) : null) || null; }

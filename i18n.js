@@ -122,12 +122,38 @@
   }
   const listeners = new Set();
   const read = (object, path) => path.split('.').reduce((value, key) => value == null ? undefined : value[key], object);
-  const format = (value, variables = {}) => typeof value === 'string' ? value.replace(/\{(\w+)\}/g, (_, key) => variables[key] ?? `{${key}}`) : value;
+  const format = (value, variables = {}) => value.replace(/\{(\w+)\}/g, (_, key) => variables[key] ?? `{${key}}`);
+
+  /* Missing-key contract: a lookup that resolves to nothing is reported, never rendered.
+     t() is the only lookup whose result reaches markup, so it always returns a string --
+     the key path itself when the key is missing, which is visible, greppable and searchable,
+     unlike the "undefined" that String() used to produce silently. */
+  const missing = [];
+  const reported = new Set();
+  function reportMissing(path, selectedLanguage, detail) {
+    const signature = `${selectedLanguage}:${path}:${detail}`;
+    missing.push({path, language: selectedLanguage, detail});
+    if (reported.has(signature)) return;
+    reported.add(signature);
+    console.error(`[nosmaps i18n] ${detail}: "${path}" (language: ${selectedLanguage})`);
+  }
+
   const api = {
     get language() { return language; },
     get dictionaries() { return dictionaries; },
-    value(path, selectedLanguage = language) { return read(dictionaries[selectedLanguage], path) ?? read(dictionaries.ja, path); },
-    t(path, variables, selectedLanguage = language) { return format(api.value(path, selectedLanguage), variables); },
+    get missing() { return missing.map(entry => ({...entry})); },
+    has(path, selectedLanguage = language) { return read(dictionaries[selectedLanguage], path) !== undefined || read(dictionaries.ja, path) !== undefined; },
+    value(path, selectedLanguage = language) {
+      const found = read(dictionaries[selectedLanguage], path) ?? read(dictionaries.ja, path);
+      if (found === undefined) reportMissing(path, selectedLanguage, 'missing translation key');
+      return found;
+    },
+    t(path, variables, selectedLanguage = language) {
+      const found = api.value(path, selectedLanguage);
+      if (typeof found === 'string') return format(found, variables);
+      if (found !== undefined) reportMissing(path, selectedLanguage, 'translation key is not a string');
+      return path;
+    },
     set(next) {
       if (!valid(next) || next === language) return;
       language = next;

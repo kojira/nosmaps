@@ -11,7 +11,7 @@ function collectErrors(page) {
 }
 
 function activeSlide(page) {
-  return page.locator('.carousel-slide:not([hidden])');
+  return page.locator('.carousel-slide:not([aria-hidden])');
 }
 
 function activeIndex(page) {
@@ -56,7 +56,7 @@ test('the carousel only shows fields that exist in the dataset and never invents
   const slideText = await page.locator('#carousel-viewport').innerText();
   expect(slideText).not.toMatch(/popular|trending|ranking|rated|人気|話題|ランキング|評価/i);
   expect(slideText).not.toMatch(/\d{4}-\d{2}-\d{2}/);
-  expect(await page.locator('.carousel-slide').count()).toBe(expected.total);
+  expect(await page.locator('.carousel-slide:not([data-clone])').count()).toBe(expected.total);
   expect(errors).toEqual([]);
 });
 

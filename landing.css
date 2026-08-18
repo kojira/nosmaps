@@ -4,13 +4,18 @@
 .hero-help{color:var(--muted);margin:0;max-width:640px}
 .landing-page .link-button.primary{padding:.85rem 1.4rem;font-size:1.05rem}
 
-.carousel{display:grid;gap:1rem;min-width:0;padding:1.25rem;border:1px solid var(--line);border-radius:1rem;background:var(--card);box-shadow:var(--shadow)}
+/* Slide width and gap are shares of the viewport width, so the arithmetic that keeps exactly
+   three slides on screen holds at any window size: the centre plus one neighbour on each side
+   spans 3*30.33% + 2*3% = 97%, and the fourth slide starts 1.5% past the edge. */
+.carousel{--slide-width:30.33%;--slide-gap:3%;display:grid;gap:1rem;min-width:0;padding:1.25rem;border:1px solid var(--line);border-radius:1rem;background:var(--card);box-shadow:var(--shadow)}
 .carousel-head{display:grid;gap:.4rem;min-width:0}
 .carousel-head h2{margin:0;font-size:1.35rem}
 .carousel-sample{margin:0;padding:.55rem .8rem;border:1px solid #dfc769;border-radius:.6rem;background:#fff7d6;color:#604800;font-size:.85rem;font-weight:650;overflow-wrap:anywhere}
-.carousel-viewport{min-width:0}
-.carousel-slide{display:grid;gap:.5rem;min-width:0;min-height:11rem;align-content:start;padding:1rem;border:1px solid var(--line);border-radius:.85rem;background:#fbfcfa}
-.carousel-slide[hidden]{display:none}
+.carousel-viewport{min-width:0;overflow:hidden;padding-block:.6rem}
+.carousel-track{display:flex;flex-wrap:nowrap;align-items:center;gap:var(--slide-gap);will-change:transform;transition:transform .55s cubic-bezier(.22,.61,.36,1)}
+.carousel-slide{flex:0 0 var(--slide-width);box-sizing:border-box;display:grid;gap:.5rem;min-width:0;min-height:11rem;align-content:start;padding:1rem;border:1px solid var(--line);border-radius:.85rem;background:#fbfcfa;transform:scale(.86);opacity:.45;transition:transform .55s cubic-bezier(.22,.61,.36,1),opacity .55s cubic-bezier(.22,.61,.36,1),border-color .55s ease}
+.carousel-slide.is-side{opacity:.6}
+.carousel-slide.is-current{transform:scale(1);opacity:1;border-color:#7866d3;box-shadow:var(--shadow)}
 .slide-icon{display:grid;place-items:center;width:2.5rem;height:2.5rem;border-radius:.65rem;background:#edf0ec;font-size:1.25rem}
 .slide-name{margin:0;font-size:1.15rem;overflow-wrap:anywhere}
 .slide-description{margin:0;color:var(--muted);overflow-wrap:anywhere}
@@ -23,4 +28,8 @@
 .carousel-nav:hover{border-color:#7866d3}
 .carousel-position{min-width:5rem;text-align:center;color:var(--muted);font-variant-numeric:tabular-nums;font-weight:700}
 
+/* Narrow: one centred slide, with the neighbours peeking in from either edge. */
+@media(max-width:700px){.carousel{--slide-width:66%;--slide-gap:2%}.carousel-slide{min-height:12rem}}
 @media(max-width:580px){.carousel{padding:.9rem}.carousel-slide{padding:.85rem}}
+
+@media(prefers-reduced-motion:reduce){.carousel-track,.carousel-slide{transition:none}}
