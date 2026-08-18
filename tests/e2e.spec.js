@@ -320,31 +320,118 @@ test('language rerender preserves selected features, comparison, and open dialog
   expect(errors).toEqual([]);
 });
 
-test('dead opt-in, in-page official information, fact/evaluation split, and evidence', async ({page}) => {
+/* The entry this test drives, chosen from the catalogue rather than named. It has to be one whose
+   detail dialog can exercise every guarantee below at once: an official link of each kind data.js
+   can carry (`homepage`/`distribution`/`sourceRepo` -- there is no fourth, see resourceTypes()), and
+   at least one capability claim that resolves against the pinned registry snapshot so the evidence
+   layer has a primary NIP source to reach. `tool-1` was what used to be named here: a sample-fixture
+   id absent from the 41 collected records, so every locator below waited on a card that is not on
+   the page. Deriving it means the day the catalogue changes shape this fails as "no entry can carry
+   this test" rather than silently passing on a page it never found. */
+function fullyDocumentedEntry(data) {
+  const nipByNumber = Object.fromEntries(data.nipCatalog.map(nip => [nip.number, nip]));
+  const resolvedClaims = tool => (tool.capabilities || []).filter(record =>
+    record.family === data.registry.family && record.registryStatus === 'resolved' && nipByNumber[record.id]?.source);
+  const tool = data.tools.find(candidate => candidate.homepage && candidate.distribution && candidate.sourceRepo && resolvedClaims(candidate).length);
+  expect(tool, 'catalogue has an entry with all three official links and a registry-resolved claim').toBeTruthy();
+  return tool;
+}
+
+/* The entry whose project is observably gone, again read out of the catalogue. §21.4 invariant I9 is
+   why this is a *liveness observation* and not a filter: a 30370 observation must not remove a row,
+   so "dead" is something the record says about itself in the detail dialog, never something that
+   subtracts from the list. See the FINDING in the report for the opt-in control this replaces. */
+function unreachableEntry(data) {
+  const tool = data.tools.find(candidate => (candidate.liveness || []).some(item => item.result === 'unreachable'));
+  expect(tool, 'catalogue has an entry with an unreachable liveness observation').toBeTruthy();
+  return tool;
+}
+
+test('liveness never hides a row, in-page official information, fact/evaluation split, and evidence', async ({page}) => {
   const errors = collectErrors(page);
+  const data = catalogueData();
+  const subject = fullyDocumentedEntry(data);
+  const dead = unreachableEntry(data);
+  const dialog = page.locator('#evidence-dialog');
   await page.goto('nip-explorer.html');
+
+  /* I9: the entry whose homepage does not resolve is listed with everything else, and narrowing the
+     list by a feature and widening it again does not turn that into a special case. A count is
+     asserted on both sides so "it is there" cannot be satisfied by an empty page. */
+  const listed = await page.locator('.feature-tool-card').count();
+  expect(listed).toBe(data.tools.length);
+  await expect(page.locator(`[data-tool-id="${dead.id}"]`)).toHaveCount(1);
   await page.locator('[data-select-feature="wallet"]').click();
-  await expect(page.locator('.dead-tool')).toHaveCount(0);
+  const narrowed = await page.locator('.feature-tool-card').count();
+  expect(narrowed).toBeGreaterThan(0);
+  expect(narrowed).toBeLessThan(listed);
   await page.locator('#filter-details > summary').click();
-  await page.locator('#include-dead').check();
-  expect(await page.locator('.dead-tool').count()).toBeGreaterThan(0);
-  await expect(page.getByRole('button', {name: /Return to active candidates/}).first()).toBeVisible();
   await page.getByRole('button', {name: 'Reset filters'}).click();
-  const card = page.locator('.feature-tool-card').first();
-  await expect(card.getByRole('heading', {name: 'Facts & observations'})).toBeVisible();
-  await expect(card.getByRole('heading', {name: 'User evaluations'})).toBeVisible();
-  for (const name of ['Official site', 'Distribution', 'Official docs', 'Source']) {
-    const control = card.getByRole('button', {name});
-    await control.click();
-    await expect(page.locator('#evidence-dialog')).toContainText('.invalid');
-    await expect(page.locator('#evidence-dialog')).toContainText('Last checked');
-    await page.keyboard.press('Escape');
-    await expect(control).toBeFocused();
+  await expect(page.locator('.feature-tool-card')).toHaveCount(listed);
+
+  /* The record says what is wrong with it where the record is: the derived value is `unknown` and
+     says so (no graph counts the observation), and both observations are printed verbatim with the
+     subject they were made against. This is the sentence the old `.dead-tool` styling stood in for. */
+  await page.locator(`[data-tool-id="${dead.id}"]`).getByRole('button', {name: 'Details & evidence'}).click();
+  await expect(dialog.locator('.liveness-derived')).toHaveAttribute('data-liveness', 'unknown');
+  await expect(dialog.locator('.liveness-why')).toContainText(String((dead.liveness || []).length));
+  await expect(dialog.locator('.liveness-list li')).toHaveCount((dead.liveness || []).length);
+  for (const observation of dead.liveness || []) {
+    const row = dialog.locator('.liveness-list li').filter({hasText: observation.subject});
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText(observation.detail);
   }
-  await card.getByRole('button', {name: 'Details & evidence'}).click();
-  await page.locator('.basis-row').first().click();
-  await expect(page.locator('#evidence-dialog')).toContainText('Observer');
-  await expect(page.locator('#evidence-dialog')).toContainText('Official NIP source');
+  await page.keyboard.press('Escape');
+
+  /* issue #6 / c15fafd: the collapsed card is a row to scan, so the fact/evaluation split and the
+     official links live one press away in the detail dialog -- not on the card. Both are asserted:
+     the card does NOT carry them, the dialog does, and in that order (facts before evaluations). */
+  const card = page.locator(`[data-tool-id="${subject.id}"]`);
+  await expect(card).toHaveCount(1);
+  await expect(card.getByRole('heading', {name: 'Facts & observations'})).toHaveCount(0);
+  await expect(card.getByRole('heading', {name: 'User evaluations'})).toHaveCount(0);
+  const detailButton = card.getByRole('button', {name: 'Details & evidence'});
+  await detailButton.click();
+  await expect(dialog.getByRole('heading', {name: 'Facts & observations'})).toBeVisible();
+  await expect(dialog.getByRole('heading', {name: 'User evaluations'})).toBeVisible();
+  expect(await dialog.locator('.dialog-layer').evaluateAll(layers => layers.map(layer => layer.classList[1])))
+    .toEqual(['fact-layer', 'claim-layer', 'evaluation-layer']);
+  /* The split is a split: what people said about the entry is not filed under what was observed. */
+  await expect(dialog.locator('.fact-layer [data-like-tool], .fact-layer [data-review-tool]')).toHaveCount(0);
+  await expect(dialog.locator('.evaluation-layer [data-like-tool]')).toHaveCount(1);
+  await expect(dialog.locator('.evaluation-layer [data-review-tool]')).toHaveCount(1);
+
+  /* Official information is reachable without leaving the page, and what it shows is the string the
+     primary source published -- not a URL built out of the name. `.invalid` hosts were what this
+     asserted before: generated addresses that only ever existed for `provenance: 'sample'` entries.
+     Every collected entry's link is checked against the value data.js holds for it. */
+  for (const [type, label] of [['site', 'Official site'], ['distribution', 'Distribution'], ['source', 'Source']]) {
+    const control = dialog.locator(`.resource-link[data-resource-type="${type}"]`);
+    await expect(control).toHaveCount(1);
+    await control.click();
+    await expect(dialog).toContainText({site: subject.homepage, distribution: subject.distribution, source: subject.sourceRepo}[type]);
+    await expect(dialog).toContainText('Last checked');
+    await expect(dialog).toContainText(subject.observed);
+    await page.keyboard.press('Escape');
+    /* Closing the link detail returns to where it was opened from -- the card's detail button, which
+       is the opener the dialog stack recorded. */
+    await expect(detailButton).toBeFocused();
+    await detailButton.click();
+  }
+
+  /* Evidence for a claim is reachable, and it carries the two things that make it evidence rather
+     than a badge: the verbatim line the source published, and the primary NIP source it resolves to
+     in the pinned snapshot. */
+  const nipByNumber = Object.fromEntries(data.nipCatalog.map(nip => [nip.number, nip]));
+  const claim = (subject.capabilities || []).find(record =>
+    record.family === data.registry.family && record.registryStatus === 'resolved' && nipByNumber[record.id]?.source);
+  const chip = dialog.locator(`.nip-tag-button[data-evidence-nip="${claim.key}"]`);
+  await expect(chip).toHaveCount(1);
+  await chip.click();
+  await expect(dialog).toContainText('Verbatim source line');
+  await expect(dialog.locator('.source-text')).toHaveText(claim.sourceText);
+  await expect(dialog.getByRole('link', {name: 'Official NIP source'})).toHaveAttribute('href', nipByNumber[claim.id].source);
+  await expect(dialog).toContainText(claim.registryTitle);
   expect(errors).toEqual([]);
 });
 
