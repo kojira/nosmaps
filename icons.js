@@ -27,5 +27,74 @@
     return `<svg class="${className}" viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="${path}"></path></svg>`;
   }
 
-  window.NOSMAPS_ICONS = Object.freeze({svg, names: Object.freeze(Object.keys(paths))});
+  /* ---------------------------------------------------------------------- */
+  /* issue #3 — the entry's own icon.                                        */
+  /*                                                                         */
+  /* One box for every entry, at one size (.entity-icon in styles.css), so a */
+  /* third-party image that is slow or that never arrives cannot move the    */
+  /* row it sits in. What goes in the box is decided by the record and by    */
+  /* nothing else: `tool.icon.url` is a URL that was requested and answered  */
+  /* with an image (the probe in icons-probe.md, stored with the markup that */
+  /* declared it in tools/build-data.mjs). A record with `icon: null` gets   */
+  /* the initial-letter placeholder — no favicon is guessed from a homepage, */
+  /* no URL is derived by convention. Absent stays absent.                   */
+  /* ---------------------------------------------------------------------- */
+
+  /** @param {unknown} value */
+  function esc(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* Code-point aware, so a name that starts outside the BMP yields its whole
+     first character. An empty or missing name yields "": the box then says
+     nothing, rather than saying "undefined". */
+  /** @param {NosmapsTool | null | undefined} tool */
+  function initialOf(tool) {
+    const name = typeof (tool && tool.name) === 'string' ? String(tool && tool.name).trim() : '';
+    const first = [...name][0];
+    return first ? first.toLocaleUpperCase() : '';
+  }
+
+  /** @param {string} initial */
+  function placeholderMarkup(initial) {
+    /* The letter is painted by CSS (::before content:attr(data-entity-initial)),
+       so it stands in for a logo without joining the card's text. */
+    return `<span class="entity-icon is-placeholder" data-entity-initial="${esc(initial)}" aria-hidden="true"></span>`;
+  }
+
+  /** @param {string} initial */
+  function placeholderElement(initial) {
+    const span = document.createElement('span');
+    span.className = 'entity-icon is-placeholder';
+    span.setAttribute('data-entity-initial', initial);
+    span.setAttribute('aria-hidden', 'true');
+    return span;
+  }
+
+  /** @param {NosmapsTool | null | undefined} tool */
+  function entity(tool) {
+    const initial = initialOf(tool);
+    const icon = tool ? tool.icon : null;
+    const url = icon && typeof icon.url === 'string' ? icon.url : '';
+    if (!url) return placeholderMarkup(initial);
+    /* The name is right next to it, so the image is decorative: empty alt and
+       aria-hidden keep it from being read twice. It carries the initial too,
+       because that is what it degrades to if the host fails. */
+    return `<img class="entity-icon" src="${esc(url)}" data-entity-initial="${esc(initial)}" alt="" aria-hidden="true" loading="lazy" decoding="async">`;
+  }
+
+  /* A third-party host that fails is not a broken page and must not be a broken
+     image: the <img> is replaced by the same-size letter box it would have had
+     if no URL had ever been recorded. `error` does not bubble from an image, so
+     this listens in the capture phase, once, for every icon on every page —
+     including the ones re-rendered into the DOM later. */
+  document.addEventListener('error', event => {
+    const target = event.target;
+    if (!(target instanceof HTMLImageElement) || !target.classList.contains('entity-icon')) return;
+    target.replaceWith(placeholderElement(target.getAttribute('data-entity-initial') || ''));
+  }, true);
+
+  window.NOSMAPS_ICONS = Object.freeze({svg, entity, names: Object.freeze(Object.keys(paths))});
 })();

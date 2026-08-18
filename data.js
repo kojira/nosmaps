@@ -717,6 +717,12 @@ window.NOSMAPS_DATA={
    "summary": "A twitter-like nostr client for iPhone, iPad and MacOS.",
    "summaryAbsent": false,
    "homepage": "https://damus.io/",
+   "icon": {
+    "url": "https://damus.io/logo_icon.png",
+    "source": "meta og:image",
+    "page": "https://damus.io/",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "clients"
@@ -942,6 +948,12 @@ window.NOSMAPS_DATA={
    "summary": "Nostr client for Android",
    "summaryAbsent": false,
    "homepage": "https://amethyst.social",
+   "icon": {
+    "url": "https://amethyst.social/amethyst-logo.jpg",
+    "source": "link rel=\"icon\" (image/jpeg)",
+    "page": "https://amethyst.social",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "clients"
@@ -2418,6 +2430,12 @@ window.NOSMAPS_DATA={
    "summary": "Primal's web app for Nostr, as experienced on primal.net.",
    "summaryAbsent": false,
    "homepage": "https://primal.net",
+   "icon": {
+    "url": "https://primal.net/assets/favicon-85332ee3.ico",
+    "source": "link rel=\"icon\" (image/ico)",
+    "page": "https://primal.net",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "clients"
@@ -2480,6 +2498,12 @@ window.NOSMAPS_DATA={
    "summary": "An experimental Nostr client focused on unlocking the full potential of multiple relays. Browse, filter, zap, and create custom feeds to create a curated Nostr experience.",
    "summaryAbsent": false,
    "homepage": "https://app.coracle.social",
+   "icon": {
+    "url": "https://app.coracle.social/icons/favicon.ico",
+    "source": "link rel=\"icon\" (48x48)",
+    "page": "https://app.coracle.social",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "clients"
@@ -2778,6 +2802,12 @@ window.NOSMAPS_DATA={
    "summary": "Feature packed nostr web UI",
    "summaryAbsent": false,
    "homepage": "https://phoenix.social",
+   "icon": {
+    "url": "https://phoenix.social/favicon.png",
+    "source": "link rel=\"icon\"",
+    "page": "https://phoenix.social",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "clients"
@@ -3571,6 +3601,12 @@ window.NOSMAPS_DATA={
    "summary": "Highly performant and normie-friendly offline-first Nostr web client that is not dependent on any single relay or other server. Featuring a Cashu wallet, secure DMs and social graph based content filtering.",
    "summaryAbsent": false,
    "homepage": "https://iris.to",
+   "icon": {
+    "url": "https://iris.to/favicon.svg",
+    "source": "link rel=\"icon\" (image/svg+xml)",
+    "page": "https://iris.to",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "clients"
@@ -3641,6 +3677,12 @@ window.NOSMAPS_DATA={
    "summary": "Nostr client for web.",
    "summaryAbsent": false,
    "homepage": "https://nostter.app",
+   "icon": {
+    "url": "https://nostter.app/favicon.svg",
+    "source": "link rel=\"icon\" (image/svg+xml)",
+    "page": "https://nostter.app",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "clients"
@@ -3694,6 +3736,7 @@ window.NOSMAPS_DATA={
    "summary": "Gossip is a nostr client",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "clients"
@@ -3806,6 +3849,12 @@ window.NOSMAPS_DATA={
    "summary": "A sandbox for exploring nostr",
    "summaryAbsent": false,
    "homepage": "https://nostrudel.ninja/",
+   "icon": {
+    "url": "https://nostrudel.ninja/favicon.ico",
+    "source": "link rel=\"icon\" (any)",
+    "page": "https://nostrudel.ninja/",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "clients"
@@ -3867,6 +3916,12 @@ window.NOSMAPS_DATA={
    "summary": "🐰 A nostr client like TweetDeck",
    "summaryAbsent": false,
    "homepage": "https://rabbit.syusui.net",
+   "icon": {
+    "url": "https://rabbit.syusui.net/images/rabbit_256.png",
+    "source": "link rel=\"shortcut icon\" (image/png)",
+    "page": "https://rabbit.syusui.net",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "clients"
@@ -3920,6 +3975,7 @@ window.NOSMAPS_DATA={
    "summary": "A secure, open-source chat app built on the Nostr protocol. Available on Android, iOS, macOS, Linux and Windows.",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "clients"
@@ -3981,6 +4037,12 @@ window.NOSMAPS_DATA={
    "summary": "A decentralized social payment client on Nostr & Bitcoin.",
    "summaryAbsent": false,
    "homepage": "https://yakihonne.com",
+   "icon": {
+    "url": "https://yakihonne.com/icon-512x512.png",
+    "source": "manifest icons (512x512)",
+    "page": "https://yakihonne.com",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "clients"
@@ -4223,6 +4285,7 @@ window.NOSMAPS_DATA={
    "summary": "",
    "summaryAbsent": true,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "clients"
@@ -4290,6 +4353,7 @@ window.NOSMAPS_DATA={
    "summary": "Habla allows you to read, write, curate and monetize long form content over Nostr, a censorship-resistant protocol for social media.",
    "summaryAbsent": false,
    "homepage": "https://habla.news",
+   "icon": null,
    "recordState": "active",
    "topics": [
     "clients"
@@ -4351,6 +4415,12 @@ window.NOSMAPS_DATA={
    "summary": "Nostr live streaming",
    "summaryAbsent": false,
    "homepage": "https://zap.stream",
+   "icon": {
+    "url": "https://zap.stream/logo_32.png",
+    "source": "link rel=\"icon\" (32x32)",
+    "page": "https://zap.stream",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "clients",
@@ -4422,6 +4492,12 @@ window.NOSMAPS_DATA={
    "summary": "Your content. Your vibe. Your rules.",
    "summaryAbsent": false,
    "homepage": "https://ditto.pub",
+   "icon": {
+    "url": "https://ditto.pub/logo.svg",
+    "source": "link rel=\"icon\" (image/svg+xml)",
+    "page": "https://ditto.pub",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "clients",
@@ -4495,6 +4571,12 @@ window.NOSMAPS_DATA={
    "summary": "A global, permissionless Nostr marketplace for Bitcoin commerce",
    "summaryAbsent": false,
    "homepage": "https://shopstr.market",
+   "icon": {
+    "url": "https://shopstr.market/shopstr.ico",
+    "source": "link rel=\"icon\"",
+    "page": "https://shopstr.market",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "commerce"
@@ -4983,6 +5065,7 @@ window.NOSMAPS_DATA={
    "summary": "Amber is a nostr event signer for Android. It allows users to keep their nsec segregated in a single, dedicated app. The goal of Amber is to have your smartphone act as a NIP-46 signing device without any need for servers or additional hardware.",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "identity"
@@ -5078,6 +5161,7 @@ window.NOSMAPS_DATA={
    "summary": "nostr signer extension",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "identity"
@@ -5157,6 +5241,12 @@ window.NOSMAPS_DATA={
    "summary": "Noauth Nostr key manager.",
    "summaryAbsent": false,
    "homepage": "https://use.nsec.app",
+   "icon": {
+    "url": "https://use.nsec.app/favicon.ico",
+    "source": "link rel=\"icon\"",
+    "page": "https://use.nsec.app",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "identity"
@@ -5229,6 +5319,12 @@ window.NOSMAPS_DATA={
    "summary": "The Bitcoin Lightning Browser Extension that brings deep Lightning & Nostr integration to the web. Wallet interface to multiple lightning nodes and key signer for Nostr, Liquid and onchain use.",
    "summaryAbsent": false,
    "homepage": "https://getalby.com/#extension",
+   "icon": {
+    "url": "https://framerusercontent.com/images/M1y26zs7Y5u5rQ1fy2kVJB5U.svg",
+    "source": "link rel=\"icon\"",
+    "page": "https://getalby.com/#extension",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "identity",
@@ -5285,6 +5381,7 @@ window.NOSMAPS_DATA={
    "summary": "Display live notifications for your nostr events and allow other apps to receive and interact with them.",
    "summaryAbsent": false,
    "homepage": "https://njump.me/npub1h2685kkxa4q50qpexuae9geqep7frr0u8t8pcy9zj0xnza9phvtsnkd9tm",
+   "icon": null,
    "recordState": "active",
    "topics": [
     "notifications"
@@ -5345,6 +5442,7 @@ window.NOSMAPS_DATA={
    "summary": "strfry is a relay for the nostr protocol. No external database required: all data is stored locally on the filesystem in LMDB.",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "relay"
@@ -5584,6 +5682,7 @@ window.NOSMAPS_DATA={
    "summary": "A nostr relay written in Rust.",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "relay"
@@ -5933,6 +6032,12 @@ window.NOSMAPS_DATA={
    "summary": "a framework for making custom Nostr relays",
    "summaryAbsent": false,
    "homepage": "https://khatru.nostr.technology/",
+   "icon": {
+    "url": "https://khatru.nostr.technology/logo.png",
+    "source": "link rel=\"icon\"",
+    "page": "https://khatru.nostr.technology/",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "relay",
@@ -6006,6 +6111,7 @@ window.NOSMAPS_DATA={
    "summary": "A Nostr Relay written in TypeScript",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "relay"
@@ -6440,6 +6546,12 @@ window.NOSMAPS_DATA={
    "summary": "The community's Nostr brain: The only server with relay, File Hosting (NIP-96 & Blossom), Nostr Address (NIP-05), Lightning Redirects, NWC, WoT, and much more.",
    "summaryAbsent": false,
    "homepage": "https://nostrcheck.me/",
+   "icon": {
+    "url": "https://nostrcheck.me/favicon.ico",
+    "source": "link rel=\"icon\"",
+    "page": "https://nostrcheck.me/",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "relay",
@@ -6886,6 +6998,7 @@ window.NOSMAPS_DATA={
    "summary": "High Availability Vault for Events on Nostr",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "relay"
@@ -6947,6 +7060,7 @@ window.NOSMAPS_DATA={
    "summary": "A blossom server written in Deno",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "media"
@@ -7137,6 +7251,7 @@ window.NOSMAPS_DATA={
    "summary": "Blobs stored simply on mediaservers — the specification documents (BUDs) for the Blossom protocol.",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "spec"
@@ -7199,6 +7314,12 @@ window.NOSMAPS_DATA={
    "summary": "nostr.build media uploader — media hosting for Nostr.",
    "summaryAbsent": false,
    "homepage": "https://nostr.build/",
+   "icon": {
+    "url": "https://nostr.build/favicon-32x32.png",
+    "source": "link rel=\"icon\" (32x32)",
+    "page": "https://nostr.build/",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "media"
@@ -7267,6 +7388,7 @@ window.NOSMAPS_DATA={
    "summary": "Free, simple file hosting.",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "media"
@@ -7344,6 +7466,12 @@ window.NOSMAPS_DATA={
    "summary": "A mobile Bitcoin wallet fit for the gods.",
    "summaryAbsent": false,
    "homepage": "https://zeusln.com",
+   "icon": {
+    "url": "https://zeusln.com/favicon.ico",
+    "source": "link rel=\"icon\"",
+    "page": "https://zeusln.com",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "wallet"
@@ -7406,6 +7534,12 @@ window.NOSMAPS_DATA={
    "summary": "Alby Hub - Your own Bitcoin Lightning node: easy, connectable, feature-rich. Run anywhere. Become self-sovereign.",
    "summaryAbsent": false,
    "homepage": "https://albyhub.com",
+   "icon": {
+    "url": "https://framerusercontent.com/images/M1y26zs7Y5u5rQ1fy2kVJB5U.svg",
+    "source": "link rel=\"icon\"",
+    "page": "https://albyhub.com",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "wallet"
@@ -7477,6 +7611,12 @@ window.NOSMAPS_DATA={
    "summary": "Mutiny is a self-custodial lightning wallet that runs in the browser.",
    "summaryAbsent": false,
    "homepage": "https://app.mutinywallet.com",
+   "icon": {
+    "url": "https://app.mutinywallet.com/favicon.ico",
+    "source": "link rel=\"icon\"",
+    "page": "https://app.mutinywallet.com",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "wallet"
@@ -7554,6 +7694,7 @@ window.NOSMAPS_DATA={
    "summary": "Tools for developing Nostr clients.",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "dev"
@@ -7628,6 +7769,7 @@ window.NOSMAPS_DATA={
    "summary": "Nostr Development Kit with outbox-model support",
    "summaryAbsent": false,
    "homepage": "https://nostr-dev-kit.github.io/ndk/",
+   "icon": null,
    "recordState": "active",
    "topics": [
     "dev"
@@ -8038,6 +8180,12 @@ window.NOSMAPS_DATA={
    "summary": "Rust implementation of the nostr protocol, high-level client library, Nostr Wallet Connect and more.",
    "summaryAbsent": false,
    "homepage": "https://nostrdevkit.org",
+   "icon": {
+    "url": "https://nostrdevkit.org/assets/logo.svg",
+    "source": "link rel=\"icon\" (image/svg+xml)",
+    "page": "https://nostrdevkit.org",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "dev"
@@ -8111,6 +8259,7 @@ window.NOSMAPS_DATA={
    "summary": "a command line tool for doing all things nostr",
    "summaryAbsent": false,
    "homepage": null,
+   "icon": null,
    "recordState": "active",
    "topics": [
     "dev"
@@ -8171,6 +8320,12 @@ window.NOSMAPS_DATA={
    "summary": "nostr.watch provides the infrastructure for observing the Nostr relay network.",
    "summaryAbsent": false,
    "homepage": "https://nostr.watch",
+   "icon": {
+    "url": "https://nostr.watch/favicon-32x32.png",
+    "source": "link rel=\"icon\" (32x32)",
+    "page": "https://nostr.watch",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "analytics"
@@ -8242,6 +8397,12 @@ window.NOSMAPS_DATA={
    "summary": "The open app store where users meet builders. Curated by communities. Android apps.",
    "summaryAbsent": false,
    "homepage": "https://zapstore.dev",
+   "icon": {
+    "url": "https://zapstore.dev/favicon.ico",
+    "source": "link rel=\"icon\"",
+    "page": "https://zapstore.dev",
+    "observedAt": "2026-08-18"
+   },
    "recordState": "active",
    "topics": [
     "distribution"

@@ -461,9 +461,13 @@
 
      `recommendationMarkup` stays because it is the relay list's own ordering key, and it renders
      nothing at all for a record that did not come from a relay: for all 41 collected entries the
-     card is exactly the four fields above. */
+     card is exactly the four fields above.
+
+     issue #3: the icon sits inside the headline, next to the name it belongs to. It is identity,
+     not a fifth field -- the card still has exactly the four rows above, and the icon carries no
+     text of its own (see NOSMAPS_ICONS.entity). */
   function featureCard(tool) {
-    return `<article class="feature-tool-card" data-tool-id="${esc(tool.id)}" data-record-state="${esc(tool.recordState)}"><div class="card-headline"><h2>${esc(tool.name)}</h2><code class="tool-identifier">${esc(tool.id)}</code></div><p class="tool-summary${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(toolDescription(tool))}</p><div class="card-topics">${topicTags(tool)}</div>${recommendationMarkup(tool)}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${esc(tool.id)}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${esc(tool.id)}">${esc(t('explorer.details'))}</button></div></article>`;
+    return `<article class="feature-tool-card" data-tool-id="${esc(tool.id)}" data-record-state="${esc(tool.recordState)}"><div class="card-headline"><div class="card-identity">${icons.entity(tool)}<h2>${esc(tool.name)}</h2></div><code class="tool-identifier">${esc(tool.id)}</code></div><p class="tool-summary${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(toolDescription(tool))}</p><div class="card-topics">${topicTags(tool)}</div>${recommendationMarkup(tool)}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${esc(tool.id)}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${esc(tool.id)}">${esc(t('explorer.details'))}</button></div></article>`;
   }
 
   function activeConditions() {

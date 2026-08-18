@@ -136,6 +136,46 @@ const LIVENESS = {
   ]
 };
 
+/* Icons. Every URL below was requested in the probe recorded in icons-probe.md (run 2026-08-18
+   against HEAD c15fafd): the entry's own homepage was fetched, every icon it declares was resolved
+   and requested, and a URL is kept here only where that request answered 2xx with an `image/*`
+   content-type and a non-zero body. `source` is the markup the page declared it in and `page` is
+   the URL that declared it — for the two Framer-hosted sites that is the same third-party CDN file,
+   which is a fact about those two pages rather than a mistake here.
+
+   No URL is guessed by convention and none is inferred: an entry absent from this map has no icon,
+   and the UI draws its initial-letter placeholder instead. Seventeen of the 41 are absent —
+   fourteen publish no homepage at all, habla.news's homepage answers 404, the NDK page declares no
+   icon of any kind, and Pokey's recorded homepage is an njump *profile* page, so the icon found
+   there is njump's own and is deliberately not used for Pokey. */
+const ICONS = {
+  'nosmaps:io.damus': {url: 'https://damus.io/logo_icon.png', source: 'meta og:image', page: 'https://damus.io/'},
+  'nosmaps:social.amethyst': {url: 'https://amethyst.social/amethyst-logo.jpg', source: 'link rel="icon" (image/jpeg)', page: 'https://amethyst.social'},
+  'nosmaps:net.primal.web': {url: 'https://primal.net/assets/favicon-85332ee3.ico', source: 'link rel="icon" (image/ico)', page: 'https://primal.net'},
+  'nosmaps:social.coracle': {url: 'https://app.coracle.social/icons/favicon.ico', source: 'link rel="icon" (48x48)', page: 'https://app.coracle.social'},
+  'nosmaps:social.phoenix': {url: 'https://phoenix.social/favicon.png', source: 'link rel="icon"', page: 'https://phoenix.social'},
+  'nosmaps:to.iris': {url: 'https://iris.to/favicon.svg', source: 'link rel="icon" (image/svg+xml)', page: 'https://iris.to'},
+  'nosmaps:app.nostter': {url: 'https://nostter.app/favicon.svg', source: 'link rel="icon" (image/svg+xml)', page: 'https://nostter.app'},
+  'nosmaps:ninja.nostrudel': {url: 'https://nostrudel.ninja/favicon.ico', source: 'link rel="icon" (any)', page: 'https://nostrudel.ninja/'},
+  'nosmaps:net.syusui.rabbit': {url: 'https://rabbit.syusui.net/images/rabbit_256.png', source: 'link rel="shortcut icon" (image/png)', page: 'https://rabbit.syusui.net'},
+  'nosmaps:com.yakihonne.web': {url: 'https://yakihonne.com/icon-512x512.png', source: 'manifest icons (512x512)', page: 'https://yakihonne.com'},
+  'nosmaps:stream.zap': {url: 'https://zap.stream/logo_32.png', source: 'link rel="icon" (32x32)', page: 'https://zap.stream'},
+  'nosmaps:pub.ditto': {url: 'https://ditto.pub/logo.svg', source: 'link rel="icon" (image/svg+xml)', page: 'https://ditto.pub'},
+  'nosmaps:market.shopstr': {url: 'https://shopstr.market/shopstr.ico', source: 'link rel="icon"', page: 'https://shopstr.market'},
+  'nosmaps:app.nsec': {url: 'https://use.nsec.app/favicon.ico', source: 'link rel="icon"', page: 'https://use.nsec.app'},
+  'nosmaps:com.getalby.extension': {url: 'https://framerusercontent.com/images/M1y26zs7Y5u5rQ1fy2kVJB5U.svg', source: 'link rel="icon"', page: 'https://getalby.com/#extension'},
+  'nosmaps:technology.nostr.khatru': {url: 'https://khatru.nostr.technology/logo.png', source: 'link rel="icon"', page: 'https://khatru.nostr.technology/'},
+  'nosmaps:me.nostrcheck.server': {url: 'https://nostrcheck.me/favicon.ico', source: 'link rel="icon"', page: 'https://nostrcheck.me/'},
+  'nosmaps:build.nostr': {url: 'https://nostr.build/favicon-32x32.png', source: 'link rel="icon" (32x32)', page: 'https://nostr.build/'},
+  'nosmaps:com.zeusln': {url: 'https://zeusln.com/favicon.ico', source: 'link rel="icon"', page: 'https://zeusln.com'},
+  'nosmaps:com.albyhub': {url: 'https://framerusercontent.com/images/M1y26zs7Y5u5rQ1fy2kVJB5U.svg', source: 'link rel="icon"', page: 'https://albyhub.com'},
+  'nosmaps:com.mutinywallet.app': {url: 'https://app.mutinywallet.com/favicon.ico', source: 'link rel="icon"', page: 'https://app.mutinywallet.com'},
+  'nosmaps:org.nostrdevkit': {url: 'https://nostrdevkit.org/assets/logo.svg', source: 'link rel="icon" (image/svg+xml)', page: 'https://nostrdevkit.org'},
+  'nosmaps:watch.nostr': {url: 'https://nostr.watch/favicon-32x32.png', source: 'link rel="icon" (32x32)', page: 'https://nostr.watch'},
+  'nosmaps:dev.zapstore': {url: 'https://zapstore.dev/favicon.ico', source: 'link rel="icon"', page: 'https://zapstore.dev'}
+};
+const ICONS_OBSERVED_AT = '2026-08-18';
+
 /* R7 — a mention is not a claim. These are recorded so a library does not read as empty, and are
    labelled as what they are: names, not support statements. */
 const NON_CLAIM_KEYS = {
@@ -245,6 +285,9 @@ function buildTool(entry) {
     summary,
     summaryAbsent: summary === '',
     homepage: content.homepage || null,
+    /* Absent for the 17 entries the probe left without a verified image. Never a guessed
+       URL and never a placeholder string: the UI draws the initial-letter box for `null`. */
+    icon: ICONS[d] ? {...ICONS[d], observedAt: ICONS_OBSERVED_AT} : null,
     /* R4 — two axes. `recordState` is the winner's own `state`; project liveness is below and is
        never merged into it. */
     recordState: content.state,

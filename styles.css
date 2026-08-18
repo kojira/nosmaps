@@ -30,3 +30,13 @@
 .site-footer-inner{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;justify-content:center;min-width:0}
 .footer-source{max-width:100%;color:var(--accent);font-weight:700;text-decoration:underline;overflow-wrap:anywhere}
 .footer-source:hover{color:#4328b9}
+
+/* issue #3: an entry's own icon. The box is the same fixed square whether it holds a remote image
+   or the initial-letter placeholder, and `flex:0 0 auto` keeps it from being squeezed, so nothing
+   next to it moves while a third-party image is still in flight — or when it never arrives.
+   The letter is generated content, not a text node: it stands in for a logo and must not be read
+   out or copied as if it were a field of the record. An entry with no name yields an empty
+   attribute, which draws an empty box rather than any placeholder word. */
+.entity-icon{flex:0 0 auto;display:grid;place-items:center;width:var(--entity-icon-size,1.6rem);height:var(--entity-icon-size,1.6rem);border-radius:.4rem;background:#edf0ec;object-fit:contain;overflow:hidden}
+.entity-icon.is-placeholder{color:var(--muted);font-size:calc(var(--entity-icon-size,1.6rem) * .55);font-weight:800;line-height:1;user-select:none}
+.entity-icon.is-placeholder::before{content:attr(data-entity-initial)}

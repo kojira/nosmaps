@@ -18,8 +18,12 @@
 .slide-link{display:grid;gap:.5rem;min-width:0;align-content:start;color:inherit;text-decoration:none}
 .slide-link:hover .slide-name{text-decoration:underline}
 .slide-link:focus-visible{outline:2px solid #7866d3;outline-offset:3px;border-radius:.6rem}
-.slide-icon{display:grid;place-items:center;width:2.5rem;height:2.5rem;border-radius:.65rem;background:#edf0ec;font-size:1.25rem}
-.slide-name{margin:0;font-size:1.15rem;overflow-wrap:anywhere}
+/* issue #3: the entry's own icon sits on the same line as its name. The box is a fixed 2.25rem
+   square (see .entity-icon in styles.css), so a third-party image that is slow, or that never
+   arrives, cannot reflow the slide around it. */
+.slide-identity{display:flex;align-items:center;gap:.55rem;min-width:0}
+.slide-identity .entity-icon{--entity-icon-size:2.25rem;border-radius:.6rem}
+.slide-name{margin:0;font-size:1.15rem;min-width:0;overflow-wrap:anywhere}
 .slide-description{margin:0;color:var(--muted);overflow-wrap:anywhere}
 .slide-facts{display:flex;flex-wrap:wrap;gap:.5rem}
 .slide-fact{display:grid;gap:.1rem;padding:.4rem .6rem;border-radius:.5rem;background:#edf0ec;min-width:0}

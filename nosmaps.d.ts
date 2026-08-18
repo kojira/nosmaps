@@ -142,6 +142,17 @@ interface NosmapsToolClaim {
     collected entries are `active`. */
 type NosmapsRecordState = 'active';
 
+/** An icon URL that was requested and answered with a non-empty `image/*`
+    body, together with the markup that declared it and the page that did. */
+interface NosmapsToolIcon {
+  readonly url: string;
+  /** The markup the page declared it in, e.g. `link rel="icon"`. */
+  readonly source: string;
+  /** The page that declared it. Two Framer-hosted entries name the same file. */
+  readonly page: string;
+  readonly observedAt: string;
+}
+
 /** One catalogue entry. All 41 entries carry every key below — absence is
     expressed as null (or as "" for `summary`), never by omitting the key. */
 interface NosmapsTool {
@@ -155,6 +166,9 @@ interface NosmapsTool {
   readonly summaryAbsent: boolean;
   /** Null for 14 of 41 — those primary sources state no homepage. */
   readonly homepage: string | null;
+  /** Null for 17 of 41 — the probe recorded in icons-probe.md found no URL for
+      them that answered with an image. Never a guessed URL. */
+  readonly icon: NosmapsToolIcon | null;
   readonly recordState: NosmapsRecordState;
   /** §21.6 R6: seed topics plus free lowercase topics, rendered verbatim. Not
       restricted to seedTopics: the 41 entries use 11 distinct topics against 7
@@ -257,6 +271,10 @@ interface NosmapsI18n {
 interface NosmapsIcons {
   /** Falls back to the `apps` glyph for an unknown name; never returns "". */
   svg(name: string, className?: string): string;
+  /** The entry's own icon box, as markup. An `<img>` when the record carries a
+      verified icon URL, otherwise the initial-letter placeholder — never "",
+      and never a guessed URL. */
+  entity(tool: NosmapsTool | null | undefined): string;
   readonly names: readonly string[];
 }
 

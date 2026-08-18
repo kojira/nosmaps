@@ -443,9 +443,18 @@
 
 .feature-tool-card .card-headline {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: .45rem;
+  min-width: 0;
+}
+
+/* issue #3: the icon and the name are one unit, so `justify-content: space-between` pushes the
+   pair to one end and the id to the other instead of stranding the icon on its own. */
+.feature-tool-card .card-identity {
+  display: flex;
+  align-items: center;
+  gap: .42rem;
   min-width: 0;
 }
 

@@ -24,11 +24,9 @@
   let viewport = null;
 
   const wrap = position => { const total = entries.length; return total ? ((position % total) + total) % total : 0; };
-  /* §21.6: topics are a set and the vocabulary is open. A seed topic has a translated label and an
-     icon; a free topic renders as the string the record published, never as "uncategorised". */
+  /* §21.6: topics are a set and the vocabulary is open. A seed topic has a translated label; a
+     free topic renders as the string the record published, never as "uncategorised". */
   const seedTopics = window.NOSMAPS_DATA.seedTopics || [];
-  const primaryTopic = tool => (tool.topics || []).find(topic => seedTopics.includes(topic)) || (tool.topics || [])[0] || null;
-  const category = tool => { const topic = primaryTopic(tool); return topic && seedTopics.includes(topic) ? i18n.value(`categories.${topic}`) : topic ? {name: topic, icon: null} : null; };
 
   function languageControl() {
     return `<div class="language-switch" role="group" aria-label="${esc(t('language'))}"><button type="button" data-language="ja" aria-pressed="${i18n.language === 'ja'}">日本語</button><button type="button" data-language="en" aria-pressed="${i18n.language === 'en'}">English</button></div>`;
@@ -50,7 +48,6 @@
 
   function slide(item, slot) {
     const tool = item.tool;
-    const record = category(tool);
     const label = (tool.topics || []).map(topic => seedTopics.includes(topic) ? i18n.value(`categories.${topic}`).name : topic).join(' / ');
     /* 一次情報が対応環境を明言したエントリだけが platform を持つ。無い欄は行ごと出さない。 */
     const facts = [label ? fact(t('landing.category'), label) : '', tool.platformText ? fact(t('landing.platform'), tool.platformText) : ''].filter(Boolean);
@@ -60,7 +57,10 @@
        that entry. `tabindex` starts at -1 on every slide including the padding copies: only the
        centred slide is exposed to assistive technology, and paint() hands it the tab stop. */
     const href = `nip-explorer.html?tool=${encodeURIComponent(tool.id)}`;
-    const body = `${record?.icon ? `<span class="slide-icon" aria-hidden="true">${icons.svg(record.icon)}</span>` : ''}<h3 class="slide-name">${esc(tool.name)}</h3><p class="slide-description${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(tool.summaryAbsent ? t('explorer.summaryAbsent') : tool.summary)}</p>${facts.length ? `<div class="slide-facts">${facts.join('')}</div>` : ''}`;
+    /* issue #3: the slot that used to hold a generic category glyph now holds the entry's own
+       icon, or its initial-letter box where no icon was verified. The category is already stated
+       in words in the fact row below, so the glyph was saying nothing the slide did not say. */
+    const body = `<div class="slide-identity">${icons.entity(tool)}<h3 class="slide-name">${esc(tool.name)}</h3></div><p class="slide-description${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(tool.summaryAbsent ? t('explorer.summaryAbsent') : tool.summary)}</p>${facts.length ? `<div class="slide-facts">${facts.join('')}</div>` : ''}`;
     return `<article class="carousel-slide" role="group" aria-label="${esc(accessibleName)}" aria-hidden="true" data-slot-index="${slot}" ${identity}><a class="slide-link" href="${esc(href)}" data-slide-link="${esc(tool.id)}" aria-label="${esc(t('landing.openEntry', {name: tool.name}))}" tabindex="-1">${body}</a></article>`;
   }
 
