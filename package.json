@@ -5,7 +5,8 @@
   "description": "Relay-native catalog of Nostr tools. Static site, no backend.",
   "scripts": {
     "build": "esbuild build/entry-rx-nostr.js --bundle --format=esm --platform=browser --outfile=dist/rx-nostr.js && esbuild build/entry-rx-nostr-crypto.js --bundle --format=esm --platform=browser --outfile=dist/rx-nostr-crypto.js",
-    "test": "playwright test"
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@rx-nostr/crypto": "3.1.6",
@@ -13,6 +14,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
-    "esbuild": "0.28.1"
+    "esbuild": "0.28.1",
+    "typescript": "^7.0.2"
   }
 }

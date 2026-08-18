@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    /* Type-check the existing plain-JS sources in place. Nothing is renamed to
+       .ts and nothing is emitted — tsc is used purely as a checker. */
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+
+    "target": "esnext",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "moduleDetection": "auto",
+    "lib": ["esnext", "dom", "dom.iterable"],
+
+    /* Strictness turned up as far as it goes. Errors here are real findings;
+       do not weaken these to make the report look clean. */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "strictBuiltinIteratorReturn": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+
+    "resolveJsonModule": true
+  },
+  "include": ["*.js", "build/**/*.js", "tools/**/*.mjs", "tests/**/*.js"],
+  "exclude": ["node_modules", "dist"]
+}
