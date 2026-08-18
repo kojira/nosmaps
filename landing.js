@@ -24,7 +24,11 @@
   let viewport = null;
 
   const wrap = position => { const total = entries.length; return total ? ((position % total) + total) % total : 0; };
-  const category = tool => (tool.category ? i18n.value(`categories.${tool.category}`) : null) || null;
+  /* §21.6: topics are a set and the vocabulary is open. A seed topic has a translated label and an
+     icon; a free topic renders as the string the record published, never as "uncategorised". */
+  const seedTopics = window.NOSMAPS_DATA.seedTopics || [];
+  const primaryTopic = tool => (tool.topics || []).find(topic => seedTopics.includes(topic)) || (tool.topics || [])[0] || null;
+  const category = tool => { const topic = primaryTopic(tool); return topic && seedTopics.includes(topic) ? i18n.value(`categories.${topic}`) : topic ? {name: topic, icon: null} : null; };
 
   function languageControl() {
     return `<div class="language-switch" role="group" aria-label="${esc(t('language'))}"><button type="button" data-language="ja" aria-pressed="${i18n.language === 'ja'}">日本語</button><button type="button" data-language="en" aria-pressed="${i18n.language === 'en'}">English</button></div>`;
@@ -47,11 +51,12 @@
   function slide(item, slot) {
     const tool = item.tool;
     const record = category(tool);
-    const label = record?.name || tool.categoryLabel || '';
-    const facts = [label ? fact(t('landing.category'), label) : '', tool.platform ? fact(t('landing.platform'), tool.platform) : ''].filter(Boolean);
+    const label = (tool.topics || []).map(topic => seedTopics.includes(topic) ? i18n.value(`categories.${topic}`).name : topic).join(' / ');
+    /* 一次情報が対応環境を明言したエントリだけが platform を持つ。無い欄は行ごと出さない。 */
+    const facts = [label ? fact(t('landing.category'), label) : '', tool.platformText ? fact(t('landing.platform'), tool.platformText) : ''].filter(Boolean);
     const accessibleName = t('landing.slideLabel', {name: tool.name, index: item.index + 1, total: entries.length});
     const identity = item.clone ? 'data-clone="true"' : `data-slide-index="${item.index}"`;
-    return `<article class="carousel-slide" role="group" aria-label="${esc(accessibleName)}" aria-hidden="true" data-slot-index="${slot}" ${identity}>${record?.icon ? `<span class="slide-icon" aria-hidden="true">${icons.svg(record.icon)}</span>` : ''}<h3 class="slide-name">${esc(tool.name)}</h3>${tool.description ? `<p class="slide-description">${esc(tool.description)}</p>` : ''}${facts.length ? `<div class="slide-facts">${facts.join('')}</div>` : ''}</article>`;
+    return `<article class="carousel-slide" role="group" aria-label="${esc(accessibleName)}" aria-hidden="true" data-slot-index="${slot}" ${identity}>${record?.icon ? `<span class="slide-icon" aria-hidden="true">${icons.svg(record.icon)}</span>` : ''}<h3 class="slide-name">${esc(tool.name)}</h3><p class="slide-description${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(tool.summaryAbsent ? t('explorer.summaryAbsent') : tool.summary)}</p>${facts.length ? `<div class="slide-facts">${facts.join('')}</div>` : ''}</article>`;
   }
 
   function carousel() {

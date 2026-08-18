@@ -14,14 +14,35 @@
         identity: {name: 'ID・鍵管理', icon: 'key', description: '鍵とプロフィールを管理する補助ツール。'},
         media: {name: '画像・動画', icon: 'movie', description: '作品やメディアを公開する制作ツール。'},
         analytics: {name: '観測・分析', icon: 'analytics', description: 'イベントや接続傾向を可視化する観測ツール。'},
-        dev: {name: '開発者向け', icon: 'code', description: 'NIPやイベントを確認する開発ツール。'}
+        dev: {name: '開発者向け', icon: 'code', description: 'NIPやイベントを確認する開発ツール。'},
+        /* §21.6 R6: 41件のうち4件が発行者自身の言葉で「ウォレット」と名乗ったので seed に加えた唯一の語。 */
+        wallet: {name: 'ウォレット', icon: 'wallet', description: 'Bitcoin・Lightningのウォレット。'}
       },
       statuses: {active: '稼働中', stale: '更新停滞', dead: '終了／到達不能', unknown: '不明'},
-      support: {implemented: '対応', partial: '部分対応', planned: '予定', unknown: '不明'},
-      evidence: {
-        implemented: '主要な操作とイベント形式を確認', partial: '主要な操作を確認し、一部は確認待ち',
-        planned: '公開された計画に対応候補として記載', unknown: '確認材料が足りないため保留'
+      /* §21.4 R4: レコードの状態（active / withdrawn）は「プロジェクトが生きているか」ではない。 */
+      recordStates: {active: '公開中（active）', withdrawn: '取り下げ済み（withdrawn）'},
+      liveness: {unknown: '不明', reachable: '到達可能', unreachable: '到達不能', archived: 'アーカイブ済み', moved: '移転', superseded: '後継あり'},
+      /* §21.7 R7: 実データが持っていた8値。unknown は否定ではなく「一次情報が何も言っていない」。 */
+      support: {
+        supported: '対応', partial: '部分対応', not_supported: '非対応（明示）', not_applicable: '対象外',
+        planned: '予定', disabled: '実装済み・無効', withdrawn: '対応取りやめ', unknown: '不明（主張なし）',
+        out_of_family: '別の仕様ファミリ'
       },
+      evidence: {
+        supported: '一次情報が無条件に対応を主張しています。',
+        partial: '一次情報が制限つきで対応を主張しています。',
+        not_supported: '一次情報が「対応しない」と明示しています。沈黙よりも強い言明です。',
+        not_applicable: '一次情報が「この仕様は当てはまらない」と述べています。分母には数えません。',
+        planned: '一次情報が予定として挙げています。現時点の実装ではありません。',
+        disabled: '実装済みで、既定では無効になっています。',
+        withdrawn: 'かつて対応していましたが取り下げられました。',
+        unknown: '一次情報は何も述べていません。非対応という意味ではありません。',
+        out_of_family: '主張は別の仕様ファミリにあります。NIPの主張は記録されていません。'
+      },
+      /* §21.2.3: id をピン留めしたスナップショットに照合した結果。落とさず、書き換えず、そのまま出す。 */
+      registryStatus: {resolved: 'レジストリで解決', not_in_registry: 'レジストリに無い', unresolvable: 'スナップショット無し'},
+      /* §21.1 R1: 主張の出どころ。転記は「そのプロジェクトが言った」ではなく「署名者が書き写した」。 */
+      basis: {transcribed: '転記（署名者が読んだ文書の写し）', self_declared: '自己申告', tested: '実行して検証'},
       observers: {crawler: 'Nosmaps観測', community: 'コミュニティレビュー', maintainer: 'メンテナー申告'},
       landing: {
         headline: 'Nostrの地図、ここにあります！',
@@ -45,6 +66,22 @@
         endedRecord: '終了／到達不能の記録。', alternatives: '同じ機能の稼働候補へ戻る', compareAdd: '比較に追加', details: '詳細・根拠',
         count: '{count}件', noMatch: '条件に合う候補がありません', noMatchHelp: '上の条件を1件ずつ外して広げられます。', removeGets: '「{label}」を外すと {count}件', resetAll: 'すべての条件をリセット',
         conditionFeature: '機能「{value}」', conditionQuery: '全文検索「{value}」', conditionPlatform: 'OS／環境「{value}」', conditionCategory: 'カテゴリ「{value}」', conditionStatus: '更新状態「{value}」', conditionSupport: '機能対応「{value}」', conditionDelivery: '提供形態「{value}」', conditionOss: 'OSS「{value}」', conditionDead: '終了／到達不能を含む', conditionSaved: 'ブックマーク済みだけ', conditionNip: 'NIP「{value}」', conditionRemove: '{label}を外す',
+        /* §21 の新語彙。unknown は「値が無い」ことを名指す語で、0 でも否定でもない。 */
+        summaryAbsent: '概要は公開されていません', freeTopic: 'レコードが公開したトピック。この端末に対応するラベルはありません。',
+        recordState: 'レコードの状態', recordStateFilter: 'レコードの状態', recordStateHelp: 'プロジェクトの生存とは別の軸です。',
+        liveness: 'プロジェクトの生存', livenessDerived: '導出された生存状態：{value}',
+        livenessUncounted: 'ソーシャルグラフが無いため、記録済みの観測 {count} 件はどれも数えていません。',
+        capabilityClaims: '対応主張', noClaimPublished: '対応主張は公開されていません', noNipClaims: 'NIPの主張は記録されていません',
+        claimFamilyCount: '{family} {count}件', claimSource: '主張の一次情報', claimCaveats: '一次情報の但し書き', caveat: '但し書き',
+        basis: '主張の根拠', assertedAt: '主張の取得日', notation: '一次情報の記法', sourceText: '一次情報の該当行',
+        registryStatus: 'レジストリ照合', registryDeprecated: 'レジストリで非推奨',
+        notInRegistry: 'ピン留めしたレジストリスナップショット {revision} に無いIDです',
+        noRegistrySnapshot: 'ファミリ {family} のレジストリスナップショットがありません',
+        primarySources: '一次情報', coordinate: '座標', noOfficialLinks: '一次情報が示すリンクはありません',
+        noReviewsObserved: 'レビューは観測していません', collectedData: '一次情報から収集',
+        platformSourced: '一次情報が対応環境を明言したエントリだけが一致します。',
+        topicCorrection: '収集時のトピック：{collected} —',
+        nonClaim: {modules: 'NIP名のモジュール（対応主張ではありません）', crates: 'NIP名のクレート（対応主張ではありません）'},
         detailKicker: '対応の根拠', supportFor: '{feature}への対応', observer: '観測主体', nipPurpose: 'NIPの用途', state: '状態', os: 'OS／環境', license: 'ライセンス',
         compareTitle: '{count}件の機能比較', differencesFirst: '差がある項目を先に表示します。', removeCandidate: '{name}を比較から外す', removeShort: '外す', alternative: '別の候補', replaceTarget: '入れ替える候補', addComparison: '比較に追加', replaceComparison: '選んだ候補と入れ替え', needTwo: '比較するには2件以上を選んでください。', featuresSection: '機能', basicsSection: '基本情報', nipEvidence: 'NIP裏付け',
         reviewTitle: '{name}のレビュー', reviewCount: '{count}件', openGallery: '画像ギャラリー', reviewer: '投稿者', postedAt: '投稿日時', use: '用途', rating: '評価', appVersion: 'アプリversion', notEntered: '未入力', helpful: '役に立った {count}', unhelpful: '立たなかった {count}', voters: '評価者{count}人・内訳', writeReview: 'レビューを追加', body: '本文', bodyPlaceholder: '使った場面や気づいたこと', image: '画像', chooseImage: '画像を選ぶ', deviceImage: '端末から選ぶ', osOptional: '対象OS（任意）', versionOptional: 'version（任意）', useOptional: '用途（任意）', ratingOptional: '評価（任意）', createReview: 'レビューを追加', chooseBodyOrImage: '本文か画像を選んでください。', addedReview: 'レビューを追加しました', imageOnly: '本文なし（画像のみ）',
@@ -85,11 +122,29 @@
       title: 'nosmaps — Find Nostr tools', description: 'Discover and compare Nostr tools by goal, category, and feature.',
       footer: {source: 'View the source on GitHub', sourceNewTab: 'View the source on GitHub (opens in a new tab)'},
       categories: {
-        clients: {name: 'Clients', icon: 'smartphone', description: 'Clients for timelines and publishing.'}, relay: {name: 'Relay operations', icon: 'dns', description: 'Tools for relay configuration and connectivity.'}, identity: {name: 'Identity & keys', icon: 'key', description: 'Tools for keys and profiles.'}, media: {name: 'Media', icon: 'movie', description: 'Tools for publishing creative media.'}, analytics: {name: 'Analytics', icon: 'analytics', description: 'Tools for observing events and connections.'}, dev: {name: 'Developer tools', icon: 'code', description: 'Tools for inspecting NIPs and events.'}
+        clients: {name: 'Clients', icon: 'smartphone', description: 'Clients for timelines and publishing.'}, relay: {name: 'Relay operations', icon: 'dns', description: 'Tools for relay configuration and connectivity.'}, identity: {name: 'Identity & keys', icon: 'key', description: 'Tools for keys and profiles.'}, media: {name: 'Media', icon: 'movie', description: 'Tools for publishing creative media.'}, analytics: {name: 'Analytics', icon: 'analytics', description: 'Tools for observing events and connections.'}, dev: {name: 'Developer tools', icon: 'code', description: 'Tools for inspecting NIPs and events.'}, wallet: {name: 'Wallet', icon: 'wallet', description: 'Bitcoin and Lightning wallets.'}
       },
       statuses: {active: 'Active', stale: 'Stale', dead: 'Ended / unreachable', unknown: 'Unknown'},
-      support: {implemented: 'Supported', partial: 'Partial', planned: 'Planned', unknown: 'Unknown'},
-      evidence: {implemented: 'Core interaction and event format confirmed', partial: 'Core interaction confirmed; some cases pending', planned: 'Listed as a candidate in the published plan', unknown: 'Held pending more evidence'},
+      recordStates: {active: 'Published (active)', withdrawn: 'Withdrawn'},
+      liveness: {unknown: 'Unknown', reachable: 'Reachable', unreachable: 'Unreachable', archived: 'Archived', moved: 'Moved', superseded: 'Superseded'},
+      support: {
+        supported: 'Supported', partial: 'Partial', not_supported: 'Not supported', not_applicable: 'Not applicable',
+        planned: 'Planned', disabled: 'Implemented but disabled', withdrawn: 'Support withdrawn', unknown: 'Unknown (no claim)',
+        out_of_family: 'Other spec family'
+      },
+      evidence: {
+        supported: 'The primary source asserts it without qualification.',
+        partial: 'The primary source asserts it with a stated limitation.',
+        not_supported: 'The primary source explicitly denies it. That is a stronger statement than silence.',
+        not_applicable: 'The source says the capability does not apply. It is not counted in any denominator.',
+        planned: 'Listed as intended, not present today.',
+        disabled: 'Implemented, and switched off by default.',
+        withdrawn: 'Was supported, and has since been removed.',
+        unknown: 'The source makes no statement. This is not a denial.',
+        out_of_family: 'The claims are in another spec family. No NIP claim is recorded.'
+      },
+      registryStatus: {resolved: 'Resolved in the registry', not_in_registry: 'Not in the registry', unresolvable: 'No registry snapshot'},
+      basis: {transcribed: 'Transcribed (a copy of a document the signer read)', self_declared: 'Self-declared', tested: 'Tested by running it'},
       observers: {crawler: 'Nosmaps observation', community: 'Community review', maintainer: 'Maintainer statement'},
       landing: {
         headline: "Here's the map of Nostr!",
@@ -106,6 +161,21 @@
         pageTitle: 'Nosmaps — Explore by feature', pageDescription: 'Find Nostr tools by feature and compare differences with NIP evidence.', location: 'Explore by feature', back: 'Back to the top page', search: 'Search apps and services', searchPlaceholder: 'Name, summary, category, OS, delivery, alias', featureGroup: 'Core features (multiple selection uses AND)', categoryGroup: 'Filter by category', allCategoriesDescription: 'Browse tools from every category.', candidates: 'Candidates', noFeature: 'No feature selected: showing all candidates', featureAnd: 'Feature filters (all AND)', viewNips: 'View NIPs', activeAnd: 'Active filters (all AND)', noExtra: 'No additional filters', settings: 'More filters', platform: 'OS / platform', updateStatus: 'Update status', activeStatus: 'Active, stale, or unknown', support: 'Feature support', featureNeeded: 'Select at least one feature to use this filter.', delivery: 'Delivery', webApp: 'Web app', installed: 'Installed app', mobileApp: 'Mobile app', oss: 'OSS', includeDead: 'Include ended / unreachable', savedOnly: 'Bookmarked only', nipSearch: 'NIP number or name', unknownInfo: 'About “Unknown”', unknownHelp: 'Unknown means the evidence is insufficient, not unsupported. Ended or unreachable entries appear only when selected.', selectedCount: '{count} selected (maximum 3)', compareByFeature: 'Compare features', clearSelection: 'Clear selection', evidenceTitle: 'Technical evidence', primarySource: 'Official NIP source', chooseForNips: 'Select a feature to show related primary NIP sources.', facts: 'Facts & observations', evaluations: 'User evaluations', noFeatureCondition: 'No feature filter', category: 'Category', observed: 'Last observed', officialLinks: 'Official information for {name}', site: 'Official site', distribution: 'Distribution', docs: 'Official docs', source: 'Source', linkDetails: '{type} information', displayUrl: 'URL', checkedAt: 'Last checked', like: 'Like {count}', bookmark: 'Bookmark', bookmarked: 'Bookmarked', reviews: 'Reviews {count}', privateDefault: 'Private', public: 'Public', publicToggle: 'Make public', endedRecord: 'Ended / unreachable record.', alternatives: 'Return to active candidates with these features', compareAdd: 'Add to comparison', details: 'Details & evidence', count: '{count}', noMatch: 'No candidates match these filters', noMatchHelp: 'Remove filters one at a time to broaden the results.', removeGets: 'Remove “{label}” for {count} results', resetAll: 'Reset every filter', conditionFeature: 'Feature “{value}”', conditionQuery: 'Full-text “{value}”', conditionPlatform: 'OS / platform “{value}”', conditionCategory: 'Category “{value}”', conditionStatus: 'Update status “{value}”', conditionSupport: 'Feature support “{value}”', conditionDelivery: 'Delivery “{value}”', conditionOss: 'OSS “{value}”', conditionDead: 'Include ended / unreachable', conditionSaved: 'Bookmarked only', conditionNip: 'NIP “{value}”', conditionRemove: 'Remove {label}', detailKicker: 'Support evidence', supportFor: 'Support for {feature}', observer: 'Observer', nipPurpose: 'NIP purpose', state: 'Status', os: 'OS / platform', license: 'License', compareTitle: '{count}-way feature comparison', differencesFirst: 'Items that differ appear first.', removeCandidate: 'Remove {name} from comparison', removeShort: 'Remove', alternative: 'Another candidate', replaceTarget: 'Candidate to replace', addComparison: 'Add to comparison', replaceComparison: 'Replace selected candidate', needTwo: 'Choose at least two candidates to compare.', featuresSection: 'Features', basicsSection: 'Basic information', nipEvidence: 'NIP evidence', reviewTitle: 'Reviews for {name}', reviewCount: '{count} reviews', openGallery: 'Image gallery', reviewer: 'Reviewer', postedAt: 'Posted', use: 'Use', rating: 'Rating', appVersion: 'App version', notEntered: 'Not entered', helpful: 'Helpful {count}', unhelpful: 'Not helpful {count}', voters: '{count} voters · breakdown', writeReview: 'Add a review', body: 'Review', bodyPlaceholder: 'Where you used it and what you noticed', image: 'Image', chooseImage: 'Choose an image', deviceImage: 'Choose from device', osOptional: 'OS (optional)', versionOptional: 'Version (optional)', useOptional: 'Use (optional)', ratingOptional: 'Rating (optional)', createReview: 'Add review', chooseBodyOrImage: 'Choose text or an image.', addedReview: 'Review added', imageOnly: 'No text (image only)', profileTitle: 'Reviewer profile', joined: 'Joined', activity: 'Activity span', posting: 'Posting pattern', voteHistory: 'Review and vote history', history: 'Review history', galleryTitle: 'Review images for {name}', galleryEmpty: 'No images have been attached yet.', enlarge: 'Enlarge', originalReview: 'Original review', imageTitle: 'Review image', remainingGallery: 'Open gallery including {count} more', imageAlt: 'Review image by {author} on {date}', voteBreakdown: 'Vote breakdown', communityVotes: 'Community votes', helpfulVotes: 'Helpful', unhelpfulVotes: 'Not helpful', toastLiked: 'Like updated', toastBookmarked: 'Bookmark updated', toastVoted: 'Vote updated', toastPublic: 'Visibility updated', compareLimit: 'You can compare up to three', loading: 'Loading feature support…', emptyState: 'There are no candidates', errorState: 'Feature information could not be loaded', retry: 'Retry', partialState: 'Showing part of the candidate list.', offlineState: 'Showing saved candidates.', offlineBanner: 'Offline: showing saved candidates.', staleState: 'Showing records observed earlier; the current round could not be completed.', incompleteState: 'Some relay results did not complete, so this list is partial.', unavailableState: 'No displayable record was observed on the configured relays. That is not a claim that none exists.', sampleData: 'Sample', relayVerified: 'Relay-verified', relayEmptyTitle: 'No matching record', relayEmpty: 'No kind 30078 record carrying the queried topic was observed on the configured relays. That is not a claim that none exists.', relayDiagnostics: 'Relay diagnostics', relayNoData: 'Relay results could not be retrieved.', relayReload: 'Refetch from relays', relayRelays: 'Relays and coverage', relayCurators: 'Recommenders in your network', relayNoCuration: 'No kind 30267 set was observed', relayManualCurators: 'Manually counted pubkeys', relayCuratorSets: 'Sets', relayCuratorSetsValue: '{used} / {observed}', relayCuratorMembers: 'Members', relayGraph: 'Social graph', relayGraphState: 'State', relayGraphCoverage: 'Coverage', relayGraphFollows: 'Graph size |G|', relayGraphFollowsValue: '{used} of {total}', relayGraphMalformed: 'Malformed p tags', relayViewer: 'Viewer key', relayViewerSource: 'Key source', relayRounds: 'Rounds', relayChunks: 'Chunks', relayQuarantined: 'Quarantined', relayUnresolved: 'Recommended but unobserved coordinates', relaySlugs: 'Diagnostics', relayAsOf: 'As of', relayReqs: 'REQ counts', relayLogical: 'Logical REQs', relayPhysical: 'Physical REQs', relayHttp: 'HTTP attempts', relayCache: 'Cache hits', relayReason: 'Reason', discoveryScope: 'Records that published topic “{topics}” on your relays — not all tools.', recommendations: 'Recommended by {count} in your network', recommendationsUnknown: 'Recommendations: unknown (needs a follow list)', graphNoneBanner: 'Not personalised — recommendation counts need a follow list. Connect a Nostr key, or paste an npub to rank in read-only mode.', graphConnect: 'Connect a Nostr key (NIP-07)', graphPasteLabel: 'npub or hex', graphApply: 'Rank with this key', graphStateLine: 'Graph: {state} ({coverage} · {used} of {total} in your graph)', graphStateLineShort: 'Graph: {state} ({coverage})', graphStates: {none: 'none', 'self-only': 'self-only', tier1: 'tier1', 'tier1+tier2': 'tier1+tier2'}, graphCoverage: {fresh: 'fresh', stale: 'stale', incomplete: 'incomplete', truncated: 'truncated', unknown: 'unknown'}, coverage: {eose: 'Complete (EOSE)', timeout: 'Timeout', error: 'Error', 'auth-required': 'Auth required', rejected: 'Rejected', disconnected: 'Disconnected', skipped: 'Not issued'},
         features: {posts: ['Posts & replies', 'Read, write, and reply on a timeline', 'timeline post reply'], dm: ['DM', 'Send encrypted direct messages', 'encrypted DM direct message'], search: ['Search', 'Find posts, people, and identifiers', 'search person identifier'], media: ['Images & video', 'View and publish images or video', 'media image video'], notifications: ['Notifications', 'Notice replies, reactions, and zaps', 'notification reaction'], accounts: ['Multiple accounts', 'Switch between keys and profiles', 'multi account'], signing: ['External signing', 'Keep private keys separate from the app', 'remote signing'], wallet: ['Wallet & Zap', 'Use zaps and wallet connections', 'payment tip'], longform: ['Long-form', 'Write articles and longer content', 'article long form'], community: ['Channels', 'Talk and organize in communities', 'channel community']},
         reviewsSeed: {aBody: 'Readable across devices, and notification settings were easy to find.', bBody: 'The path from search results back to a profile was clear.', cBody: 'It was easy to follow the conversation alongside images.', aBio: 'Reviews client navigation and accessibility across several operating systems.', bBio: 'Records first-use and comparison findings.', aSpread: '28 months · 11 categories · Web/Desktop/Mobile', bSpread: '9 months · 6 categories · mostly Web', aPosts: '2–9 per month: short posts, images, and notes.', bPosts: '1–4 per month: comparisons and replies.', localName: 'You', localBio: 'Reviews added on this screen.', screenTimeline: 'Timeline', screenSettings: 'Settings', screenMedia: 'Media view'},
+        summaryAbsent: 'No summary published', freeTopic: 'A topic the record published; this client ships no label for it.',
+        recordState: 'Record state', recordStateFilter: 'Record state', recordStateHelp: 'A separate axis from project liveness.',
+        liveness: 'Project liveness', livenessDerived: 'Derived liveness: {value}',
+        livenessUncounted: 'No social graph, so none of the {count} recorded observations is counted.',
+        capabilityClaims: 'Capability claims', noClaimPublished: 'No capability claim published', noNipClaims: 'No NIP claims recorded',
+        claimFamilyCount: '{count} {family} claims', claimSource: 'Claim source', claimCaveats: 'Verbatim caveats from the source', caveat: 'Caveat',
+        basis: 'Claim basis', assertedAt: 'Claim fetched', notation: 'Source notation', sourceText: 'Verbatim source line',
+        registryStatus: 'Registry resolution', registryDeprecated: 'unrecommended in the registry',
+        notInRegistry: 'not in the pinned registry snapshot {revision}',
+        noRegistrySnapshot: 'no registry snapshot for family {family}',
+        primarySources: 'Primary sources', coordinate: 'Coordinate', noOfficialLinks: 'The primary sources state no link',
+        noReviewsObserved: 'No reviews observed', collectedData: 'From primary sources',
+        platformSourced: 'Matches only entries whose primary source states a platform.',
+        topicCorrection: 'Collected topics: {collected} —',
+        nonClaim: {modules: 'Modules named after NIPs (not a support claim)', crates: 'Crates named after NIPs (not a support claim)'},
         nipPurposes: {'01': 'Basic events, signatures, and client/relay messages', '02': 'Follow lists using kind 3', '05': 'Verification between DNS identifiers and public keys', '09': 'Event deletion requests using kind 5', '11': 'Relay information retrieved over HTTP', '19': 'bech32 identifiers such as npub and note', '21': 'Identifier links using the nostr: URI scheme', '23': 'Long-form content using kind 30023', '25': 'Reactions using kind 7', '42': 'Client authentication to relays', '44': 'Versioned encrypted payloads', '46': 'Remote signing with private keys kept separate', '47': 'Remote Lightning wallet connections', '57': 'Lightning payments using zap requests and receipts', '65': 'Read/write relay lists using kind 10002', '78': 'Storage for app-specific data'}
       }
     }

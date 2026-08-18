@@ -1,13 +1,22 @@
 (() => {
   'use strict';
 
-  const {tools, nipCatalog} = window.NOSMAPS_DATA;
+  const {tools, nipCatalog, seedTopics, registry, resultPrecedence} = window.NOSMAPS_DATA;
   const i18n = window.NOSMAPS_I18N;
   const icons = window.NOSMAPS_ICONS;
   const t = (key, variables) => i18n.t(key, variables);
   const iconSvg = name => icons.svg(name);
-  const categories = ['clients', 'relay', 'identity', 'media', 'analytics', 'dev'];
+  /* §21.6 R6: seven seed topics. Every other topic is a free lowercase string rendered verbatim as
+     itself -- never coerced into a seed term and never rendered as `unknown`. */
+  const categories = seedTopics;
+  const freeTopics = [...new Set(tools.flatMap(tool => tool.topics).filter(topic => !categories.includes(topic)))].sort();
+  const allTopics = [...categories, ...freeTopics];
+  /* §21.2 R2: the key is an opaque ASCII token, so `5A` and `7D` index exactly like `01`. */
   const nipByNumber = Object.fromEntries(nipCatalog.map(nip => [nip.number, nip]));
+  /* §21.7 R7: eight result values. `unknown` is deliberately absent from the precedence list -- it
+     is not a low rank, it is what is shown when no stated result exists (D7 / invariant I8). */
+  const RESULT_VALUES = [...resultPrecedence, 'unknown'];
+  const precedenceOf = result => { const index = resultPrecedence.indexOf(result); return index === -1 ? -1 : resultPrecedence.length - index; };
   const featureDefinitions = [
     ['posts', 'edit', ['01', '09', '25']], ['dm', 'mail', ['44']], ['search', 'search', ['01', '19', '21']], ['media', 'image', ['01', '19']],
     ['notifications', 'notifications', ['25', '57']], ['accounts', 'account', ['19', '46']], ['signing', 'key', ['46']], ['wallet', 'wallet', ['47', '57']],
@@ -20,26 +29,37 @@
   const relayRequested = params.get('relay') === '1';
   let relayState = null;
   const state = {
-    features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: 'all', delivery: 'all', oss: 'all',
-    includeDead: false, savedOnly: false, nipQuery: '', compare: [], likes: {}, bookmarks: {}, reviews: {}, reviewVotes: {}, reviewDrafts: {},
+    features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: 'all', oss: 'all',
+    savedOnly: false, nipQuery: '', compare: [], likes: {}, bookmarks: {}, reviews: {}, reviewVotes: {}, reviewDrafts: {},
     uiState: validStates.includes(requestedState) ? requestedState : 'normal'
   };
 
   const $ = selector => document.querySelector(selector);
   const esc = value => String(value).replace(/[&<>'"]/g, character => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'}[character]));
-  const category = id => i18n.value(`categories.${id}`);
+  /* A seed topic has a translated label and an icon; a free topic renders as itself, with the
+     generic topic icon, and is never reported as a missing translation key. */
+  const isSeedTopic = id => categories.includes(id);
+  const category = id => isSeedTopic(id) ? i18n.value(`categories.${id}`) : {name: id, icon: 'tag', description: t('explorer.freeTopic')};
+  const primaryTopic = tool => (tool.topics || []).find(isSeedTopic) || (tool.topics || [])[0] || null;
+  const topicLabel = id => category(id).name;
   const localizedFeature = (id, language = i18n.language) => {
     const values = i18n.value(`explorer.features.${id}`, language);
     return {...featureById[id], name: values[0], scene: values[1], aliases: values[2]};
   };
   const featureList = language => featureDefinitions.map(feature => localizedFeature(feature.id, language));
-  const toolDescription = (tool, language = i18n.language) => i18n.value(`categories.${tool.category}.description`, language);
+  /* §21.5 R5: `""` is the normative absent form for `summary`, and it renders as an explicit
+     "no summary published", never as a blank line that reads like a missing row. */
+  const toolDescription = (tool, language = i18n.language) => tool.summaryAbsent ? i18n.t('explorer.summaryAbsent', undefined, language) : tool.summary;
   const metadataValues = value => value == null ? [] : Array.isArray(value) ? value.flatMap(metadataValues) : typeof value === 'object' ? Object.values(value).flatMap(metadataValues) : [String(value)];
-  const displayLicense = tool => /^(MIT|AGPL)/.test(tool.license) ? tool.license : t('unknown');
-  const isOss = tool => /^(MIT|AGPL)/.test(tool.license);
-  const delivery = tool => tool.platform === 'Web' ? 'web' : tool.platform === 'Mobile' ? 'mobile' : 'installed';
-  const deliveryLabel = value => ({web: t('explorer.webApp'), mobile: t('explorer.mobileApp'), installed: t('explorer.installed')}[value]);
+  /* The licence is whatever GitHub's own detection reported for the project. `NOASSERTION` and
+     "reports none" are not "not open source": they are the absence of a machine-readable licence,
+     so ossState has three values and the filter never turns an absence into a negative. */
+  const SPDX_OSS = /^(MIT|AGPL|GPL|LGPL|Apache|BSD|MPL|Unlicense|ISC|CC0)/i;
+  const displayLicense = tool => tool.license || t('unknown');
+  const ossState = tool => !tool.license ? 'unknown' : SPDX_OSS.test(tool.license) ? 'yes' : 'unknown';
+  const isOss = tool => ossState(tool) === 'yes';
   const statusLabel = status => t(`support.${status}`);
+  const registryStatusLabel = status => t(`registryStatus.${status}`);
   const els = {
     query: $('#feature-query'), chips: $('#feature-chips'), results: $('#tool-results'), resultCount: $('#result-count'), selected: $('#selected-feature-summary'),
     condition: $('#condition-summary'), activeFilterCount: $('#active-filter-count'), uiState: $('#ui-state-view'), offline: $('#offline-banner'),
@@ -59,44 +79,81 @@
   }
 
   function featureName(id) { return localizedFeature(id).name; }
-  function supportRecords(tool, feature) { return feature.nips.map(number => tool.nips.find(record => record.nip === number)).filter(Boolean); }
+  /* §21.10 item 3: the old form mapped each feature NIP through `tool.nips.find` and then dropped
+     every miss with `.filter(Boolean)`, so a claim against an id the registry does not hold vanished
+     from the screen. Selecting from the tool's own capabilities instead means a claim is matched by
+     its opaque id and is never dropped -- its resolution status is carried alongside it. */
+  function capabilitiesOf(tool) { return tool.capabilities || []; }
+  function supportRecords(tool, feature) { return capabilitiesOf(tool).filter(record => record.family === registry.family && feature.nips.includes(record.id)); }
+  /* §21.3 R3 case 1: claims exist but none in the requested family. That is a third answer, distinct
+     from "supported" and from "no claim at all", and it must never read as supporting nothing. */
+  function outOfFamily(tool) { return !capabilitiesOf(tool).some(record => record.family === registry.family) && capabilitiesOf(tool).length > 0; }
   function featureSupportRecord(tool, feature) {
-    const records = supportRecords(tool, feature);
+    const records = supportRecords(tool, feature).filter(record => precedenceOf(record.result) > 0);
     if (!records.length) return null;
-    const rank = {implemented: 4, partial: 3, planned: 2, unknown: 1};
-    return records.reduce((best, record) => rank[record.status] > rank[best.status] ? record : best);
+    return records.reduce((best, record) => precedenceOf(record.result) > precedenceOf(best.result) ? record : best);
   }
-  function featureSupport(tool, feature) { return featureSupportRecord(tool, feature)?.status || null; }
+  /* §21.3 R3 case 2 / the brief: no claim at all is `unknown`, never "not supported" and never an
+     empty checklist that reads as a set of negatives. It is a value, so it always has a badge. */
+  function featureSupport(tool, feature) {
+    const record = featureSupportRecord(tool, feature);
+    if (record) return record.result;
+    return outOfFamily(tool) ? 'out_of_family' : 'unknown';
+  }
+  function claimSummary(tool) {
+    const byFamily = {};
+    for (const record of capabilitiesOf(tool)) byFamily[record.family] = (byFamily[record.family] || 0) + 1;
+    return {total: capabilitiesOf(tool).length, byFamily};
+  }
   function selectedFeatures(source = state) { return source.features.map(id => localizedFeature(id)).filter(Boolean); }
-  function observerLabel(value) { return value.includes('community') ? t('observers.community') : value.includes('maintainer') ? t('observers.maintainer') : t('observers.crawler'); }
+  /* §21.1 R1: a transcribed claim is the signer's claim, never "the project says". The basis is
+     what makes the same kind carry a transcription and a test run without either impersonating the
+     other, so it is named in the row rather than flattened into an observer label. */
+  function basisLabel(value) { return t(`basis.${value || 'transcribed'}`); }
   function evidenceText(status) { return t(`evidence.${status}`); }
-  function nipPurpose(number) { return t(`explorer.nipPurposes.${number}`); }
+  /* nipCatalog is the pinned registry snapshot (§19.1), which supplies a title for every id it
+     holds; the hand-written Japanese purpose exists only for the ids the feature chips use. Falling
+     back to the snapshot title is a choice between two present values, not a missing key. */
+  function nipPurpose(number) {
+    if (i18n.has(`explorer.nipPurposes.${number}`)) return t(`explorer.nipPurposes.${number}`);
+    return nipByNumber[number] ? nipByNumber[number].title : t('unknown');
+  }
 
   function toolMatchesQuery(tool, source = state) {
     const query = source.query.trim().toLowerCase();
     if (!query) return true;
     const featureTerms = ['ja', 'en'].flatMap(language => featureList(language).filter(feature => featureSupport(tool, feature)).flatMap(feature => [feature.name, feature.scene, feature.aliases]));
-    const categoryTerms = ['ja', 'en'].flatMap(language => [i18n.value(`categories.${tool.category}.name`, language), toolDescription(tool, language)]);
-    const deliveryTerms = ['ja', 'en'].map(language => i18n.t(`explorer.${{web: 'webApp', mobile: 'mobileApp', installed: 'installed'}[delivery(tool)]}`, undefined, language));
-    const nipTerms = tool.nips.flatMap(record => { const nip = nipByNumber[record.nip]; return [`NIP-${record.nip}`, `NIP ${record.nip}`, record.nip, nip?.title || '', nip?.purpose || '']; });
-    const terms = [tool.name, tool.platform, ...(tool.os || []), ...deliveryTerms, displayLicense(tool), isOss(tool) ? 'OSS open source オープンソース' : '',
-      ...metadataValues(tool.description), ...metadataValues(tool.tags), ...metadataValues(tool.summary), ...metadataValues(tool.aliases), ...metadataValues(tool.purposes), ...metadataValues(tool.categoryLabel),
-      ...categoryTerms, ...featureTerms, ...nipTerms];
+    const topicTerms = (tool.topics || []).flatMap(topic => isSeedTopic(topic)
+      ? ['ja', 'en'].flatMap(language => [i18n.value(`categories.${topic}.name`, language), i18n.value(`categories.${topic}.description`, language)])
+      : [topic]);
+    /* The claimed id, the family-qualified key, and the registry title the id resolves to are all
+       searchable; an unresolved id is searchable by the id itself, which is all the source gave. */
+    const nipTerms = capabilitiesOf(tool).flatMap(record => {
+      const nip = record.family === registry.family ? nipByNumber[record.id] : null;
+      return [record.key, `${record.family.toUpperCase()}-${record.id}`, `${record.family.toUpperCase()} ${record.id}`, record.id, record.registryTitle || '', nip?.title || '', record.sourceText || ''];
+    });
+    const terms = [tool.name, tool.id, tool.platformText || '', displayLicense(tool), isOss(tool) ? 'OSS open source オープンソース' : '',
+      ...metadataValues(tool.summary), ...metadataValues(tool.homepage), ...metadataValues(tool.sourceRepo), ...metadataValues(tool.distribution),
+      ...topicTerms, ...featureTerms, ...nipTerms];
     return terms.join(' ').toLowerCase().includes(query);
   }
 
   function filteredTools(overrides = {}) {
     const source = {...state, ...overrides};
     const selected = source.features.map(id => featureById[id]).filter(Boolean);
-    const nipQuery = source.nipQuery.trim().toLowerCase().replace(/^nip[- ]?/, '');
+    const nipQuery = source.nipQuery.trim().toLowerCase().replace(/^(nip|bud|lud)[- ]?/, '');
     return tools.filter(tool => {
       const supports = selected.map(feature => featureSupport(tool, feature));
-      const relevant = selected.length ? selected.flatMap(feature => supportRecords(tool, feature)) : tool.nips;
-      const nipMatch = !nipQuery || relevant.some(record => { const nip = nipByNumber[record.nip]; return `${record.nip} NIP-${record.nip} ${nip?.title || ''} ${nip?.purpose || ''}`.toLowerCase().includes(nipQuery); });
-      return supports.every(Boolean) && toolMatchesQuery(tool, source) && (source.includeDead || tool.status !== 'dead') && (!source.savedOnly || Boolean(source.bookmarks[tool.id])) &&
-        (source.platform === 'all' || tool.platform === source.platform || (tool.os || []).includes(source.platform)) && (source.category === 'all' || tool.category === source.category) &&
-        (source.toolStatus === 'all' || tool.status === source.toolStatus) && (source.support === 'all' || (supports.length && supports.every(value => value === source.support))) &&
-        (source.delivery === 'all' || delivery(tool) === source.delivery) && (source.oss === 'all' || (source.oss === 'yes' ? isOss(tool) : !isOss(tool))) && nipMatch;
+      const relevant = selected.length ? selected.flatMap(feature => supportRecords(tool, feature)) : capabilitiesOf(tool);
+      const nipMatch = !nipQuery || relevant.some(record => `${record.id} ${record.key} ${record.registryTitle || ''}`.toLowerCase().includes(nipQuery));
+      /* §21.4 invariant I9: nothing about liveness removes a row. There is no dead filter, because
+         `dead` is only derivable from a counted 30370 observation and this build counts none. */
+      return toolMatchesQuery(tool, source) && (!source.savedOnly || Boolean(source.bookmarks[tool.id])) &&
+        (source.platform === 'all' || String(tool.platformText || '').toLowerCase().includes(source.platform.toLowerCase())) &&
+        (source.category === 'all' || (tool.topics || []).includes(source.category)) &&
+        (source.toolStatus === 'all' || tool.recordState === source.toolStatus) &&
+        (source.support === 'all' || (supports.length && supports.every(value => value === source.support))) &&
+        (source.oss === 'all' || ossState(tool) === source.oss) && nipMatch;
     });
   }
 
@@ -132,23 +189,32 @@
   }
   function renderFilterPanel() {
     const wasOpen = els.filterDetails.open;
-    $('#feature-filter-grid').innerHTML = `<label class="field">${esc(t('explorer.platform'))}<select id="platform-filter">${option('all', t('all'), state.platform)}${['Web', 'Desktop', 'Mobile', 'Android', 'iOS'].map(value => option(value, value, state.platform)).join('')}</select></label>
-      <fieldset class="category-filter"><legend>${esc(t('explorer.categoryGroup'))}</legend><div class="category-icon-group" role="group" aria-label="${esc(t('explorer.categoryGroup'))}">${categoryFilterButton('all', 'apps', t('all'), t('explorer.allCategoriesDescription'))}${categories.map(id => { const item = category(id); return categoryFilterButton(id, item.icon, item.name, item.description); }).join('')}</div></fieldset>
-      <label class="field">${esc(t('explorer.updateStatus'))}<select id="tool-status-filter">${option('all', t('explorer.activeStatus'), state.toolStatus)}${['active', 'stale', 'unknown'].map(value => option(value, t(`statuses.${value}`), state.toolStatus)).join('')}</select></label>
-      <label class="field">${esc(t('explorer.support'))}<select id="support-filter" aria-describedby="support-filter-help" ${state.features.length ? '' : 'disabled'}>${option('all', t('all'), state.support)}${['implemented', 'partial', 'planned', 'unknown'].map(value => option(value, statusLabel(value), state.support)).join('')}</select><small id="support-filter-help" class="filter-prerequisite">${esc(t('explorer.featureNeeded'))}</small></label>
-      <label class="field">${esc(t('explorer.delivery'))}<select id="delivery-filter">${option('all', t('all'), state.delivery)}${['web', 'installed', 'mobile'].map(value => option(value, deliveryLabel(value), state.delivery)).join('')}</select></label>
+    $('#feature-filter-grid').innerHTML = `<label class="field">${esc(t('explorer.platform'))}<select id="platform-filter">${option('all', t('all'), state.platform)}${['Android', 'iOS', 'macOS'].map(value => option(value, value, state.platform)).join('')}</select><small class="filter-prerequisite">${esc(t('explorer.platformSourced'))}</small></label>
+      <fieldset class="category-filter"><legend>${esc(t('explorer.categoryGroup'))}</legend><div class="category-icon-group" role="group" aria-label="${esc(t('explorer.categoryGroup'))}">${categoryFilterButton('all', 'apps', t('all'), t('explorer.allCategoriesDescription'))}${allTopics.map(id => { const item = category(id); return categoryFilterButton(id, item.icon, item.name, item.description); }).join('')}</div></fieldset>
+      <label class="field">${esc(t('explorer.recordStateFilter'))}<select id="tool-status-filter">${option('all', t('all'), state.toolStatus)}${['active', 'withdrawn'].map(value => option(value, t(`recordStates.${value}`), state.toolStatus)).join('')}</select><small class="filter-prerequisite">${esc(t('explorer.recordStateHelp'))}</small></label>
+      <label class="field">${esc(t('explorer.support'))}<select id="support-filter" aria-describedby="support-filter-help" ${state.features.length ? '' : 'disabled'}>${option('all', t('all'), state.support)}${RESULT_VALUES.concat(['out_of_family']).map(value => option(value, statusLabel(value), state.support)).join('')}</select><small id="support-filter-help" class="filter-prerequisite">${esc(t('explorer.featureNeeded'))}</small></label>
       <label class="field">${esc(t('explorer.oss'))}<select id="oss-filter">${option('all', t('all'), state.oss)}${option('yes', 'OSS', state.oss)}${option('unknown', t('unknown'), state.oss)}</select></label>
-      <label class="include-dead"><input id="include-dead" type="checkbox" ${state.includeDead ? 'checked' : ''}> ${esc(t('explorer.includeDead'))}</label><label class="include-dead"><input id="saved-only" type="checkbox" ${state.savedOnly ? 'checked' : ''}> ${esc(t('explorer.savedOnly'))}</label>
+      <label class="include-dead"><input id="saved-only" type="checkbox" ${state.savedOnly ? 'checked' : ''}> ${esc(t('explorer.savedOnly'))}</label>
       <label class="field advanced-nip">${esc(t('explorer.nipSearch'))}<input id="nip-query" type="search" value="${esc(state.nipQuery)}" placeholder="46 / remote signing"></label>
       <div class="filter-help"><details><summary>${esc(t('explorer.unknownInfo'))}</summary><p>${esc(t('explorer.unknownHelp'))}</p></details><button class="text-button" type="button" data-reset-all>${esc(t('reset'))}</button></div>`;
     els.filterDetails.open = wasOpen;
   }
 
   function supportBadge(status) { return `<span class="support-badge ${status}">${esc(statusLabel(status))}</span>`; }
+  /* 一次情報が持っていないリンク種別のボタンは出さない。存在しない URL を生成するのは捏造で、
+     ボタンだけ出して「不明」を見せるのは、あるはずの物が壊れているように読める。 */
+  function resourceTypes(tool) {
+    const types = [];
+    if (tool.homepage) types.push('site');
+    if (tool.distribution) types.push('distribution');
+    if (tool.sourceRepo) types.push('source');
+    if (tool.provenance === 'sample') return ['site', 'distribution', 'docs', ...(isOss(tool) ? ['source'] : [])];
+    return types;
+  }
   function resourceLinks(tool) {
-    const links = [['site', t('explorer.site')], ['distribution', t('explorer.distribution')], ['docs', t('explorer.docs')]];
-    if (isOss(tool)) links.push(['source', t('explorer.source')]);
-    return links.map(([type, label]) => `<button class="resource-link" type="button" data-resource-tool="${tool.id}" data-resource-type="${type}">${esc(label)}</button>`).join('');
+    const types = resourceTypes(tool);
+    if (!types.length) return `<span class="no-support-record">${esc(t('explorer.noOfficialLinks'))}</span>`;
+    return types.map(type => `<button class="resource-link" type="button" data-resource-tool="${tool.id}" data-resource-type="${type}">${esc(t(`explorer.${type}`))}</button>`).join('');
   }
 
   const profiles = {
@@ -168,12 +234,12 @@
     const labels = [seed.screenTimeline, seed.screenSettings, seed.screenMedia, seed.screenTimeline];
     return bodies.map((body, index) => ({
       id: `${tool.id}-r${index + 1}`, profile: index % 2 ? 'b' : 'a', author: index % 2 ? profiles.b.name : profiles.a.name,
-      date: `2026-08-${String(12 - index).padStart(2, '0')}`, body, os: index % 2 ? 'Web' : 'Android', version: `2.${index + 1}`, use: category(tool.category).name,
+      date: `2026-08-${String(12 - index).padStart(2, '0')}`, body, os: index % 2 ? 'Web' : 'Android', version: `2.${index + 1}`, use: topicLabel(primaryTopic(tool) || 'clients'),
       rating: index === 1 ? 4 : 5, helpful: 7 + index * 2, unhelpful: index % 2, image: {label: labels[index], src: imageData(labels[index], shotPalette[index])}
     }));
   }
-  // リレー由来のエントリはレビューを観測していないので、data.js 前提の seed を混ぜない。
-  function allReviews(tool) { if (!tool) return []; return [...(tool.provenance === 'relay' ? [] : seedReviews(tool)), ...(state.reviews[tool.id] || [])]; }
+  // レビューは観測していない。実在のプロジェクトに架空のレビュー・npub・スクリーンショットを付けるのは捏造なので、seed はサンプル入口専用に閉じる。
+  function allReviews(tool) { if (!tool) return []; return [...(tool.provenance === 'sample' ? seedReviews(tool) : []), ...(state.reviews[tool.id] || [])]; }
   function reviewCounts(review) {
     const vote = state.reviewVotes[review.id];
     return {helpful: review.helpful + (vote === 'helpful' ? 1 : 0), unhelpful: review.unhelpful + (vote === 'unhelpful' ? 1 : 0), vote};
@@ -193,22 +259,37 @@
     return `<div class="card-review-thumbnails" aria-label="${esc(t('explorer.openGallery'))}">${shown.map(review => { const label = t('explorer.imageAlt', {author: review.author, date: review.date}); return `<button type="button" class="card-review-thumbnail" data-open-image="${tool.id}" data-image-review="${review.id}" aria-label="${esc(label)}" title="${esc(label)}">${screenshotMarkup(review.image, true, '')}</button>`; }).join('')}${remaining ? `<button type="button" class="card-review-more" data-gallery-tool="${tool.id}" aria-label="${esc(t('explorer.remainingGallery', {count: remaining}))}" title="${esc(t('explorer.openGallery'))}">+${remaining}</button>` : ''}</div>`;
   }
 
-  // data.js の id は tool-<n> で、いいね数はその連番から作るサンプル値。リレー由来の id からは数を作らず、観測がないことを null で返す。
-  function likeCount(tool) { if (relayEntry(tool)) return null; const serial = Number(String(tool.id).replace('tool-', '')); return 12 + (Number.isFinite(serial) ? serial * 3 : 0) + (state.likes[tool.id] ? 1 : 0); }
+  // いいね数はサンプル用の連番由来の値。一次情報から収集した実エントリでは観測がないので null を返し、数を作らない。
+  function likeCount(tool) { if (tool.provenance !== 'sample') return null; const serial = Number(String(tool.id).replace('tool-', '')); return 12 + (Number.isFinite(serial) ? serial * 3 : 0) + (state.likes[tool.id] ? 1 : 0); }
   // 観測値がないときは比較ダイアログと同じ「—（不明）」マーカーで出す。数字を捏造しない。
   function likeCountMarkup(tool) { const count = likeCount(tool); return count === null ? `<span class="no-support-record" aria-label="${esc(t('unknown'))}" title="${esc(t('unknown'))}">—</span>` : String(count); }
+  // 由来は3つある: リレーで検証したレコード、一次情報から収集したエントリ、サンプル。取り違えると出所を偽ることになるので分けて出す。
   function provenanceBadge(tool) {
-    const verified = tool && tool.provenance === 'relay';
-    return `<span class="provenance-badge ${verified ? 'relay' : 'sample'}">${esc(t(verified ? 'explorer.relayVerified' : 'explorer.sampleData'))}</span>`;
+    const kind = tool && tool.provenance === 'relay' ? 'relay' : tool && tool.provenance === 'collected' ? 'collected' : 'sample';
+    const label = {relay: 'explorer.relayVerified', collected: 'explorer.collectedData', sample: 'explorer.sampleData'}[kind];
+    return `<span class="provenance-badge ${kind}">${esc(t(label))}</span>`;
   }
   const unknownMarker = () => `<span class="no-support-record" aria-label="${esc(t('unknown'))}" title="${esc(t('unknown'))}">—</span>`;
-  // 観測していない欄は data.js 由来の語彙で埋めず、既存の「不明」語彙で出す。
-  function categoryText(tool) { return relayEntry(tool) && !tool.categoryObserved ? t('unknown') : category(tool.category).name; }
-  function osText(tool) { const list = (tool.os || []).filter(Boolean); if (list.length) return list.join(' / '); return tool.platform || t('unknown'); }
-  function platformTags(tool) {
-    // 30078 は OS / 配布形態を観測しない。data.js サンプルだけが実データを持つ。
-    if (relayEntry(tool) && !(tool.os || []).length && !tool.platform) return `<span class="tag">${esc(t('explorer.os'))}: ${esc(t('unknown'))}</span>`;
-    return `<span class="tag">${esc(tool.platform)}</span><span class="tag">${esc((tool.os || []).filter(value => value !== tool.platform).join(' / ') || deliveryLabel(delivery(tool)))}</span>`;
+  // §21.6: トピックは集合。単一値に畳むと Nostrcheck server の3件も Ditto の2件も round-trip しない。
+  // seed に無いトピックはそのまま出す。ラベルが無いことは「未分類」ではない。
+  function topicsText(tool) { const list = tool.topics || []; return list.length ? list.map(topicLabel).join(' / ') : t('unknown'); }
+  function categoryText(tool) { return topicsText(tool); }
+  function topicTags(tool) {
+    const list = tool.topics || [];
+    if (!list.length) return `<span class="tag">${esc(t('explorer.category'))}: ${esc(t('unknown'))}</span>`;
+    return list.map(topic => `<span class="tag topic-tag${isSeedTopic(topic) ? '' : ' free-topic'}" data-topic="${esc(topic)}">${esc(topicLabel(topic))}</span>`).join('');
+  }
+  // v1 profile には OS 欄が無い。一次情報が明言した分だけ逐語で出し、それ以外は不明のまま。
+  function osText(tool) { return tool.platformText || t('unknown'); }
+  function platformTags(tool) { return `<span class="tag">${esc(t('explorer.os'))}: ${esc(osText(tool))}</span>`; }
+  /* §21.4 R4: 記録の状態 (`state`) と プロジェクトの生存 (liveness) は別の軸。liveness は
+     30370 の観測で、ビューアの G に居る署名者の分だけ数える。グラフが無いこのビルドでは
+     どの観測も数えないので、導出値は常に unknown。観測そのものは消さずに併記する。 */
+  function livenessValue() { return 'unknown'; }
+  function livenessMarkup(tool) {
+    const observations = tool.liveness || [];
+    const rows = observations.map(item => `<li><span class="liveness-result ${esc(item.result)}">${esc(t(`liveness.${item.result}`))}</span> <code>${esc(item.subject)}</code> <small>${esc(item.detail)}</small>${item.target ? ` <small>→ ${esc(item.target)}</small>` : ''} <small>${esc(item.observedAt)}</small></li>`).join('');
+    return `<div class="liveness-block"><p class="liveness-derived" data-liveness="${esc(livenessValue())}">${esc(t('explorer.livenessDerived', {value: t(`liveness.${livenessValue()}`)}))} ${unknownMarker()}</p>${observations.length ? `<p class="liveness-why">${esc(t('explorer.livenessUncounted', {count: observations.length}))}</p><ul class="liveness-list">${rows}</ul>` : ''}</div>`;
   }
   // §6.4: 推薦数はビューアのフォローグラフから数えた「distinct pubkey 数」。
   // グラフが無いときは unknown で、0 とは別の見た目にし、並び順にも 0 として入れない (I8)。
@@ -220,27 +301,43 @@
     }
     return `<p class="recommendation-count" data-recommendations="${esc(String(count))}">${esc(t('explorer.recommendations', {count}))}</p>`;
   }
+  /* §21.2.3 / §21.10 item 3: a claim carries the id the source wrote and the status it resolves to
+     against the pinned snapshot. `not_in_registry` and `unresolvable` are rendered verbatim with the
+     reason -- never dropped, never silently remapped to a successor NIP. */
+  function capabilityChip(tool, record) {
+    const status = record.registryStatus;
+    const title = record.registryTitle || (status === 'not_in_registry' ? t('explorer.notInRegistry', {revision: registry.revision.slice(0, 7)}) : t('explorer.noRegistrySnapshot', {family: record.family}));
+    const label = `${record.family.toUpperCase()}-${record.id}${record.scope ? `@${record.scope}` : ''}${record.sub ? `/${record.sub}` : ''}`;
+    return `<button type="button" class="nip-tag-button registry-${esc(status)}" data-evidence-tool="${esc(tool.id)}" data-evidence-nip="${esc(record.key)}" title="${esc(`${label} — ${title}`)}">${esc(label)} · ${esc(statusLabel(record.result))}${status === 'resolved' ? '' : ` <span class="registry-flag">${esc(registryStatusLabel(status))}</span>`}</button>`;
+  }
+  /* §21.3 R3 の三分岐をそのまま出す。1) 別ファミリの主張がある 2) 主張が一つも無い
+     3) 主張が「対応しない」と言っている — 3 は 2 より強い言明であって、弱い言明ではない。 */
+  function claimSummaryMarkup(tool) {
+    const summary = claimSummary(tool);
+    if (!summary.total) return `<p class="claim-summary is-unknown" data-claim-summary="none">${esc(t('explorer.noClaimPublished'))} ${unknownMarker()}</p>`;
+    const families = Object.entries(summary.byFamily).map(([family, count]) => t('explorer.claimFamilyCount', {family: family.toUpperCase(), count})).join(' · ');
+    const outOf = outOfFamily(tool) ? ` <span class="out-of-family">${esc(t('explorer.noNipClaims'))}</span>` : '';
+    return `<p class="claim-summary" data-claim-summary="${esc(String(summary.total))}" data-claim-families="${esc(Object.keys(summary.byFamily).join(','))}">${esc(families)}${outOf}</p>`;
+  }
   function featureCard(tool) {
     const selected = state.features.map(id => localizedFeature(id));
     const supports = selected.map(feature => ({feature, support: featureSupport(tool, feature)}));
-    const records = [...new Map(selected.flatMap(feature => supportRecords(tool, feature)).map(record => [record.nip, record])).values()];
+    const records = [...new Map(selected.flatMap(feature => supportRecords(tool, feature)).map(record => [record.key, record])).values()];
     const bookmark = state.bookmarks[tool.id];
-    return `<article class="feature-tool-card ${tool.status === 'dead' ? 'dead-tool' : ''}" data-tool-id="${tool.id}"><div class="nip-card-top"><span class="tool-icon" aria-hidden="true">${iconSvg(category(tool.category).icon)}</span><span class="card-top-meta">${provenanceBadge(tool)}<span class="status ${tool.status}">${esc(t(`statuses.${tool.status}`))}</span></span></div><h2>${esc(tool.name)}</h2><p>${esc(toolDescription(tool))}</p>
-      <section class="card-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><div class="support-line">${supports.length ? supports.map(item => `<span class="feature-support-summary">${esc(item.feature.name)} ${supportBadge(item.support)}</span>`).join('') : `<span class="tag">${esc(t('explorer.noFeatureCondition'))}</span>`}${platformTags(tool)}</div><dl class="tool-facts"><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(categoryText(tool))}</dd></div><div><dt>OSS</dt><dd>${esc(displayLicense(tool))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool).split(' ')[0])}</dd></div></dl><nav class="resource-links" aria-label="${esc(t('explorer.officialLinks', {name: tool.name}))}">${resourceLinks(tool)}</nav>${records.length ? `<div class="basis-nips">${records.map(record => `<button type="button" class="nip-tag-button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}">NIP-${record.nip} · ${esc(statusLabel(record.status))}</button>`).join('')}</div>` : ''}</section>
-      <section class="card-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${recommendationMarkup(tool)}${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${tool.id}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCountMarkup(tool)}</button><button type="button" data-bookmark-tool="${tool.id}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${tool.id}">${esc(t('explorer.reviews', {count: allReviews(tool).length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${tool.id}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}</section>
-      ${tool.status === 'dead' ? `<p class="replacement-note">${esc(t('explorer.endedRecord'))} <button type="button" class="text-button" data-find-alternative>${esc(t('explorer.alternatives'))}</button></p>` : ''}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${tool.id}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${tool.id}">${esc(t('explorer.details'))}</button></div></article>`;
+    return `<article class="feature-tool-card" data-tool-id="${esc(tool.id)}" data-record-state="${esc(tool.recordState)}"><div class="nip-card-top"><span class="tool-icon" aria-hidden="true">${iconSvg(category(primaryTopic(tool) || 'clients').icon)}</span><span class="card-top-meta">${provenanceBadge(tool)}<span class="record-state ${esc(tool.recordState)}">${esc(t(`recordStates.${tool.recordState}`))}</span></span></div><h2>${esc(tool.name)}</h2><p class="tool-summary${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(toolDescription(tool))}</p>
+      <section class="card-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><div class="support-line">${supports.length ? supports.map(item => `<span class="feature-support-summary">${esc(item.feature.name)} ${supportBadge(item.support)}</span>`).join('') : `<span class="tag">${esc(t('explorer.noFeatureCondition'))}</span>`}${topicTags(tool)}${platformTags(tool)}</div><dl class="tool-facts"><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(categoryText(tool))}</dd></div><div><dt>OSS</dt><dd>${esc(displayLicense(tool))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool))}</dd></div></dl>${claimSummaryMarkup(tool)}${livenessMarkup(tool)}<nav class="resource-links" aria-label="${esc(t('explorer.officialLinks', {name: tool.name}))}">${resourceLinks(tool)}</nav>${records.length ? `<div class="basis-nips">${records.map(record => capabilityChip(tool, record)).join('')}</div>` : ''}</section>
+      <section class="card-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${recommendationMarkup(tool)}${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${esc(tool.id)}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCountMarkup(tool)}</button><button type="button" data-bookmark-tool="${esc(tool.id)}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${esc(tool.id)}">${esc(t('explorer.reviews', {count: allReviews(tool).length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${esc(tool.id)}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}</section>
+      <div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${esc(tool.id)}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${esc(tool.id)}">${esc(t('explorer.details'))}</button></div></article>`;
   }
 
   function activeConditions() {
     const conditions = state.features.map(id => ({key: `feature:${id}`, label: t('explorer.conditionFeature', {value: featureName(id)}), overrides: {features: state.features.filter(value => value !== id)}}));
     if (state.query) conditions.push({key: 'query', label: t('explorer.conditionQuery', {value: state.query}), overrides: {query: ''}});
     if (state.platform !== 'all') conditions.push({key: 'platform', label: t('explorer.conditionPlatform', {value: state.platform}), overrides: {platform: 'all'}});
-    if (state.category !== 'all') conditions.push({key: 'category', label: t('explorer.conditionCategory', {value: category(state.category).name}), overrides: {category: 'all'}});
-    if (state.toolStatus !== 'all') conditions.push({key: 'toolStatus', label: t('explorer.conditionStatus', {value: t(`statuses.${state.toolStatus}`)}), overrides: {toolStatus: 'all'}});
+    if (state.category !== 'all') conditions.push({key: 'category', label: t('explorer.conditionCategory', {value: topicLabel(state.category)}), overrides: {category: 'all'}});
+    if (state.toolStatus !== 'all') conditions.push({key: 'toolStatus', label: t('explorer.conditionStatus', {value: t(`recordStates.${state.toolStatus}`)}), overrides: {toolStatus: 'all'}});
     if (state.support !== 'all') conditions.push({key: 'support', label: t('explorer.conditionSupport', {value: statusLabel(state.support)}), overrides: {support: 'all'}});
-    if (state.delivery !== 'all') conditions.push({key: 'delivery', label: t('explorer.conditionDelivery', {value: deliveryLabel(state.delivery)}), overrides: {delivery: 'all'}});
     if (state.oss !== 'all') conditions.push({key: 'oss', label: t('explorer.conditionOss', {value: state.oss === 'yes' ? 'OSS' : t('unknown')}), overrides: {oss: 'all'}});
-    if (state.includeDead) conditions.push({key: 'includeDead', label: t('explorer.conditionDead'), overrides: {includeDead: false}});
     if (state.savedOnly) conditions.push({key: 'savedOnly', label: t('explorer.conditionSaved'), overrides: {savedOnly: false}});
     if (state.nipQuery) conditions.push({key: 'nipQuery', label: t('explorer.conditionNip', {value: state.nipQuery}), overrides: {nipQuery: ''}});
     return conditions;
@@ -256,9 +353,10 @@
 
   function renderNips() {
     const numbers = [...new Set(state.features.flatMap(id => featureById[id].nips))];
-    const list = numbers.map(number => nipByNumber[number]).filter(Boolean);
+    // 参照カードも .filter(Boolean) で落とさない。スナップショットに無い id は理由付きで出す。
+    const list = numbers.map(number => nipByNumber[number] || {number, title: null, source: null});
     els.nipCount.textContent = `${list.length} NIPs`;
-    els.nipList.innerHTML = list.length ? list.map(nip => `<article class="nip-reference-card" id="nip-${nip.number}"><strong>NIP-${nip.number}</strong><h3>${esc(nip.title)}</h3><p>${esc(nipPurpose(nip.number))}</p><a href="${nip.source}" target="_blank" rel="noreferrer">${esc(t('explorer.primarySource'))}</a></article>`).join('') : `<p class="feature-chip-empty">${esc(t('explorer.chooseForNips'))}</p>`;
+    els.nipList.innerHTML = list.length ? list.map(nip => `<article class="nip-reference-card" id="nip-${esc(nip.number)}" data-registry-status="${nip.title ? 'resolved' : 'not_in_registry'}"><strong>NIP-${esc(nip.number)}</strong><h3>${esc(nip.title || t('explorer.notInRegistry', {revision: registry.revision.slice(0, 7)}))}</h3><p>${esc(nipPurpose(nip.number))}</p>${nip.source ? `<a href="${nip.source}" target="_blank" rel="noreferrer">${esc(t('explorer.primarySource'))}</a>` : ''}</article>`).join('') : `<p class="feature-chip-empty">${esc(t('explorer.chooseForNips'))}</p>`;
   }
 
   function renderCompareActions() {
@@ -455,36 +553,62 @@
   }
   function dialogHead(kicker, title) { return `<div class="dialog-head"><div><div class="dialog-kicker">${esc(kicker)}</div><h2>${esc(title)}</h2></div><div class="dialog-tools">${languageControl(true)}<button class="icon-btn" type="button" data-close-dialog aria-label="${esc(t('close'))}" title="${esc(t('close'))}">×</button></div></div>`; }
 
+  /* §21.10 item 3: this used to `return` when `nipByNumber[record.nip]` was undefined, so a claim
+     against NIP-5A, NIP-7D or NIP-12 opened an empty dialog. The claim is the subject of the row, so
+     it renders whether or not the pinned snapshot resolves it. */
   function renderEvidence(context, shouldOpen = true) {
     const tool = findTool(context.toolId);
-    const record = (tool?.nips || []).find(item => item.nip === context.nip);
-    const nip = record ? nipByNumber[record.nip] : null;
-    if (!tool || !record || !nip) return;
-    els.evidenceDialog.setAttribute('aria-label', `${tool.name} · NIP-${record.nip}`);
-    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.detailKicker'), `${tool.name} · NIP-${record.nip}`)}<p>${esc(t('explorer.supportFor', {feature: context.featureId ? featureName(context.featureId) : nip.title}))} ${supportBadge(record.status)}</p><section class="dialog-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><p>${esc(evidenceText(record.status))}</p><dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(record.observed)}</dd></div><div><dt>${esc(t('explorer.observer'))}</dt><dd>${esc(observerLabel(record.observer))}</dd></div><div><dt>${esc(t('explorer.nipPurpose'))}</dt><dd>${esc(nipPurpose(record.nip))}</dd></div><div><dt>${esc(t('explorer.state'))}</dt><dd>${esc(statusLabel(record.status))}</dd></div></dl><a href="${nip.source}" target="_blank" rel="noreferrer">${esc(t('explorer.primarySource'))}</a></section>`;
+    const record = capabilitiesOf(tool).find(item => item.key === context.nip);
+    if (!tool || !record) return;
+    const nip = record.family === registry.family ? nipByNumber[record.id] : null;
+    const label = `${record.family.toUpperCase()}-${record.id}${record.scope ? `@${record.scope}` : ''}${record.sub ? `/${record.sub}` : ''}`;
+    const registryLine = record.registryStatus === 'resolved'
+      ? `${registryStatusLabel('resolved')} — ${record.registryTitle}${record.deprecated ? ` (${t('explorer.registryDeprecated')})` : ''}`
+      : record.registryStatus === 'not_in_registry'
+        ? `${registryStatusLabel('not_in_registry')} — ${t('explorer.notInRegistry', {revision: registry.revision.slice(0, 7)})}`
+        : `${registryStatusLabel('unresolvable')} — ${t('explorer.noRegistrySnapshot', {family: record.family})}`;
+    els.evidenceDialog.setAttribute('aria-label', `${tool.name} · ${label}`);
+    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.detailKicker'), `${tool.name} · ${label}`)}<p>${esc(t('explorer.supportFor', {feature: context.featureId ? featureName(context.featureId) : (record.registryTitle || label)}))} ${supportBadge(record.result)}</p><section class="dialog-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><p>${esc(evidenceText(record.result))}</p>${record.caveat ? `<p class="claim-caveat">${esc(t('explorer.caveat'))}: ${esc(record.caveat)}</p>` : ''}<dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.state'))}</dt><dd>${esc(statusLabel(record.result))}</dd></div><div><dt>${esc(t('explorer.basis'))}</dt><dd>${esc(basisLabel(record.basis))}</dd></div><div><dt>${esc(t('explorer.assertedAt'))}</dt><dd>${esc(record.assertedAt || t('unknown'))}</dd></div><div><dt>${esc(t('explorer.registryStatus'))}</dt><dd data-registry-status="${esc(record.registryStatus)}">${esc(registryLine)}</dd></div><div><dt>${esc(t('explorer.nipPurpose'))}</dt><dd>${esc(nip ? nipPurpose(record.id) : t('unknown'))}</dd></div><div><dt>${esc(t('explorer.sourceText'))}</dt><dd class="source-text">${esc(record.sourceText || t('unknown'))}</dd></div></dl>${record.source ? `<a href="${esc(record.source)}" target="_blank" rel="noreferrer">${esc(t('explorer.claimSource'))}</a> ` : ''}${nip ? `<a href="${esc(nip.source)}" target="_blank" rel="noreferrer">${esc(t('explorer.primarySource'))}</a>` : ''}</section>`;
     if (shouldOpen) openDialog(els.evidenceDialog, context);
+  }
+  function sourceListMarkup(tool) {
+    const rows = (tool.sources || []).map(item => `<li><a href="${esc(item.url)}" target="_blank" rel="noreferrer">${esc(item.url)}</a> <small>${esc((item.fields || []).join(', '))} · ${esc(item.fetched)}</small><br><small>${esc(item.what)}</small></li>`).join('');
+    return rows ? `<ul class="source-list">${rows}</ul>` : `<p class="no-support-record">${esc(t('none'))}</p>`;
+  }
+  function claimBlockMarkup(tool) {
+    const claim = tool.claim || {};
+    const caveats = (claim.caveats || []).map(text => `<li>${esc(text)}</li>`).join('');
+    /* §21.7: a module or crate named after a NIP is not a support claim. It is recorded so a
+       library does not read as empty, and it is labelled as what it is. */
+    const nonClaims = (claim.nonClaims || []).map(item => `<p class="non-claim">${esc(t(`explorer.nonClaim.${item.kind}`))}: <code>${esc(item.values.join(', '))}</code></p>`).join('');
+    const capabilities = capabilitiesOf(tool);
+    const rows = capabilities.length
+      ? capabilities.map(record => capabilityChip(tool, record)).join('')
+      : `<p class="claim-summary is-unknown" data-claim-summary="none">${esc(t('explorer.noClaimPublished'))} ${unknownMarker()}</p>`;
+    return `<section class="dialog-layer claim-layer"><h3>${esc(t('explorer.capabilityClaims'))}</h3>${claimSummaryMarkup(tool)}<div class="basis-nips">${rows}</div>`
+      + `<dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.basis'))}</dt><dd>${esc(capabilities.length ? basisLabel(capabilities[0].basis) : t('unknown'))}</dd></div><div><dt>${esc(t('explorer.notation'))}</dt><dd>${esc(claim.notation || t('unknown'))}</dd></div></dl>`
+      + `${claim.source ? `<a href="${esc(claim.source)}" target="_blank" rel="noreferrer">${esc(t('explorer.claimSource'))}</a>` : ''}${nonClaims}`
+      + `${caveats ? `<details class="claim-caveats"><summary>${esc(t('explorer.claimCaveats'))}</summary><ul>${caveats}</ul></details>` : ''}</section>`;
   }
   function renderToolDetail(context, shouldOpen = true) {
     const tool = findTool(context.toolId);
     if (!tool) return;
-    // リレー由来の説明文は 30078 の署名済み content の summary だけ。NIP・レビューは観測していないので埋め合わせない。
-    const description = relayEntry(tool) ? (tool.summary || t('unknown')) : toolDescription(tool);
-    const records = (tool.nips || []).slice(0, 7);
+    // 説明文は署名済み content の summary だけ。空文字は「未公開」として明示する (§21.5)。
+    const description = relayEntry(tool) ? (tool.summary || t('explorer.summaryAbsent')) : toolDescription(tool);
     const reviews = allReviews(tool);
-    const basisList = records.length
-      ? records.map(record => `<button class="basis-row" type="button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}"><strong>NIP-${record.nip}</strong>${supportBadge(record.status)}<small>${esc(evidenceText(record.status))}</small></button>`).join('')
-      : `<p class="no-support-record">${esc(t('none'))}</p>`;
     els.evidenceDialog.setAttribute('aria-label', tool.name);
-    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.details'), tool.name)}<p>${esc(description)}</p><section class="dialog-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.state'))}</dt><dd>${esc(t(`statuses.${tool.status}`))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool))}</dd></div><div><dt>${esc(t('explorer.os'))}</dt><dd>${esc((tool.os || [tool.platform]).filter(Boolean).join(' / ') || t('unknown'))}</dd></div><div><dt>${esc(t('explorer.license'))}</dt><dd>${esc(displayLicense(tool))}</dd></div></dl><div class="feature-basis-list">${basisList}</div></section><section class="dialog-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${reviews.length ? `<button type="button" class="secondary" data-review-tool="${tool.id}">${esc(t('explorer.reviews', {count: reviews.length}))}</button>` : `<p class="no-support-record">${esc(t('none'))}</p>`}</section>`;
+    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.details'), tool.name)}<p class="tool-summary${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(description)}</p><section class="dialog-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.recordState'))}</dt><dd>${esc(t(`recordStates.${tool.recordState}`))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool))}</dd></div><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(topicsText(tool))}</dd></div><div><dt>${esc(t('explorer.os'))}</dt><dd>${esc(osText(tool))}</dd></div><div><dt>${esc(t('explorer.license'))}</dt><dd>${esc(displayLicense(tool))}</dd></div><div><dt>${esc(t('explorer.coordinate'))}</dt><dd><code>${esc(tool.coordinate || tool.id)}</code></dd></div></dl>${livenessMarkup(tool)}${tool.topicCorrection ? `<p class="topic-correction">${esc(t('explorer.topicCorrection', {collected: (tool.collectedTopics || []).join(', ') || t('none')}))} ${esc(tool.topicCorrection)}</p>` : ''}<h4>${esc(t('explorer.primarySources'))}</h4>${sourceListMarkup(tool)}</section>${claimBlockMarkup(tool)}<section class="dialog-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${reviews.length ? `<button type="button" class="secondary" data-review-tool="${esc(tool.id)}">${esc(t('explorer.reviews', {count: reviews.length}))}</button>` : `<p class="no-support-record">${esc(t('explorer.noReviewsObserved'))}</p>`}</section>`;
     if (shouldOpen) openDialog(els.evidenceDialog, context);
   }
-  function resourceUrl(tool, type) { const slug = tool.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'); return ({site: `https://${slug}.example.invalid/`, distribution: `https://store.example.invalid/apps/${slug}`, docs: `https://docs.${slug}.example.invalid/`, source: `https://code.example.invalid/${slug}/source`}[type]); }
+  function resourceUrl(tool, type) {
+    if (tool.provenance === 'sample') { const slug = tool.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'); return ({site: `https://${slug}.example.invalid/`, distribution: `https://store.example.invalid/apps/${slug}`, docs: `https://docs.${slug}.example.invalid/`, source: `https://code.example.invalid/${slug}/source`}[type]); }
+    // 収集済みエントリは一次情報が述べた値だけ。生成した URL は一つも出さない。
+    return ({site: tool.homepage, distribution: tool.distribution, source: tool.sourceRepo}[type]) || '';
+  }
   function renderResource(context, shouldOpen = true) {
     const tool = findTool(context.toolId);
     if (!tool) return;
     const typeLabel = t(`explorer.${context.resourceType}`);
-    // resourceUrl は data.js サンプル用の生成 URL。リレー由来で観測できる URL は
-    // 30078 content の homepage だけなので、site 以外は出さない。
     const url = relayEntry(tool) ? (context.resourceType === 'site' ? (tool.homepage || '') : '') : resourceUrl(tool, context.resourceType);
     els.evidenceDialog.setAttribute('aria-label', t('explorer.linkDetails', {type: typeLabel}));
     els.evidenceContent.innerHTML = `${dialogHead(t('explorer.linkDetails', {type: typeLabel}), tool.name)}<dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.displayUrl'))}</dt><dd>${esc(url || t('unknown'))}</dd></div><div><dt>${esc(t('explorer.checkedAt'))}</dt><dd>${esc(observedText(tool))}</dd></div></dl>`;
@@ -493,7 +617,7 @@
   function renderFeatureBasis(context = {type: 'featureBasis'}, shouldOpen = true) {
     const selected = selectedFeatures();
     els.evidenceDialog.setAttribute('aria-label', t('explorer.evidenceTitle'));
-    els.evidenceContent.innerHTML = `${dialogHead('NIP', t('explorer.evidenceTitle'))}<div class="feature-basis-list">${selected.flatMap(feature => feature.nips.map(number => nipByNumber[number]).filter(Boolean).map(nip => `<article class="nip-reference-card"><strong>${esc(feature.name)} · NIP-${nip.number}</strong><h3>${esc(nip.title)}</h3><p>${esc(nipPurpose(nip.number))}</p><a href="${nip.source}" target="_blank" rel="noreferrer">${esc(t('explorer.primarySource'))}</a></article>`)).join('')}</div>`;
+    els.evidenceContent.innerHTML = `${dialogHead('NIP', t('explorer.evidenceTitle'))}<div class="feature-basis-list">${selected.flatMap(feature => feature.nips.map(number => nipByNumber[number] || {number, title: null, source: null}).map(nip => `<article class="nip-reference-card" data-registry-status="${nip.title ? 'resolved' : 'not_in_registry'}"><strong>${esc(feature.name)} · NIP-${esc(nip.number)}</strong><h3>${esc(nip.title || t('explorer.notInRegistry', {revision: registry.revision.slice(0, 7)}))}</h3><p>${esc(nipPurpose(nip.number))}</p>${nip.source ? `<a href="${nip.source}" target="_blank" rel="noreferrer">${esc(t('explorer.primarySource'))}</a>` : ''}</article>`)).join('')}</div>`;
     if (shouldOpen) openDialog(els.evidenceDialog, context);
   }
 
@@ -506,10 +630,12 @@
     const alternatives = filteredTools().filter(tool => !state.compare.includes(tool.id));
     const items = featureDefinitions.map(definition => {
       const records = selected.map(tool => featureSupportRecord(tool, definition));
-      const values = records.map(record => record?.status || null);
+      /* 主張が無い欄は「—」ではなく unknown のバッジで出す。空欄・ダッシュは否定に読める。
+         主張が別ファミリだけのときは out_of_family で、unknown とも否定とも別の第三の答え。 */
+      const values = selected.map(tool => featureSupport(tool, definition));
       return comparisonItem(featureName(definition.id), values, selected.map((tool, index) => {
         const record = records[index];
-        return `<div class="comparison-value">${record ? `${supportBadge(record.status)}<button class="comparison-evidence" type="button" data-evidence-tool="${tool.id}" data-evidence-nip="${record.nip}" data-evidence-feature="${definition.id}">${esc(t('explorer.nipEvidence'))}</button>` : `<span class="no-support-record" aria-label="${esc(t('none'))}" title="${esc(t('none'))}">—</span>`}</div>`;
+        return `<div class="comparison-value" data-support="${esc(values[index])}">${supportBadge(values[index])}${record ? `<button class="comparison-evidence" type="button" data-evidence-tool="${esc(tool.id)}" data-evidence-nip="${esc(record.key)}" data-evidence-feature="${definition.id}">${esc(t('explorer.nipEvidence'))}</button>` : ''}</div>`;
       }), `<span class="feature-symbol" aria-hidden="true">${iconSvg(definition.icon)}</span>`);
     });
     const basics = [
@@ -517,6 +643,10 @@
       comparisonItem(t('explorer.os'), selected.map(tool => osText(tool)), selected.map(tool => `<div class="comparison-value">${esc(osText(tool))}</div>`)),
       comparisonItem(t('explorer.category'), selected.map(tool => categoryText(tool)), selected.map(tool => `<div class="comparison-value">${esc(categoryText(tool))}</div>`)),
       comparisonItem('OSS', selected.map(tool => displayLicense(tool)), selected.map(tool => `<div class="comparison-value">${esc(displayLicense(tool))}</div>`)),
+      // §21.10 item 4: レコードの状態とプロジェクトの生存は別行。ひとつのバッジに混ぜない。
+      comparisonItem(t('explorer.recordState'), selected.map(tool => tool.recordState), selected.map(tool => `<div class="comparison-value">${esc(t(`recordStates.${tool.recordState}`))}</div>`)),
+      comparisonItem(t('explorer.liveness'), selected.map(() => livenessValue()), selected.map(tool => `<div class="comparison-value" data-liveness="${esc(livenessValue())}">${esc(t(`liveness.${livenessValue()}`))} ${unknownMarker()}${(tool.liveness || []).length ? `<small>${esc(t('explorer.livenessUncounted', {count: tool.liveness.length}))}</small>` : ''}</div>`)),
+      comparisonItem(t('explorer.capabilityClaims'), selected.map(tool => String(claimSummary(tool).total)), selected.map(tool => `<div class="comparison-value" data-claim-total="${claimSummary(tool).total}">${claimSummary(tool).total ? esc(Object.entries(claimSummary(tool).byFamily).map(([family, count]) => t('explorer.claimFamilyCount', {family: family.toUpperCase(), count})).join(' · ')) : `${esc(t('explorer.noClaimPublished'))} ${unknownMarker()}`}</div>`)),
       // observed が空のリレー由来エントリでも空欄にせず、observedText の「不明」語彙で出す。
       comparisonItem(t('explorer.observed'), selected.map(tool => observedText(tool)), selected.map(tool => `<div class="comparison-value">${esc(observedText(tool).split(' ')[0])}</div>`))
     ];
@@ -614,7 +744,7 @@
   }
 
   function toast(message) { els.toast.textContent = message; els.toast.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => els.toast.classList.remove('show'), 1800); }
-  function resetFilters() { Object.assign(state, {features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: 'all', delivery: 'all', oss: 'all', includeDead: false, savedOnly: false, nipQuery: '', uiState: 'normal'}); renderAll(); }
+  function resetFilters() { Object.assign(state, {features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: 'all', oss: 'all', savedOnly: false, nipQuery: '', uiState: 'normal'}); renderAll(); }
   function removeCondition(key) { const item = activeConditions().find(condition => condition.key === key); if (!item) return; Object.assign(state, item.overrides); if (!state.features.length) state.support = 'all'; state.uiState = 'normal'; renderAll(); }
   function toggleCompare(id, checked) { if (checked && state.compare.length >= 3) { document.querySelector(`[data-compare-tool="${CSS.escape(id)}"]`).checked = false; toast(t('explorer.compareLimit')); return; } state.compare = checked ? [...state.compare, id] : state.compare.filter(value => value !== id); renderCompareActions(); }
   function syncComparisonCheckboxes() { document.querySelectorAll('[data-compare-tool]').forEach(input => { input.checked = state.compare.includes(input.dataset.compareTool); }); }
@@ -651,7 +781,6 @@
     if (event.target.closest('[data-reset-all]')) { resetFilters(); return; }
     const compareRemove = event.target.closest('[data-compare-remove]'); if (compareRemove) { state.compare = state.compare.filter(id => id !== compareRemove.dataset.compareRemove); renderCompareActions(); syncComparisonCheckboxes(); if (state.compare.length) renderCompare({type: 'compare'}, false); else els.compareDialog.close(); return; }
     if (event.target.closest('[data-compare-apply]')) { const alternative = $('#compare-alternative')?.value; if (!alternative) return; if (state.compare.length >= 3) { const target = $('#compare-replace-target')?.value; state.compare = state.compare.map(id => id === target ? alternative : id); } else state.compare.push(alternative); renderCompareActions(); syncComparisonCheckboxes(); renderCompare({type: 'compare'}, false); return; }
-    if (event.target.closest('[data-find-alternative]')) { state.includeDead = false; renderAll(); return; }
     if (event.target.closest('[data-show-feature-basis]')) { renderFeatureBasis(); return; }
     const relayAction = event.target.closest('[data-relay-action]'); if (relayAction) { if (relayAction.dataset.relayAction === 'reload') loadRelayCatalog(); return; }
     // §6.5.4 の二つの手段。どちらも並び順と推薦数にしか効かず、行の集合は動かない (I7)。
@@ -664,9 +793,8 @@
   $('#open-compare').addEventListener('click', () => renderCompare());
   $('#clear-compare').addEventListener('click', () => { state.compare = []; renderCompareActions(); syncComparisonCheckboxes(); });
   document.addEventListener('change', event => {
-    const mapping = {'platform-filter': 'platform', 'tool-status-filter': 'toolStatus', 'support-filter': 'support', 'delivery-filter': 'delivery', 'oss-filter': 'oss'};
+    const mapping = {'platform-filter': 'platform', 'tool-status-filter': 'toolStatus', 'support-filter': 'support', 'oss-filter': 'oss'};
     if (mapping[event.target.id]) { state[mapping[event.target.id]] = event.target.value; state.uiState = 'normal'; renderAll(); return; }
-    if (event.target.id === 'include-dead') { state.includeDead = event.target.checked; renderAll(); return; }
     if (event.target.id === 'saved-only') { state.savedOnly = event.target.checked; renderAll(); return; }
     if (event.target.matches('[data-compare-tool]')) { toggleCompare(event.target.dataset.compareTool, event.target.checked); return; }
     if (event.target.matches('[data-public-bookmark]')) { const bookmark = state.bookmarks[event.target.dataset.publicBookmark]; if (bookmark) bookmark.public = event.target.checked; renderResults(); toast(t('explorer.toastPublic')); return; }

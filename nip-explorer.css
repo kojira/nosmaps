@@ -402,7 +402,10 @@
   line-height: 1.35;
 }
 
-.support-badge.implemented {
+/* §21.7 R7: eight result values, and each one has to be distinguishable from the others at a
+   glance. `not_supported` and `withdrawn` are explicit negatives -- a stronger statement than
+   silence -- so they are solid, while `unknown` stays dashed because it asserts nothing. */
+.support-badge.supported {
   background: #d9f4e9;
   color: #005c48;
 }
@@ -417,10 +420,174 @@
   color: #382482;
 }
 
+.support-badge.disabled {
+  background: #ffe3cd;
+  color: #7a3900;
+}
+
+.support-badge.withdrawn {
+  background: #f6dadd;
+  color: #7d1424;
+  text-decoration: line-through;
+}
+
+.support-badge.not_supported {
+  background: #fbd9dd;
+  color: #8a0f22;
+}
+
+.support-badge.not_applicable {
+  border: 1px solid #9aa4ae;
+  background: #f2f4f6;
+  color: #4a555f;
+  font-style: italic;
+}
+
+.support-badge.out_of_family {
+  border: 1px solid #6b5bbd;
+  background: #efeaff;
+  color: #3b2a86;
+}
+
 .support-badge.unknown {
   border: 1px dashed #82909b;
   background: #e7ebee;
   color: #46535f;
+}
+
+/* §21.4: the record's own state, never merged with project liveness. */
+.record-state {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 99px;
+  padding: .16rem .42rem;
+  border: 1px solid #b7bec8;
+  background: #f4f6f9;
+  color: #3d4854;
+  font-size: .64rem;
+  font-weight: 850;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.record-state.withdrawn {
+  border-color: #c2727f;
+  background: #fbeef0;
+  color: #7d1424;
+}
+
+/* §21.6: a free topic is rendered as itself, so it is marked as unlabelled, not as uncategorised. */
+.topic-tag.free-topic {
+  border-style: dashed;
+}
+
+.claim-summary {
+  margin: .35rem 0 .2rem;
+  font-size: .72rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.claim-summary.is-unknown {
+  color: #46535f;
+}
+
+.claim-summary .out-of-family {
+  display: inline-block;
+  margin-left: .3rem;
+  padding: .05rem .35rem;
+  border: 1px solid #6b5bbd;
+  border-radius: 99px;
+  color: #3b2a86;
+}
+
+.liveness-block {
+  margin: .3rem 0;
+  font-size: .72rem;
+  color: var(--muted);
+}
+
+.liveness-derived,
+.liveness-why {
+  margin: .1rem 0;
+  overflow-wrap: anywhere;
+}
+
+.liveness-list {
+  margin: .2rem 0 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: .2rem;
+}
+
+.liveness-list li,
+.source-list li {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.liveness-result {
+  font-weight: 850;
+  color: #46535f;
+}
+
+.liveness-result.unreachable,
+.liveness-result.archived {
+  color: #8a0f22;
+}
+
+.source-list {
+  margin: .25rem 0 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: .35rem;
+  font-size: .74rem;
+}
+
+.source-text,
+.claim-caveat,
+.non-claim,
+.topic-correction {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.claim-caveats {
+  margin-top: .4rem;
+  font-size: .74rem;
+}
+
+.claim-caveats ul {
+  padding-left: 1rem;
+  display: grid;
+  gap: .25rem;
+}
+
+.claim-caveats li {
+  overflow-wrap: anywhere;
+}
+
+/* §21.2.3: an id the pinned snapshot does not hold is rendered with its status, never dropped. */
+.registry-flag {
+  font-size: .62rem;
+  font-weight: 850;
+  text-transform: none;
+}
+
+.nip-tag-button.registry-not_in_registry {
+  border-style: dashed;
+  border-color: #b06a12;
+  color: #7a4300;
+}
+
+.nip-tag-button.registry-unresolvable {
+  border-style: dashed;
+  border-color: #6b5bbd;
+  color: #3b2a86;
+}
+
+.nip-reference-card[data-registry-status="not_in_registry"] {
+  border-style: dashed;
 }
 
 .card-top-meta {
@@ -451,6 +618,12 @@
 .provenance-badge.relay {
   background: #d9f4e9;
   color: #005c48;
+}
+
+/* 一次情報から収集したエントリ。サンプルでもリレー検証済みでもないので、三つ目の見た目を持つ。 */
+.provenance-badge.collected {
+  background: #e4ecff;
+  color: #1f3d8a;
 }
 
 /* §6.5.4: the no-graph banner is persistent and non-modal. */

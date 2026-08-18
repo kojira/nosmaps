@@ -1,0 +1,573 @@
+{
+ "family": "nip",
+ "registry": "github.com/nostr-protocol/nips",
+ "revision": "656cecc7c0a815b6a2b218d3b5d6f078b3f4dbab",
+ "source": "https://raw.githubusercontent.com/nostr-protocol/nips/656cecc7c0a815b6a2b218d3b5d6f078b3f4dbab/README.md",
+ "fetched": "2026-08-18",
+ "entries": [
+  {
+   "number": "01",
+   "title": "Basic protocol flow description",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "02",
+   "title": "Follow List",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "03",
+   "title": "OpenTimestamps Attestations for Events",
+   "deprecated": true,
+   "note": "**unrecommended**: vulnerable to one specific attack, needs update"
+  },
+  {
+   "number": "04",
+   "title": "Encrypted Direct Message",
+   "deprecated": true,
+   "note": "**unrecommended**: deprecated in favor of [NIP-17](17.md)"
+  },
+  {
+   "number": "05",
+   "title": "Mapping Nostr keys to DNS-based internet identifiers",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "06",
+   "title": "Basic key derivation from mnemonic seed phrase",
+   "deprecated": true,
+   "note": "**unrecommended**: prefer a single nsec"
+  },
+  {
+   "number": "07",
+   "title": "`window.nostr` capability for web browsers",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "08",
+   "title": "Handling Mentions",
+   "deprecated": true,
+   "note": "**unrecommended**: deprecated in favor of [NIP-27](27.md)"
+  },
+  {
+   "number": "09",
+   "title": "Event Deletion Request",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "10",
+   "title": "Text Notes and Threads",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "11",
+   "title": "Relay Information Document",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "13",
+   "title": "Proof of Work",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "14",
+   "title": "Subject tag in text events",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "15",
+   "title": "Nostr Marketplace (for resilient marketplaces)",
+   "deprecated": true,
+   "note": "**unrecommended**: too complicated, try [99](99.md) instead"
+  },
+  {
+   "number": "17",
+   "title": "Private Direct Messages",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "18",
+   "title": "Reposts",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "19",
+   "title": "bech32-encoded entities",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "21",
+   "title": "`nostr:` URI scheme",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "22",
+   "title": "Comment",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "23",
+   "title": "Long-form Content",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "24",
+   "title": "Extra metadata fields and tags",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "25",
+   "title": "Reactions",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "26",
+   "title": "Delegated Event Signing",
+   "deprecated": true,
+   "note": "**unrecommended**: adds unnecessary burden for little gain"
+  },
+  {
+   "number": "27",
+   "title": "Text Note References",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "28",
+   "title": "Public Chat",
+   "deprecated": true,
+   "note": "**unrecommended**: try [NIP-29](29.md) instead"
+  },
+  {
+   "number": "29",
+   "title": "Relay-based Groups",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "30",
+   "title": "Custom Emoji",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "31",
+   "title": "Dealing with Unknown Events",
+   "deprecated": true,
+   "note": "**unrecommended**: unnecessarily bloated"
+  },
+  {
+   "number": "32",
+   "title": "Labeling",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "34",
+   "title": "`git` stuff",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "35",
+   "title": "Torrents",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "36",
+   "title": "Sensitive Content",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "37",
+   "title": "Draft Events",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "38",
+   "title": "User Statuses",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "39",
+   "title": "Linking Profiles to Other Platforms",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "40",
+   "title": "Expiration Timestamp",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "42",
+   "title": "Authentication of clients to relays",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "43",
+   "title": "Relay Access Metadata and Requests",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "44",
+   "title": "Encrypted Payloads (Versioned)",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "45",
+   "title": "Counting results",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "46",
+   "title": "Nostr Remote Signing",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "47",
+   "title": "Nostr Wallet Connect",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "48",
+   "title": "Bridged Events",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "49",
+   "title": "Private Key Encryption (`ncryptsec`)",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "50",
+   "title": "Search Capability",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "51",
+   "title": "Lists",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "52",
+   "title": "Calendar Events",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "53",
+   "title": "Live Streaming and Spaces",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "54",
+   "title": "Wiki",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "55",
+   "title": "Android Signer Application",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "56",
+   "title": "Reporting",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "57",
+   "title": "Lightning Zaps",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "58",
+   "title": "Badges",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "59",
+   "title": "Gift Wrap",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "5A",
+   "title": "Static Websites (nsites)",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "60",
+   "title": "Cashu Wallet",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "61",
+   "title": "Nutzaps",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "62",
+   "title": "Request to Vanish",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "64",
+   "title": "Chess (PGN)",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "65",
+   "title": "Relay List Metadata",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "66",
+   "title": "Relay Discovery and Liveness Monitoring",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "67",
+   "title": "EOSE Completeness Hint",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "68",
+   "title": "Picture-first feeds",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "69",
+   "title": "Peer-to-peer Order events",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "70",
+   "title": "Protected Events",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "71",
+   "title": "Video Events",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "72",
+   "title": "Moderated Communities",
+   "deprecated": true,
+   "note": "**unrecommended**: try [NIP-29](29.md) instead"
+  },
+  {
+   "number": "73",
+   "title": "External Content IDs",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "75",
+   "title": "Zap Goals",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "77",
+   "title": "Negentropy Syncing",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "78",
+   "title": "Application-specific data",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "7D",
+   "title": "Forum Threads",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "84",
+   "title": "Highlights",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "85",
+   "title": "Trusted Assertions",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "86",
+   "title": "Relay Management API",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "87",
+   "title": "Cashu and Fedimint Discoverability",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "88",
+   "title": "Polls",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "89",
+   "title": "Recommended Application Handlers",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "90",
+   "title": "Data Vending Machines",
+   "deprecated": true,
+   "note": "**unrecommended**: this got totally out of control, prefer use-case-specific microstandards"
+  },
+  {
+   "number": "92",
+   "title": "Media Attachments Metadata (`imeta`)",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "94",
+   "title": "File Metadata",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "96",
+   "title": "HTTP File Storage Integration",
+   "deprecated": true,
+   "note": "**unrecommended**: replaced by Blossom"
+  },
+  {
+   "number": "98",
+   "title": "HTTP Auth",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "99",
+   "title": "Classified Listings",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "A0",
+   "title": "Voice Messages",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "A4",
+   "title": "Public Messages",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "B0",
+   "title": "Web Bookmarks",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "B7",
+   "title": "Blossom",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "BE",
+   "title": "Nostr BLE Communications Protocol",
+   "deprecated": true,
+   "note": "**unrecommended**: only implemented once and unclear whether it works, requires review"
+  },
+  {
+   "number": "C0",
+   "title": "Code Snippets",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "C7",
+   "title": "Chats",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "CC",
+   "title": "Geocaching",
+   "deprecated": false,
+   "note": ""
+  },
+  {
+   "number": "EE",
+   "title": "E2EE Messaging using MLS Protocol",
+   "deprecated": true,
+   "note": "**unrecommended**: superseded by the [Marmot Protocol](https://github.com/marmot-protocol/marmot)"
+  },
+  {
+   "number": "F4",
+   "title": "Podcasts",
+   "deprecated": false,
+   "note": ""
+  }
+ ]
+}
