@@ -173,7 +173,7 @@ test('language rerender preserves selected features, comparison, and open dialog
   await chooseComparisons(page, 2);
   await page.locator('[data-review-tool]').first().click();
   await expect(page.locator('#review-dialog')).toBeVisible();
-  await page.locator('#review-dialog').getByRole('button', {name: '日本語'}).click();
+  await page.locator('#compact-identity [data-language="ja"]').dispatchEvent('click');
   await expect(page.locator('#review-dialog')).toBeVisible();
   await expect(page.locator('#review-dialog')).toContainText('レビューを追加');
   await expect(page.locator('[data-select-feature="media"]')).toHaveAttribute('aria-pressed', 'true');
@@ -283,7 +283,7 @@ test('review language rerenders preserve draft fields and images, and a seeded i
   await form.locator('input[name="use"]').fill('Draft use');
   await form.locator('select[name="rating"]').selectOption('4');
   await form.locator('input[name="imageChoice"]').nth(1).check();
-  await page.locator('#review-dialog').getByRole('button', {name: '日本語'}).click();
+  await page.locator('#compact-identity [data-language="ja"]').dispatchEvent('click');
   await expect(form.locator('textarea[name="body"]')).toHaveValue('Keep this review draft');
   await expect(form.locator('input[name="os"]')).toHaveValue('Draft OS');
   await expect(form.locator('input[name="version"]')).toHaveValue('9.9');
@@ -295,7 +295,7 @@ test('review language rerenders preserve draft fields and images, and a seeded i
   await form.locator('input[name="deviceImage"]').setInputFiles({name: 'draft-image.png', mimeType: 'image/png', buffer: png});
   await expect(form.locator('.local-image-preview img')).toBeVisible();
   await expect(form.locator('.local-image-preview')).toContainText('draft-image.png');
-  await page.locator('#review-dialog').getByRole('button', {name: 'English'}).click();
+  await page.locator('#compact-identity [data-language="en"]').dispatchEvent('click');
   await expect(form.locator('textarea[name="body"]')).toHaveValue('Keep this review draft');
   await expect(form.locator('.local-image-preview img')).toBeVisible();
   await expect(form.locator('.local-image-preview')).toContainText('draft-image.png');

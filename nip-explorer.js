@@ -74,8 +74,10 @@
   const dialogContexts = new WeakMap();
   let lastInteractive = null;
 
-  function languageControl(compact = false) {
-    return `<div class="language-switch${compact ? ' compact' : ''}" role="group" aria-label="${esc(t('language'))}"><button type="button" data-language="ja" aria-pressed="${i18n.language === 'ja'}">日本語</button><button type="button" data-language="en" aria-pressed="${i18n.language === 'en'}">English</button></div>`;
+  /* issue #5: 言語切り替えはページの上部に一つだけ。以前は dialogHead が同じものを毎回 dialog
+     の中にも描いていたので、ダイアログを開くたびに二つ目・三つ目が現れていた。 */
+  function languageControl() {
+    return `<div class="language-switch" role="group" aria-label="${esc(t('language'))}"><button type="button" data-language="ja" aria-pressed="${i18n.language === 'ja'}">日本語</button><button type="button" data-language="en" aria-pressed="${i18n.language === 'en'}">English</button></div>`;
   }
 
   /* ---- NIP-07 サインイン (issue #9) --------------------------------------------------
@@ -281,7 +283,7 @@
     document.title = t('explorer.pageTitle');
     $('meta[name="description"]').content = t('explorer.pageDescription');
     $('#skip-link').textContent = t('skip');
-    $('#compact-identity').innerHTML = `<a href="index.html" aria-label="${esc(t('explorer.back'))}"><span class="identity-mark" aria-hidden="true">N</span><span>nosmaps</span></a><span aria-hidden="true">/</span><span>${esc(t('explorer.location'))}</span>${viewerControl()}${languageControl(false)}`;
+    $('#compact-identity').innerHTML = `<a href="index.html" aria-label="${esc(t('explorer.back'))}"><span class="identity-mark" aria-hidden="true">N</span><span>nosmaps</span></a><span aria-hidden="true">/</span><span>${esc(t('explorer.location'))}</span>${viewerControl()}${languageControl()}`;
     renderViewer();
     $('#search-title').textContent = t('explorer.search');
     els.query.placeholder = t('explorer.searchPlaceholder');
@@ -849,7 +851,7 @@
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => focusableElements(dialog)[0]?.focus());
   }
-  function dialogHead(kicker, title) { return `<div class="dialog-head"><div><div class="dialog-kicker">${esc(kicker)}</div><h2>${esc(title)}</h2></div><div class="dialog-tools">${languageControl(true)}<button class="icon-btn" type="button" data-close-dialog aria-label="${esc(t('close'))}" title="${esc(t('close'))}">×</button></div></div>`; }
+  function dialogHead(kicker, title) { return `<div class="dialog-head"><div><div class="dialog-kicker">${esc(kicker)}</div><h2>${esc(title)}</h2></div><div class="dialog-tools"><button class="icon-btn" type="button" data-close-dialog aria-label="${esc(t('close'))}" title="${esc(t('close'))}">×</button></div></div>`; }
 
   /* §21.10 item 3: this used to `return` when `nipByNumber[record.nip]` was undefined, so a claim
      against NIP-5A, NIP-7D or NIP-12 opened an empty dialog. The claim is the subject of the row, so
@@ -903,13 +905,32 @@
     // 収集済みエントリは一次情報が述べた値だけ。生成した URL は一つも出さない。
     return ({site: tool.homepage, distribution: tool.distribution, source: tool.sourceRepo}[type]) || '';
   }
+  /* 一次情報が述べた値が本当に http(s) の URL のときだけ、本物のリンクにする。判定は URL パーサに
+     任せ、`javascript:` などスキームの違うものは素通しさせない。href もリンク文字も一次情報の文字列
+     そのままで、`new URL().href` の正規化形は使わない (`https://albyhub.com` は末尾に `/` が付く)。 */
+  /** @param {string | null | undefined} value @returns {string | null} */
+  function httpUrl(value) {
+    if (typeof value !== 'string' || !value) return null;
+    let parsed;
+    try { parsed = new URL(value); } catch { return null; }
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? value : null;
+  }
+  /* URL を述べていない欄はリンクにしない。空の href は自分自身に飛ぶ死んだリンクになり、
+     URL でない文章 (Damus の配布欄は "Apple App Store id1628663131 (README badge link)") を
+     リンクにすれば行き先を捏造することになる。述べていないときは `unknown` の語彙で不在を書く。 */
+  /** @param {string | null | undefined} value */
+  function resourceValueMarkup(value) {
+    const url = httpUrl(value);
+    if (!url) return esc(value || t('unknown'));
+    return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="${esc(t('explorer.opensInNewTab'))}">${esc(url)}</a>`;
+  }
   function renderResource(context, shouldOpen = true) {
     const tool = findTool(context.toolId);
     if (!tool) return;
     const typeLabel = t(`explorer.${context.resourceType}`);
     const url = relayEntry(tool) ? (context.resourceType === 'site' ? (tool.homepage || '') : '') : resourceUrl(tool, context.resourceType);
     els.evidenceDialog.setAttribute('aria-label', t('explorer.linkDetails', {type: typeLabel}));
-    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.linkDetails', {type: typeLabel}), tool.name)}<dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.displayUrl'))}</dt><dd>${esc(url || t('unknown'))}</dd></div><div><dt>${esc(t('explorer.checkedAt'))}</dt><dd>${esc(observedText(tool))}</dd></div></dl>`;
+    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.linkDetails', {type: typeLabel}), tool.name)}<dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.displayUrl'))}</dt><dd>${resourceValueMarkup(url)}</dd></div><div><dt>${esc(t('explorer.checkedAt'))}</dt><dd>${esc(observedText(tool))}</dd></div></dl>`;
     if (shouldOpen) openDialog(els.evidenceDialog, context);
   }
   function renderFeatureBasis(context = {type: 'featureBasis'}, shouldOpen = true) {
@@ -1069,7 +1090,12 @@
       const openerKeys = dialogs.map(dialog => dialog.open ? focusKey(dialogOpeners.get(dialog)) : null);
       i18n.set(language.dataset.language);
       dialogs.forEach((dialog, index) => { const replacement = openerKeys[index] && document.querySelector(openerKeys[index]); if (replacement) dialogOpeners.set(dialog, replacement); });
-      restoreFocus(key, dialogs.filter(dialog => dialog.open).at(-1) || document);
+      /* issue #5 以降、言語ボタンは dialog の外にしか無い。開いているダイアログの中身は差し替わって
+         いるので、そこにあった元の要素はもう居ない。焦点をモーダルの中に戻さないと body (inert) に
+         落ちるので、開いているダイアログの先頭の操作対象に戻す。 */
+      const openModal = dialogs.filter(dialog => dialog.open).at(-1);
+      if (openModal) requestAnimationFrame(() => { if (!openModal.contains(document.activeElement)) focusableElements(openModal)[0]?.focus(); });
+      else restoreFocus(key);
       return;
     }
     if (event.target.closest('[data-viewer-signin]')) { signIn(); return; }
