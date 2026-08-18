@@ -1,5 +1,21 @@
+const fs = require('node:fs');
+const path = require('node:path');
 const {test, expect} = require('@playwright/test');
 const {stubExternalImages} = require('./support/stub-external-images');
+
+/* The category buttons are derived from the catalogue, not from a list of categories: nip-explorer.js
+   renders `all`, then the seed topics, then every other topic the records published, sorted. So the
+   expected set is read out of data.js here instead of being written down. A literal `7` was what
+   broke this assertion -- it stayed 7 while the catalogue grew four free topics past it, and a frozen
+   number reports the catalogue growing as a regression. */
+function catalogueCategoryIds() {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'data.js'), 'utf8');
+  const sandbox = {};
+  new Function('window', source)(sandbox);
+  const {tools, seedTopics} = sandbox.NOSMAPS_DATA;
+  const free = [...new Set(tools.flatMap(tool => tool.topics || []).filter(topic => !seedTopics.includes(topic)))].sort();
+  return ['all', ...seedTopics, ...free];
+}
 
 /* Icons in the catalogue point at ~25 real third-party hosts. Serve those bytes locally so a remote
    host having a bad day cannot turn this file red; the URLs themselves are untouched. See
@@ -72,6 +88,7 @@ test('browser language detection, visible switch, session memory, and no localSt
 
 test('category titles and descriptions wrap without clipping or overflow on desktop and 375x812', async ({page}) => {
   const errors = collectErrors(page);
+  const expectedCategoryIds = catalogueCategoryIds();
   for (const viewport of [{width: 1280, height: 900}, {width: 375, height: 812}]) {
     await page.setViewportSize(viewport);
     await page.goto('nip-explorer.html');
@@ -80,13 +97,25 @@ test('category titles and descriptions wrap without clipping or overflow on desk
       const switchName = language === 'ja' ? '日本語' : 'English';
       await page.getByRole('button', {name: switchName}).click();
       const choices = page.locator('.category-filter .category-icon');
-      await expect(choices).toHaveCount(7);
+      await expect(choices).toHaveCount(expectedCategoryIds.length);
       const layout = await choices.evaluateAll(elements => elements.map(element => {
         const title = element.querySelector('.category-title');
         const description = element.querySelector('.category-description');
         const fits = node => node.scrollHeight <= node.clientHeight && node.scrollWidth <= node.clientWidth;
-        return {button: fits(element), title: fits(title), description: fits(description), titleText: title.textContent.trim(), descriptionText: description.textContent.trim()};
+        return {id: element.dataset['categoryFilter'], button: fits(element), title: fits(title), description: fits(description), titleText: title.textContent.trim(), descriptionText: description.textContent.trim()};
       }));
+      expect(layout.map(item => item.id), `explorer ${viewport.width}/${language} ids`).toEqual(expectedCategoryIds);
+      /* Every button carries a label in the language on screen. A missing dictionary entry surfaces
+         as the literal `undefined` (or as the lookup path echoed back), and both read as a real
+         label to the wrap check above, so they are rejected by name here. */
+      for (const item of layout) {
+        const where = `explorer ${viewport.width}/${language}/${item.id}`;
+        for (const [field, text] of [['title', item.titleText], ['description', item.descriptionText]]) {
+          expect(text, `${where} ${field}`).toBeTruthy();
+          expect(text, `${where} ${field}`).not.toContain('undefined');
+          expect(text, `${where} ${field}`).not.toMatch(/^(categories|explorer)\./);
+        }
+      }
       expect(layout.every(item => item.button && item.title && item.description && item.titleText && item.descriptionText), `explorer ${viewport.width}/${language}`).toBe(true);
       await expectNoOverflow(page);
       if (viewport.width === 375) {
