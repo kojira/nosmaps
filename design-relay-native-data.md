@@ -3,7 +3,15 @@
 Status: design only; no implementation in this phase
 Revision date: 2026-08-17
 Supersedes: revision 1 (2026-08-16, "review-1 revision")
+Amended: 2026-08-18 — **§21** revises the capability, liveness, and taxonomy model against 41 real
+entries collected from primary sources (`real-catalog-draft.json`, `real-catalog-draft-report.md`).
+The amendment touches §3, §4.2, §5.1, §8.2, §10.3, §10.4, §19.3, §20.1 and §20.2; each edit points
+back at §21 for its evidence. The `org.nosmaps.software` v1 content profile is **unchanged** (§21.9).
 Normative terms: MUST, MUST NOT, SHOULD, MAY
+Write path: this document covers the **read path** only. Publishing, signing, and the submit
+form are specified in the companion [`design-relay-native-write-path.md`](design-relay-native-write-path.md),
+which reuses §4.2, §5.1-§5.4, §7.1, §12.3 and §14.1 verbatim and introduces no second schema,
+validator, or `d` grammar. Amendments that companion requires here are listed in its §W10.
 
 ## 0. Why revision 2 exists
 
@@ -150,6 +158,7 @@ GRAPH_STALE_AFTER                = 24h
 MAX_FUTURE_SKEW                  = 10m
 MAX_FUTURE_HORIZON               = 30d
 MAX_MIGRATION_DEPTH              = 8
+RECORD_AGE_WARN_AFTER            = 365d            # record age only, never project liveness (§21.4)
 
 DISCOVERY_TOPICS                 = ["nosmaps"]     # lowercase `t` values, user-editable
 DISCOVERY_LIMIT_PER_RELAY        = 500
@@ -249,14 +258,50 @@ Normative rules:
    (`validateSoftwareEvent`) alongside the kind and schema checks.
 2. `content` is a JSON object with exactly `{schema:"org.nosmaps.software", version:1, state, name,
    summary, homepage?, superseded_by?}`. Unknown keys are rejected in the v1 profile. `name` max 120
-   characters, `summary` max 1,000, `homepage` HTTPS max 2,048.
-3. `state` is the closed, case-sensitive enum `active | withdrawn`.
+   characters, `summary` max 1,000, `homepage` HTTPS max **2,048 UTF-8 bytes**. The `homepage`
+   ceiling is counted in **encoded UTF-8 bytes**, not UTF-16 code units and not code points, for
+   consistency with every other length limit in this design — §10.1 requires UTF-8 byte counting
+   for the candidate kinds' fields, and rule 1's `d` ceiling is already measured that way. A
+   percent-encoded URL cannot tell the two units apart; a non-ASCII IRI can, which is exactly why
+   the unit is stated rather than left to the reader. `validateSoftwareEvent` currently applies
+   `c.homepage.length > 2048` (`nostr-catalog.js:326`), i.e. UTF-16 code units, and therefore
+   diverges from this rule for non-ASCII IRIs. The divergence is one-directional — the code is more
+   permissive than this rule, never stricter — and it is a **known, unapplied** code amendment, not a
+   second opinion about the limit. Authors MUST measure UTF-8 bytes regardless of what the validator
+   currently accepts.
+2b. **`summary` is a required *key* whose value MAY be the empty string.** `""` is the normative
+   form for "no publisher-authored summary exists" and MUST be rendered as §3's `unknown`. A
+   cataloguer-authored placeholder (`"Unknown"`, `"N/A"`, `"No description"`) is forbidden: it is
+   indistinguishable from content, is monolingual, and is a fabricated value under D7. `name`, by
+   contrast, is required **non-empty**. This records what `validateSoftwareEvent` already implements
+   (`nostr-catalog.js:316-318`, `:323`) and what §W2.2 already documents; it is stated here because
+   reading rule 2's "required" as required-*value* produced exactly one fabricated record in the
+   2026-08-18 collection. Evidence and reasoning: §21.5.
+3. `state` is the closed, case-sensitive enum `active | withdrawn`. It is a property of the
+   **record**, not of the project. Project liveness — dead, archived, moved, unreachable — is a kind
+   `30370` observation and is never expressible here; see §21.4, which proves the enum cannot carry
+   it (only the publisher may set `state`, and a dead project's publisher is by definition the party
+   that has stopped acting).
 4. A `["state", ...]` tag is optional. When present it MUST equal content `state`; disagreement
    invalidates the event. The tag exists for cheap scanning only — `state` is not a single-letter tag
    and is therefore **not relay-indexable**, so it can never be used as a filter.
 5. `t` tags carry discovery topics (§5.1).
 6. Signature and event id MUST validate. `created_at` is subject to future-timestamp quarantine
    (§12.3).
+
+**Why rule 1's `d` grammar is not narrowed to §10.1's.** §10.1 gives the candidate kinds the
+lowercase ASCII grammar `[a-z0-9](?:[a-z0-9._:/-]{0,190}[a-z0-9])?`. `30078` deliberately does
+**not** adopt it. Rule 1's permissive printable-ASCII form stands, exactly as
+`validateSoftwareEvent` implements it today (`nostr-catalog.js:89`,
+`D_ASCII_RE = /^[\x21-\x7e]+$/`, uppercase included). The reason is migration cost against zero
+observed benefit: tightening the grammar would begin quarantining records that are valid right
+now — any existing `d` carrying an uppercase letter, or any character outside the narrow set,
+would flip to `bad-d` without its publisher having done anything — and there is no observed
+real-world case motivating the change. **Accepted residual risk:** two coordinates differing only
+in case (`nosmaps:Tool` and `nosmaps:tool`) are distinct records that look identical in a list,
+and this design accepts that rather than paying the quarantine cost to prevent it. Revisit only if
+real data shows the collision actually occurring; the change would then belong in
+`validateSoftwareEvent` and would need its own quarantine-migration note.
 
 **Foreign `30078` events.** NIP-78 specifies the kind as shared, so other applications publish it
 with their own content, and they demonstrably do: a live probe of `wss://x.kojira.io` on 2026-08-18
@@ -327,8 +372,20 @@ Normative details:
    three separate `t` tags (`["t","nosmaps"], ["t","relay-client"], ["t","signer"]`), never
    `["t","nosmaps","relay-client","signer"]`. A validator MUST reject the multi-value form for
    `t` because it silently loses indexing.
+2b. A `t` value is at most **128 UTF-8 bytes**, measured on the encoded bytes exactly as rule 1 of
+   §4.2 measures `d`. This records the ceiling `validateSoftwareEvent` already enforces —
+   `utf8ByteLength(tag[1]) > 128` returns `bad-topic` (`nostr-catalog.js:303`) — so the design and
+   the code agree and **no code change follows from this rule**. An over-limit topic is rejected
+   before signing and is never truncated: a truncated topic is a *different* topic, so it would
+   silently move the record into someone else's discovery bucket.
 3. `DISCOVERY_TOPICS` defaults to `["nosmaps"]` and is user-editable. Additional topics may be added
    from selected `30368` taxonomy terms.
+3b. **The topic vocabulary is open and multi-valued.** A seed of seven terms — `clients`, `relay`,
+   `identity`, `media`, `analytics`, `dev`, `wallet` — is what the UI ships labels for. Every other
+   lowercase topic is valid and MUST be rendered **verbatim as itself**, never coerced into a seed
+   term and never rendered as `unknown`; `unknown` is reserved for a record carrying no `t` beyond
+   `nosmaps`. `wallet` is the only term minted from the 2026-08-18 collection, and only because four
+   entries clustered on it. Derivation, the entries behind each term, and the promotion rule: §21.6.
 4. Results are paginated with the §12.1 boundary protocol using inclusive `until`, bounded by
    `MAX_DISCOVERY_PAGES_PER_RELAY`, `MAX_DISCOVERY_RAW_EVENTS_PER_RELAY`, and
    `DISCOVERY_LIMIT_PER_RELAY`. Hitting a bound marks the relay `incomplete: discovery-cap`. An empty
@@ -345,8 +402,8 @@ of whether it carries a discovery topic:
 
 ```json
 [
-  {"kinds":[30078],"authors":["<publisher-A>"],"#d":["tool-a","tool-b"],"limit":8},
-  {"kinds":[30078],"authors":["<publisher-B>"],"#d":["tool-c"],"limit":4}
+  {"kinds":[30078],"authors":["<publisher-A>"],"#d":["nosmaps:tool-a","nosmaps:tool-b"],"limit":8},
+  {"kinds":[30078],"authors":["<publisher-B>"],"#d":["nosmaps:tool-c"],"limit":4}
 ]
 ```
 
@@ -586,7 +643,7 @@ coordinate with `state:"withdrawn"`**:
   "kind": 30078,
   "created_at": 1786982400,
   "pubkey": "<publisher-hex>",
-  "tags": [["d", "com.example.tool"], ["state", "withdrawn"], ["v", "1"]],
+  "tags": [["d", "nosmaps:com.example.tool"], ["state", "withdrawn"], ["v", "1"]],
   "content": "{\"schema\":\"org.nosmaps.software\",\"version\":1,\"state\":\"withdrawn\",\"name\":\"Example Tool\",\"summary\":\"No longer maintained.\"}"
 }
 ```
@@ -704,6 +761,10 @@ state.
   logged in and diffing the row sets.)*
 - **I8 Unknown is not zero** — an unknown count renders distinctly from a zero count and is excluded
   from the ordering key rather than coerced to `0`.
+- **I9 Liveness neutrality** — for any set of observed kind `30370` liveness observations, the
+  listable row set is identical. Only ordering, badges, and the derived liveness value differ. This
+  is I7's guarantee extended to the observation layer, and it is what keeps "no third party can
+  de-list a publisher" true once a third party can publish "this project is dead" (§21.4).
 
 ### 8.3 Partition examples
 
@@ -775,10 +836,10 @@ needs 67 bytes per curator inside a filter that was going to be sent anyway.
 
 ```json
 [
-  {"kinds":[30078],"authors":["<publisher-A>"],"#d":["tool-a","tool-b"],"limit":8},
-  {"kinds":[30078],"authors":["<publisher-B>"],"#d":["tool-c"],"limit":4},
+  {"kinds":[30078],"authors":["<publisher-A>"],"#d":["nosmaps:tool-a","nosmaps:tool-b"],"limit":8},
+  {"kinds":[30078],"authors":["<publisher-B>"],"#d":["nosmaps:tool-c"],"limit":4},
   {"kinds":[5],"authors":["<publisher-A>","<publisher-B>","<curator-C>"],
-   "#a":["30078:<publisher-A>:tool-a","30267:<curator-C>:nostr"],"limit":256}
+   "#a":["30078:<publisher-A>:nosmaps:tool-a","30267:<curator-C>:nostr"],"limit":256}
 ]
 ```
 
@@ -951,23 +1012,53 @@ old content under a third party's schema.
 - A taxonomy `term` MAY be offered as a discovery `t` value (§5.1); doing so is a UI affordance, not
   a schema requirement.
 
-### 10.3 `30369` conformance claim
+### 10.3 `30369` capability claim
 
-- `d=conformance:<tool-coordinate-sha256>:<feature-key>`; hash the exact UTF-8 bytes of the canonical
-  `30078:<publisher-hex>:<d>` coordinate; derive the feature key by §10.1.
-- required: `schema=org.nosmaps.conformance`, `version=1`, `state`, `tool`, `feature`, `result`,
-  `environment_hash`.
+**Revised 2026-08-18 against real data (§21.1, §21.2, §21.7). Zero records are published on this
+kind, so this is a v1 definition change before first publication — not a version bump and not a
+migration (§21.9).** The kind previously read as a *test-result* schema; the real world supplies
+*transcriptions* of publisher documents, and `basis` is what lets one kind carry both without either
+impersonating the other. The kind remains unpublishable until the read path can validate it (§W7.1).
+
+- `d=conformance:<tool-coordinate-sha256>:<capability-key>`; hash the exact UTF-8 bytes of the
+  canonical `30078:<publisher-hex>:<d>` coordinate; derive the capability key by §10.1 from the slug
+  form of `capability` (§21.2.4). **The `d` grammar and its 115-byte key budget are unchanged.**
+- required: `schema=org.nosmaps.conformance`, `version=1`, `state`, `tool`, `capability`,
+  `spec_title`, `registry`, `basis`, `result`.
+- conditionally required: `environment_hash` **iff** `basis === "tested"`, and MUST be absent
+  otherwise; `source`, `source_text` and `asserted_at` **iff** `basis === "transcribed"`.
+- optional: `caveat` (max 500 UTF-8 bytes); `evidence` array of at most 32 `30371` coordinates.
 - `tool` is one canonical software coordinate and the event MUST contain exactly one
   `["a", "30078:<publisher>:<d>"]` whose value equals content `tool` byte-for-byte. Mismatch, missing
-  tag, duplicate differing tool tag, or a noncanonical coordinate fails validation.
-- `feature` is the complete NFC feature identifier, maximum 512 UTF-8 bytes; reverse-DNS ASCII plus
-  version remains recommended, e.g. `org.nosmaps.nip.65-v1`. The `d` uses its bounded feature key,
-  never truncation.
-- `result`: `pass | fail | partial | unknown`; optional `evidence` array of at most 32 `30371`
-  coordinates.
+  tag, duplicate differing tool tag, or a noncanonical coordinate fails validation. *(unchanged)*
+- `capability` replaces the former free-form `feature` and has the closed grammar
+  `<family> ":" <id> [ "/" <sub> ] [ "@" <scope> ]`, maximum 512 UTF-8 bytes: `family` lowercase
+  ASCII `[a-z0-9-]{1,16}`; `id` the identifier **as the source writes it**, uppercased and zero-padded
+  to a minimum of two characters, an **opaque ASCII token and never an integer**; `sub` and `scope`
+  lowercase `[a-z0-9._-]`, maximum 64 and 32 bytes. Ordering is by codepoint over the uppercased
+  minimum-two-character form, which reproduces the sources' own order (`59 < 5A < 60`). Rationale and
+  the four observed same-number-different-spec collisions: §21.2.
+- `spec_title` is the specification title **as the source wrote it**, verbatim, maximum 200 UTF-8
+  bytes. Two claims sharing `(family, id[, sub][, scope])` with different `spec_title` are a
+  **collision**: both are rendered, and they MUST NOT share a comparison column (§21.2.2).
+- `registry` is `{family, registry, revision}`, naming the snapshot the signer resolved the id
+  against; `revision` is a 40-hex commit or the literal `"unpinned"`. `registry_status`
+  (`resolved | title_mismatch | not_in_registry | unresolvable`) is **derived by the reader** against
+  its own snapshot and is never stored. **A claim whose id is absent from the registry is rendered
+  verbatim with its status; it is never dropped and never remapped to a successor NIP** (§21.2.3).
+- `basis`: `self_declared | transcribed | tested`. `self_declared` means the signer's pubkey **equals**
+  the `30078` coordinate's publisher pubkey; it asserts nothing about ownership and MUST NOT be
+  rendered as "official" (§4.3). Claims are **never merged across `basis`**, and no numeric capability
+  score or "supports N" figure may be computed from them (§21.1).
+- `result` is the closed, case-sensitive enum
+  `supported | partial | not_supported | not_applicable | planned | disabled | withdrawn | unknown`,
+  replacing v1's `pass | fail | partial | unknown`. Each value is carried by a collected entry;
+  `result` MUST be read from the source's prose and **never from a checkbox glyph**, whose polarity is
+  project-local and inverts between projects (§21.7).
 - environment hash input is canonical JSON of
   `{runtime, runtime_version, os, arch, dependency_lock_hash, config_hash}`, all required strings,
-  where absent facts use `"unknown"`.
+  where absent facts use `"unknown"`. *(unchanged, but now reachable only via `basis === "tested"`,
+  because writing it for a transcribed README claim fabricates a test that never ran — §21.1.)*
 
 ### 10.4 `30370` observation
 
@@ -978,6 +1069,17 @@ old content under a third party's schema.
   `observed_at`, `value`; optional `tool`, `environment_hash`.
 - `subject` uses §10.5 syntax; `observation_type` is the complete NFC identifier, maximum 512 UTF-8
   bytes; `observed_at` is an integer; `value` is a scalar or object up to 4 KiB canonical bytes.
+- **Registered `observation_type` `org.nosmaps.liveness` (added 2026-08-18, §21.4).** `value` is
+  `{result, method, detail?, target?}`: `result` is
+  `reachable | unreachable | archived | moved | superseded`; `method` is
+  `http | dns | repository-metadata | nip11`; `detail` is at most 200 UTF-8 bytes verbatim from the
+  check; `target` is a free absolute URL or `30078` coordinate and is required when `result` is
+  `moved` or `superseded`. This is a **schema-field-free addition** — §10.4's `subject` grammar,
+  `observed_at`, and `value` cap already carry it. Liveness observations are counted only from
+  pubkeys in the viewer's `G` (§6.2), affect display and ordering only, and MUST NOT change the
+  listable row set (invariant I9). `target` is deliberately free-form because khatru's successor is a
+  Go module path and Iris's is an `htree://` URL; it carries **no** coordinate-migration authority,
+  which stays with §11 clause 7.
 - If `subject` is an `address:30078:<publisher>:<d>`, content `tool` is required and MUST equal that
   embedded coordinate. Any observation intended for tool detail or comparison MUST carry content
   `tool` and exactly one matching canonical `["a", "30078:<publisher>:<d>"]`. Observations without a
@@ -1120,6 +1222,15 @@ design**: if a relay does not index it, discovery on that relay is impossible an
 `incomplete: t-index-unsupported`. Curation-derived exact fetches (§5.2) still work there, so the
 relay degrades to recall-only rather than being useless. Broad kind scans, arbitrary author
 discovery, and any central index fallback are prohibited.
+
+**Carve-out — the viewer's own key.** "Arbitrary author discovery" means enumerating or scanning
+for authors the viewer has not already named. An **exact single-author** query for the signed-in
+viewer's *own* pubkey — `{"kinds":[30078],"authors":["<self>"],"limit":64}`, as a publisher's
+own-records screen needs — does **not** fall under this prohibition and is permitted. It is an exact
+match on a key the viewer already holds rather than a scan over a key space, it discovers nothing the
+viewer did not themselves publish, and it is the only way to reach a coordinate that withdrawal made
+non-listable (§5.4). It remains subject to the same caps, coalescing, chunking, and pagination bounds
+as any other query, and it does not license widening `authors` to any other key.
 
 Never put unrelated `authors` and `#d` arrays into one Cartesian-product filter with a low limit.
 Filter sets are coalesced across components, deduped, byte-chunked, and lazy tabs issue zero REQs
@@ -1559,12 +1670,45 @@ The Blossom BUD repository `hzrd149/blossom` at commit
 `b5bd2801d1763aa635fc8fea7a76597e0eb18990`, cited throughout revision 1, is removed along with every
 claim that depended on it (§18).
 
+**Amended 2026-08-18.** That removal stands in full: no Blossom *mechanism* — manifest, blob, mirror,
+quorum — is cited anywhere, and §18's deletions are unaffected. The repository re-enters this design
+in **two unrelated roles**, neither of which is a mechanism:
+
+1. as a **collected catalogue entry** (`hzrd149/blossom`, a specification repository — the entry for
+   which `state`, `homepage` and "NIP support" are all category errors, FINDING 39), and
+2. as the **registry for the `bud` spec family** (§21.3), because `hzrd149/blossom-server` claims
+   BUD-01…09 and nothing else, and a NIP-only capability model would report it as supporting nothing.
+
+Neither role is pinned or verified in this revision, so both currently resolve
+`registry_status: unresolvable` (§21.2.3) — honest, and recorded as **OPEN-12** in §21.11.
+
+### 19.4 Sources introduced by the §21 amendment
+
+Collected 2026-08-18, primary sources only; every value traces to the project's own repository
+metadata, README, or site, with per-entry `provenance[]` recording URL, what was read, and the fetch
+date. No aggregator, no third-party listing, no inference from observed behaviour.
+
+| artefact | what it is | used by |
+|---|---|---|
+| `real-catalog-draft.json` | 41 collected entries + 2 recorded as not-collectable, each with `provenance[]`, `nip_support_claim`, and `facts_with_no_home_in_v1_profile` | every decision in §21 |
+| `real-catalog-draft-report.md` | 56 numbered FINDINGS with per-entry evidence | §21.0–§21.11 |
+
+Both are untracked working-tree files at `HEAD = 822f56f`. They are **evidence, not normative**: if
+they are regenerated and an entry's facts change, the decision that cited it must be re-derived, and
+§21 names the entry behind each decision precisely so that check is mechanical.
+
 ## 20. Verification and acceptance gates
 
 ### 20.1 Static design checks
 
-- No manifest, blob, pointer, mirror, quorum, generation, previous-hash, or BUD concept appears
-  anywhere in this document.
+- No manifest, blob, pointer, mirror, quorum, generation, or previous-hash concept appears anywhere
+  in this document.
+- **No BUD is used as a Nosmaps storage, transport, or inclusion mechanism anywhere in this
+  document.** *(Narrowed 2026-08-18. The original check read "…or BUD concept appears anywhere",
+  which §21.3 now violates: `bud` is registered as a **spec family a catalogued project claims
+  capability in** — Blossom server's entire capability surface is BUD-01…09 — which is data about a
+  third party, not a mechanism. The prohibition this check exists to enforce is revision 1's
+  Blossom-manifest mechanism (§0, §18), and that prohibition is unweakened. See §19.3.)*
 - No trusted-curator list, no shipped default curator, and no shipped recommendation set appears
   anywhere in this document or in configuration defaults.
 - Every catalog-path budget row in §9.2 shows `0` HTTP.
@@ -1643,6 +1787,36 @@ claim that depended on it (§18).
 23. **Foreign `30078`**: a signature-valid `30078` with non-Nosmaps content is quarantined with
     `foreign-profile`, remains inspectable, and is never reported as nonexistent.
 
+Added by the §21 amendment. Each is fixtured from a **named real entry**, so a regression is
+traceable to the fact that motivated the rule.
+
+24. **Capability key is opaque (§21.2.1)**: `nip:5A` and `nip:7D` (Amethyst) round-trip through key,
+    slug, and sort without a numeric parse; codepoint ordering yields `59 < 5A < 60` and
+    `78 < 7D < 84`, matching the source's own order. Any integer coercion fails the test.
+25. **Registry resolution never drops (§21.2.3)**: `nip:12` (nostr-rs-relay, nostream, Damus,
+    YakiHonne) and `nip:91` (nostr-rs-relay, a PR number) render as `not_in_registry` rows carrying
+    the claim verbatim; assert they are **never** absent from output and **never** remapped to
+    `nip:01`. `bud:01` (Blossom server) renders `unresolvable` with its claim intact.
+26. **Same-number collision (§21.2.2)**: two claims at `nip:15` with `spec_title` "End of Stored
+    Events Notice" (nostr-rs-relay) and "Nostr Marketplace" (Amethyst) render as a collision and
+    **never share a comparison column**. Repeat for `nip:22`, `nip:43`, `nip:85`.
+27. **Liveness neutrality (I9, §21.4)**: for the void.cat fixture (repo archived, `url:` DNS failure),
+    the listable row set is byte-identical with zero, one, and eight counted liveness observations;
+    only the derived liveness value and ordering differ. With `graph: none` the value is `unknown`,
+    never `dead`. Mutiny Wallet's two contradicting subjects (`archived` repo, `reachable` site) both
+    render; neither is reconciled away.
+28. **`result` is read from prose, not glyphs (§21.7)**: a transcriber fixture over Shopstr
+    (`- [ ]` = partial), Snort (`- [x]` = partial, `- [ ]` = not_supported), Amber (`- [x]` inside a
+    TODO = planned), nostr-rs-relay (`- [ ]` = disabled) and nostream (`- [ ]` = withdrawn) asserts
+    that deriving `result` from checkbox state alone produces a wrong value for at least four of the
+    five, in both directions. `unknown` is never rendered as a negative or ordered as zero (I8).
+29. **Free topics and empty summary (§21.6, §21.5)**: a record with `t=commerce` (Shopstr) renders
+    the string `commerce`, not `unknown`; a record with only `t=nosmaps` renders `unknown`; a record
+    with four topics (Nostrcheck server) round-trips all four. A record with `summary: ""` (Olas) is
+    valid, listable, and renders "no summary published"; a record with `summary: "Unknown"` is
+    accepted by the validator and MUST be flagged by the authoring path (§W2), because the schema
+    cannot distinguish it from content.
+
 ### 20.3 Implementation preflight
 
 Live-probe both default relays for reachability, NIP-11 fields, AUTH behaviour, `OK` semantics,
@@ -1663,3 +1837,685 @@ outcome.
 TypeScript acceptance requires an exact lockfile fixture, project DOM libs, explicit `window.nostr`
 type augmentation, `tsc --noEmit`, and the real project build. Pseudocode in this document is not
 compile evidence.
+
+## 21. Capability, liveness, and taxonomy — revised against real data (2026-08-18)
+
+### 21.0 Why this section exists, and what evidence it is built on
+
+§4.2 through §10 were written before any real record existed. On 2026-08-18, 41 entries were
+collected from primary sources only — each project's own repository metadata, README, or site — and
+recorded in `real-catalog-draft.json` with per-entry `provenance[]`, plus 56 numbered findings in
+`real-catalog-draft-report.md`. Two further entries were recorded as *not collectable*.
+
+That collection is the evidence base for this section. **Every rule below names the entry that forced
+it.** No rule here is justified by a hypothetical, and where the real data did not settle something it
+is left OPEN in §21.11 with the evidence that would settle it.
+
+The headline result is a negative one and is stated first, because it constrains everything else:
+
+> **The `org.nosmaps.software` v1 content profile does not change, and there is no `version` bump.**
+> Not one of the seven decisions below adds, removes, or retypes a key in §4.2 rule 2. The real data
+> broke the *candidate* kinds (§10.3, §10.4), the *topic vocabulary* (§5.1), and one *reading* of
+> §4.2 rule 2 — not the canonical record. §21.9 states this in full, with what a bump would have cost.
+
+**Published-record count: zero.** No write path exists — both design documents are marked
+"design only; no implementation in this phase", and §W7.1 confirms this slice publishes nothing yet.
+The only live relay probe recorded in this repo (`STATUS-revision2.md`, both default relays) found
+**0 events carrying a `d` that begins `nosmaps:`**. There is therefore **no migration to define**: no
+record exists that any rule below could invalidate. Every "before first publication" claim in this
+section rests on that, and if a record is ever observed before these rules land, the claim is void and
+this section must be re-derived.
+
+**Scope note.** §21.1–§21.3 and §21.8 revise the *candidate* kinds `30369` and `30370`. Those kinds
+have no read-side validator (§W7.1, §W7.3) and remain unpublishable under the §W7.1 ordering rule:
+*a kind becomes publishable only after the read path can validate, select, and render it.* Defining
+their schema correctly does **not** unblock them. It stops the submit form from being built around a
+shape that cannot render — which is the whole reason this revision happens before §W2 is implemented.
+
+---
+
+### 21.1 DECISION R1 — a NIP claim lives in a separate signed record, never inside the software record
+
+**Decision.** A capability claim is a kind `30369` event (§10.3), signed by anyone, carrying a
+required `basis` field that says how the signer came to hold it. It is **not** a field of the `30078`
+record, in v1 or any later version. §4.2 rule 2's key set is unchanged and §W2.4's "no NIP support
+matrix" stands, now with a positive reason rather than only a mechanical one.
+
+**Why not a field in the record.** Four collected entries each independently rule it out.
+
+1. **Alby Browser Extension** — its README contains **zero occurrences of the string "NIP"**, while
+   its own repository description says "key signer for Nostr". The capability is real and the
+   publisher does not state it. A field inside the software record can only ever hold the record
+   publisher's view, so this project's NIP-07 support would be permanently unrecordable. A separate
+   signed record lets a third party record it *as a third party's claim*, which is the honest shape.
+2. **Amethyst** — one README, one NIP, **two answers**: a second "NIP Support" table marks NIP-46
+   "Full" on Android and "Partial" in commonMain, and NIP-03 "Full" on Android and "No" in
+   commonMain, while the same README's checklist reports both as `[x]`. A single-valued field in a
+   replaceable record cannot hold both. Two `30369` records at different `scope` values can (§21.2).
+3. **Alby Hub** — its README section is titled "NIP-47 **Supported Methods**" and carries a
+   per-method table (`info` event, `pay_invoice`, …). "Alby Hub supports NIP-47" is not the fact;
+   "Alby Hub supports these NIP-47 methods" is. Sub-NIP granularity needs a key space, not an array
+   slot (§21.2).
+4. **strfry** — the truthful, machine-readable claim for relay software is the `supported_nips` array
+   of a **deployed instance's** NIP-11 document, a property of each deployment, not of the software.
+   Its README says only "Supports most applicable NIPs: 1, 2, 4, 9, 11, 28, 40, 42, 45, 70, 77".
+   A deployment fact cannot live in a record whose coordinate identifies software. It is an
+   observation with a `url:` subject (§21.4, §10.5 subject grammar).
+
+**Why not a new kind.** `30369` already exists in §10.3, already requires the exact tool `a` index
+(§4.1 row, §20.2 item 17), and already carries `result: pass | fail | partial | unknown`. Minting a
+second capability kind alongside it would be two mechanisms expressing one fact, which is the exact
+failure §0 rewrote revision 1 to remove.
+
+**By whom — publisher self-claim versus third-party observation.** Both, in one kind, separated by a
+**required** `basis` enum and never merged in display:
+
+| `basis` | meaning | required alongside | evidencing entry |
+|---|---|---|---|
+| `self_declared` | the signer's pubkey **equals** the `30078` coordinate's publisher pubkey, asserting about their own record's subject | nothing further | none yet — zero records published, so zero self-declared claims exist. This is the shape §W2 will eventually produce. |
+| `transcribed` | the signer read a document they did not sign and is repeating it | `source` (HTTPS URL), `source_text` (the verbatim line), `asserted_at` | **Damus** — the claim is 10 lines of a README the collector did not author; the README "has no checkboxes and no status column: every line is an unqualified assertion", and that qualifier is only recoverable from `source_text`. |
+| `tested` | the signer ran the software | `environment_hash` (§10.3's existing definition) | **none of the 41.** Zero entries came from a test run. This is why `environment_hash` becomes conditional — see below. |
+
+`self_declared` is defined **coordinate-locally**, by pubkey equality with the coordinate, and MUST
+NOT be rendered as "official". §4.3 already forbids exactly that inference ("The UI MUST NOT say
+'official' solely because `d` resembles reverse DNS…"), and §4.3's `self_asserted` level is the
+precedent this reuses: it means *this key signed it*, nothing more. §4.3's closed level list is
+**not** extended — those levels are about *tool identity*; `basis` is about *capability provenance*.
+Two orthogonal axes, two vocabularies, stated here so a later reader does not merge them.
+
+**`environment_hash` becomes conditional, and that is a schema change to `30369` v1.** §10.3 requires
+it unconditionally, with absent facts written `"unknown"`. Against the real data that produces a
+fabricated test result: **18 of the 41 entries** carry a README NIP list and **none** of them is a
+test run with a runtime, os, arch, or dependency lock. Writing `{runtime:"unknown", os:"unknown",
+arch:"unknown", …}` for all of them makes every real claim indistinguishable from a genuine test whose
+environment was not captured. `environment_hash` is therefore required **only** when
+`basis === "tested"`, and MUST be absent otherwise. See §21.8 for the full revised contract.
+
+**Consistency with the read design's layers.** §4.3 (identity claim levels), §10.3 (conformance
+claim), §10.4 (observation), and §10.5 (evidence relation) already separate fact / claim / observation.
+This decision uses them as written and adds nothing to the stack: the software record is the fact
+(§4.2), the capability claim is the claim (§10.3), the deployment or liveness check is the
+observation (§10.4), and the URL it was read from is the evidence (§10.5 `url:` subject). The one
+thing that changes is that §10.3's contract was written as a *test-result* schema and the real world
+supplies *transcriptions*; `basis` is what makes the same kind carry both without either
+impersonating the other.
+
+**Display rules the UI MUST honour.**
+
+- A `transcribed` claim signed by pubkey X about Damus is **X's claim**, never "Damus says". The
+  signer is named in the row.
+- Claims are **never merged across `basis`**. A `tested` fail and a `transcribed` supported are two
+  rows, both shown, not reconciled.
+- **No numeric capability score, ever.** Amethyst's README claims 84 NIPs and Damus's claims 10.
+  That ratio measures README verbosity, not capability, and any "supports N NIPs" figure or sort key
+  would present it as if it measured capability.
+- Retrieval stays author-independent — §20.2 item 17's exact
+  `{30369,30370,30371 #a:[selectedToolCoordinates]}` is unchanged. Only *aggregation order* is
+  viewer-relative: `self_declared` first, then claims signed by a pubkey in the viewer's `G` (§6.2),
+  then the rest, each group labelled. This is D4/D5 applied to a new signal, and like curation it
+  MUST NOT change which capability rows exist — only their order and grouping.
+
+---
+
+### 21.2 DECISION R2 — the capability key is `family:id`, the registry is pinned, and an unresolvable id is rendered, never dropped
+
+**Decision.** A bare NIP number is not the key. The key is:
+
+```text
+capability = <family> ":" <id> [ "/" <sub> ] [ "@" <scope> ]
+```
+
+- `family` — lowercase ASCII `[a-z0-9-]{1,16}`, the spec family (§21.3).
+- `id` — the identifier **exactly as the source writes it**, stripped of the family prefix and
+  separators, uppercased, and zero-padded to a minimum of two characters: `01`, `15`, `5A`, `7D`.
+  It is an **opaque ASCII token, never an integer**.
+- `sub` — optional, lowercase `[a-z0-9._-]{1,64}`, a named part of the spec below whole-spec
+  granularity.
+- `scope` — optional, lowercase `[a-z0-9._-]{1,32}`, the source's own scope word.
+
+Content also carries **`spec_title`** — the title as the source wrote it, verbatim, ≤ 200 UTF-8
+bytes — and **`registry`**, the snapshot the signer resolved the id against (§21.2.3).
+
+**21.2.1 Why `id` is an opaque token and not a number.** **Amethyst** claims **NIP-5A** ("Pubkey
+Static Websites") and **NIP-7D** ("Threads"). Any integer key, any numeric sort, and any
+zero-padded-numeric coercion breaks on these two values. `data.js`'s `nipCatalog` uses `"01"`-style
+zero-padded *strings* (`data.js`, `nipCatalog[].number`), which is the right type and the wrong
+alphabet — it cannot hold `5A`.
+
+Ordering is by **codepoint over the uppercased, two-character-minimum form**. This is not a
+convenience: it reproduces the source's own order. Amethyst's README lists `59, 5A, 60` and
+`78, 7D, 84`, and codepoint order over `59 < 5A < 60` and `78 < 7D < 84` gives exactly that, because
+`'9' < 'A'` and `'5' < '6'`. No numeric parse is needed anywhere, and none is permitted.
+
+**21.2.2 Why `spec_title` is required, and what a collision renders as.** The same number denotes
+different specifications across primary sources. Four collected collisions, all between two current,
+publisher-authored documents:
+
+| id | one source | the other source |
+|---|---|---|
+| `15` | **nostr-rs-relay** README: "NIP-15: End of Stored Events Notice" | **Amethyst** README: "Nostr Marketplace (NIP-15)" |
+| `22` | **nostr-rs-relay** README: "Event created_at limits" (qualified "future-dated events only") | **Amethyst**, **NDK**, **Ditto**: "Comment" |
+| `43` | **nostream** README: "invite codes" | **Amethyst** README: "Relay Access Metadata and Requests" |
+| `85` | **Shopstr** README: "Reviews" | **Amethyst** README: "Trusted Assertions" |
+
+Rule: two claims sharing `(family, id[, sub][, scope])` but carrying **different `spec_title`** are a
+**collision**. The UI MUST render them as a collision — both titles, both signers, both sources —
+and MUST NOT place them in the same comparison column. Without this, a per-NIP comparison grid shows
+nostr-rs-relay and Amethyst as "supporting the same thing", which is false for all four rows above.
+
+Collision detection deliberately requires **no external registry**: both titles are in the claims
+themselves. That is what makes the rule implementable today.
+
+**21.2.3 Withdrawn, renumbered, and never-merged ids — recorded, resolved, never dropped.**
+Claims against ids that are absent from the registry are not an edge case. **nostr-rs-relay** claims
+NIP-12, 15, 16, 20 and 33 — *five of its fifteen claims* — all merged into NIP-01 and deleted from the
+registry. **nostream** claims the same five. **Damus** and **YakiHonne Web App** each claim NIP-12.
+**nostr-rs-relay** additionally claims "NIP-91: AND operator for filters", linking to
+`nostr-protocol/nips` **pull request #1365** — a number that exists only in a proposal. **Coracle**
+claims "NIP 87 closed groups", not in the merged registry.
+
+The `registry` field pins what the signer resolved against:
+
+```json
+{"family": "nip",
+ "registry": "github.com/nostr-protocol/nips",
+ "revision": "656cecc7c0a815b6a2b218d3b5d6f078b3f4dbab"}
+```
+
+That commit is not invented here: §19.1 already pins it, re-verified 2026-08-17, and it is the same
+commit `data.js`'s `nipCatalog[].source` URLs cite. When a source does not pin a revision — and
+**none of the 18 collected sources does** — `revision` is the literal `"unpinned"`, and the claim is
+still valid.
+
+Resolution is performed **by the reading client against its own pinned snapshot**, and produces a
+derived, never-stored `registry_status`:
+
+| `registry_status` | when | UI MUST show | evidencing entry |
+|---|---|---|---|
+| `resolved` | id present in the client's snapshot **and** `spec_title` matches it | the registry title | Damus `nip:01` |
+| `title_mismatch` | id present, `spec_title` differs | **both** titles, marked as disagreeing with the snapshot | nostr-rs-relay `nip:15` ("End of Stored Events Notice") against the snapshot's current NIP-15 |
+| `not_in_registry` | id absent from the snapshot | the claim verbatim, plus "claimed against `nip:12`, which is not in the pinned registry snapshot `656cecc…`" | nostr-rs-relay / nostream / Damus / YakiHonne `nip:12` |
+| `unresolvable` | the client holds no snapshot for `family` | the claim verbatim, plus "no registry snapshot for family `bud`" | Blossom server `bud:01` (§21.3) |
+
+**A claim is never dropped, never silently remapped, and never merged into its successor.** Mapping
+`nip:12` to `nip:01` because the registry merged them would override a current primary source, and
+the brief for this collection forbids that; dropping it would report a project as claiming less than
+it claims. Both are fabrications in opposite directions. Rendering the unresolved claim verbatim with
+its status is the only option that adds nothing and removes nothing — and it is D7 ("Unknown is never
+invented") applied to a fifth kind of unknown.
+
+`nipCatalog` lookup in `nip-explorer.js` is keyed by `nipByNumber`, which returns `undefined` for
+`"12"` and for `"5A"`. Today that yields a row that quietly renders nothing. Under this rule it MUST
+render as a `not_in_registry` / `unresolvable` row. That is a code amendment (§21.10 item 3).
+
+**21.2.4 `sub` and `scope`, and why they cost no `d` grammar change.** §10.3's
+`d = conformance:<tool-sha256>:<feature-key>` allows 115 bytes for the feature key, and §10.1 already
+specifies the derivation: use the source value unchanged when it is a lowercase ASCII slug matching
+`[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?` and fits, otherwise `sha256-<64hex>`. The capability key's slug
+form substitutes `:` → `.`, `/` → `-`, `@` → `.`, then lowercases:
+
+| capability | slug (the §10.1 feature key) | bytes | evidencing entry |
+|---|---|---|---|
+| `nip:01` | `nip.01` | 6 | Damus |
+| `nip:5A` | `nip.5a` | 6 | Amethyst |
+| `nip:46@android` | `nip.46.android` | 14 | Amethyst — "Full" on Android |
+| `nip:46@commonmain` | `nip.46.commonmain` | 17 | Amethyst — "Partial" in commonMain |
+| `nip:47/pay_invoice` | `nip.47-pay_invoice` | 18 | Alby Hub |
+| `bud:01` | `bud.01` | 6 | Blossom server |
+
+Every one matches §10.1's slug grammar and fits inside 115 bytes, so §10.3's `d` grammar is
+**unchanged** and the `sha256-` escape hatch stays available for anything exotic. `id` is uppercased
+in content and lowercased in the slug; that fold is lossless for every id observed
+(`[0-9A-F]`-shaped), and a family whose ids are case-significant MUST use the `sha256-` form.
+
+**One replacement unit per (author, tool, capability).** `basis` is deliberately **not** part of the
+key. If a signer transcribes a README and then tests the software and disagrees, they publish one
+claim carrying their current position and current `basis` — replacement, not accumulation. This
+matches §10.6's "one replacement unit per reviewer per tool" and keeps `d` stable.
+
+---
+
+### 21.3 DECISION R3 — non-NIP spec families are in scope, expressed by the `family` component
+
+**Decision.** `family` is a first-class component of the capability key, not a NIP-shaped
+afterthought. v1 registers three families with the evidence that put each one there, and leaves the
+set open:
+
+| `family` | registry | evidencing entry |
+|---|---|---|
+| `nip` | `github.com/nostr-protocol/nips` @ `656cecc7c0a815b6a2b218d3b5d6f078b3f4dbab` (§19.1) | 18 entries |
+| `bud` | `github.com/hzrd149/blossom` — **Blossom Upgrade Documents** | **Blossom server** claims BUD-01, 02, 03, 04, 05, 06, 08, 09 and its only NIP mentions are incidental ("BUD-08 — nip94 field in blob descriptors", "BUD-09 — … accepting NIP-56 kind:1984 events") |
+| `lud` | Lightning LUD specifications | **NDK** annotates its NIP-57 line "(LUD06, LUD16)" |
+
+Any other family is expressed as a reverse-DNS ASCII token (e.g. `org.cashu.nut`) and resolves to
+`registry_status: unresolvable` until a snapshot exists for it (§21.2.3). It is still **published,
+stored, displayed, and comparable within its own family**.
+
+**Why not "NIP-only, out of scope".** Blossom server's *entire* capability surface is BUDs. Under a
+NIP-only model its `nip_support_claim` is `Unknown` and the project renders as supporting nothing,
+which the collection report states flatly is "the opposite of the truth". The brief's constraint —
+such a project must not read as "supports nothing" — is therefore not satisfiable by declaring
+non-NIP families out of scope, because the project's real, publisher-documented capability surface
+would be the thing declared out of scope.
+
+**What the UI MUST show, in three distinct cases.** These are three different facts and the UI MUST
+NOT collapse them:
+
+1. **Claims exist, none in the requested family.** Blossom server: 8 `bud:` claims, 0 `nip:` claims.
+   Render "8 capability claims — BUD family. No NIP claims recorded." In the NIP explorer's per-NIP
+   filter the project is **out of family**, rendered distinctly from both "supported" and
+   "not supported", and MUST NOT be counted as a NIP-supporting-zero row.
+2. **No claim of any family exists.** This is **23 of the 41 entries**, including nostr-tools,
+   rust-nostr, go-nostr, nak, Gossip, Iris, noStrudel, Olas, Zeus, Pokey, and the Alby Browser
+   Extension. Render §3's `unknown` — "no capability claim published" — never "supports nothing" and
+   never an empty checklist that reads as a set of negatives.
+3. **A claim exists and says no.** Snort explicitly lists NIP-03, 14, 39 and 40 as unsupported;
+   Shopstr lists NIP-42, 58, 61; Gossip's README states "the options currently are NIP-32, NIP-56, and
+   NIP-72, but none of these are defined well enough". These are `not_supported` results (§21.5) and
+   are a **stronger** statement than case 2, not a weaker one.
+
+**Conflict with §20.1, and which side changes.** §20.1's static check reads "No manifest, blob,
+pointer, mirror, quorum, generation, previous-hash, or **BUD** concept appears anywhere in this
+document." **§20.1 must change, not this decision.** That check was written to keep revision 1's
+Blossom-manifest mechanism from returning (§0, §18) — it prohibits a *storage and transport
+mechanism*. Decision R3 introduces BUD only as a **spec family that a catalogued project claims
+capability in**, which is data about a third party, not a Nosmaps mechanism. §20.1 is narrowed
+accordingly (edit applied). §19.3 likewise moves `hzrd149/blossom` from "deliberately not cited" to a
+cited entry — as the BUD family registry and as a collected catalogue entry — and the removal of
+every *mechanism* claim that depended on it is unaffected (edit applied).
+
+---
+
+### 21.4 DECISION R4 — liveness is a third-party observation on kind `30370`; `state` stays `active | withdrawn`
+
+**Decision.** `content.state` is **not** extended. Deadness is expressed as a kind `30370` observation
+(§10.4) with a registered `observation_type` of `org.nosmaps.liveness`, signed by anyone, counted only
+from the viewer's `G`, and affecting **display and ordering only** — never listability.
+
+**Why extending the enum cannot work, proved by one entry.** **void.cat**: the repository is archived
+(last push 2024-09-26) and `https://void.cat` **fails DNS resolution** — `curl` returns
+"Could not resolve host". The software is gone and the service is gone. §7.1 permits only the
+coordinate's own pubkey to change `state`, and "ceasing to publish is not retraction". So adding
+`dead` to the enum would produce a value that **only the party who has demonstrably stopped acting is
+permitted to publish**. The one entry that most needs the value is the one entry structurally
+guaranteed never to carry it. That is not a gap in the enum; it is proof that liveness is not a
+property the record's own `state` field can hold.
+
+**The invariant is preserved exactly.** §5.4 is unchanged: *a coordinate is listable iff a winner
+exists and its `state` is `active`.* No liveness observation, from anyone, by anyone, in any quantity,
+can remove a row. This gets a named invariant of its own, parallel to I7 and testable the same way:
+
+> **I9 — Changing the set of observed liveness observations MUST NOT change the listable row set.**
+> Only ordering, badges, and the derived liveness value differ.
+
+**The subject is a URL or a coordinate, and that is what makes contradictions representable.**
+§10.5's subject grammar — reused by §10.4 — already admits `url:<absolute-https-url>`,
+`address:<kind>:<64hex>:<d>`, `event:<64hex>` and `sha256:<64hex>`. **Mutiny Wallet** is the entry
+that proves the subject must be finer-grained than the tool: its archived repository says the code is
+frozen while `app.mutinywallet.com` serves "Mutiny is a self-custodial lightning wallet that runs in
+the browser" in the present tense, both primary, both current. Under one liveness field per tool the
+design would need a source-precedence rule and would have to pick a winner between two true facts.
+Under per-subject observations it needs neither:
+
+```text
+subject: url:https://github.com/MutinyWallet/mutiny-web   value.result: archived
+subject: url:https://app.mutinywallet.com                 value.result: reachable
+```
+
+Both are shown. Nothing is reconciled. The contradiction *is* the finding, and it renders as one.
+
+**`value` shape** (a §10.4 `value` object, ≤ 4 KiB canonical bytes):
+
+```json
+{"result": "reachable | unreachable | archived | moved | superseded",
+ "method": "http | dns | repository-metadata | nip11",
+ "detail": "<= 200 UTF-8 bytes, verbatim from the check>",
+ "target": "<optional; absolute URL or 30078 coordinate; required when result is moved|superseded>"}
+```
+
+Each `result` value is carried by a collected entry, and none is speculative:
+
+| `result` | evidencing entry | the observed fact |
+|---|---|---|
+| `unreachable` | **void.cat** | `https://void.cat` — `curl: (6) Could not resolve host` |
+| `archived` | **void.cat**, **Mutiny Wallet**, **khatru** | repository archived; khatru's last push 2025-09-22 |
+| `reachable` | **Mutiny Wallet** | `app.mutinywallet.com` serves the product page, HTTP 200 |
+| `moved` | **Flotilla** (recorded in FINDING 15/35, not collected as an entry), **Iris** ("Main development is on decentralized git: `htree://npub1xdhnr…/iris-client`"), **rust-nostr** (org renamed to `nostrdevkit`) | canonical source is elsewhere |
+| `superseded` | **khatru** | README banner: "This repository is in maintenance mode and adventurous programmers are encouraged to try `fiatjaf.com/nostr/khatru@master` instead" |
+
+`moved` and `superseded` deliberately carry a free-form `target`, because khatru's successor is a **Go
+module path**, Iris's is an `htree://` URL, and Flotilla's is a Gitea instance. §11's `superseded_by`
+accepts only a `30078` coordinate and is effective only when the old winner is `withdrawn` — neither
+condition holds for any of the four, so all four migrations are currently inexpressible. An
+observation with a free `target` records them without touching §11's coordinate-migration authority,
+which stays exactly as written. This does **not** resolve OPEN-2 (§21.11).
+
+**Who counts.** Same rule as curation, for the same reason: **only pubkeys in the viewer's `G`**
+(§6.2/§6.3). Anyone may sign a liveness observation and all are fetched (§20.2 item 17 retrieval is
+unchanged), but only counted signers drive the derived display value. This is D5 — trust is the
+viewer's — and it is what makes the "no third party can de-list a publisher" guarantee hold in
+practice as well as in principle: an observation from outside your graph cannot paint a project dead
+on your screen, and an observation from inside it cannot remove the row either (I9).
+
+**The honest consequence, stated rather than hidden:** with `graph: none` (§3), void.cat's liveness
+renders `unknown`, not `dead`, even though the DNS failure is a fact. A logged-out viewer sees the
+row with no liveness verdict. That follows from D5 and D7 and is the same trade §6.5 already accepts
+for recommendation counts — an unknown is rendered as unknown, never as a value nobody vouched for.
+
+**Two axes, not one — and this is where `data.js` is wrong.** `data.js` ships a single
+`status: active | stale | dead | unknown` per tool. Two independent facts are conflated in it:
+
+- **record freshness** — derived from the winner's `created_at` against `RECORD_AGE_WARN_AFTER`
+  (§21.8). Always computable, needs no graph. It says *the catalogue record has not been re-signed*,
+  and §7.1 already forbids inferring withdrawal from it. It says nothing about the project.
+- **project liveness** — `unknown` by default; otherwise the newest counted observation per subject.
+  It says nothing about the record.
+
+FINDING 2 is exactly this conflation: `created_at` is when the *record* was signed, and
+`30370.observed_at` is when the *fact* was checked, and **Mutiny Wallet** shows they can be years
+apart and both current. The two MUST be labelled separately and MUST NOT be merged into one badge.
+That is a code amendment (§21.10 item 4).
+
+---
+
+### 21.5 DECISION R5 — `summary` stays required, and the empty string is the honest absent form
+
+**Decision.** `summary` remains a **required key** in §4.2 rule 2. Its **value MAY be the empty
+string**, and `""` is the normative form for "no publisher-authored summary exists". A
+cataloguer-authored placeholder — `"Unknown"`, `"N/A"`, `"No description"` — is **forbidden**.
+`name` stays required and non-empty.
+
+**The evidencing entry.** **Olas** (`pablof7z/olas`): the GitHub repository description is the literal
+string `"Guess."`, and the entire README body is Maestro end-to-end-test setup instructions. There is
+no publisher-authored statement of what Olas is. The collector, reading "required", wrote
+`"summary": "Unknown"` and correctly flagged the record as invalid.
+
+**The record was never invalid, and that is the actual defect.** `validateSoftwareEvent` requires the
+*key* and accepts any string including `""` (`nostr-catalog.js:316-318`, `:323` —
+`typeof c.summary !== 'string' || charLength(c.summary) > 1000`), and §W2.2 already documents this
+("key always present; text may be empty"). §4.2 rule 2 says "required" without saying required-key
+versus required-value, and a careful reader of §4.2 alone read it the stricter way and fabricated a
+value. The rule is now explicit (§4.2 rule 2b, applied).
+
+**Why `""` and not `"Unknown"`.** `"Unknown"` is a nine-character English string sitting in a
+monolingual field (FINDING 20 — Rabbit's README is entirely Japanese and Nosmaps ships a Japanese UI).
+It is indistinguishable from a project whose summary genuinely is that word, it is not translatable by
+the i18n layer, and it renders as content. `""` is machine-detectable, language-neutral, and maps to
+§3's `unknown` state, which the UI already knows how to render distinctly from a value.
+
+**What the record does.** It is valid, listable, and shows the row with "no summary published" — the
+project is not excluded from the catalogue for its README's shape. Recording Olas's own `"Guess."`
+verbatim is **equally conformant**, because it is publisher-authored text; the schema takes no view
+between the two. What it forbids is the third option the collector was pushed into.
+
+**Why `summary` is not made optional.** Making the key optional would be a `version` bump (the v1
+profile rejects unknown keys and requires this one), for zero gain: `""` and an absent key render
+identically, and an absent key would let a form omit the field silently rather than showing an empty
+one. The bump is not worth buying a second way to say the same thing. §21.9.
+
+---
+
+### 21.6 DECISION R6 — the topic vocabulary is a seed of seven, derived from the 41, and free topics render as themselves
+
+**Decision.** `t` topics are a **multi-valued, open** vocabulary. v1 ships a **seed of seven** and
+every other topic is a free lowercase string that the UI renders **verbatim as itself**, never coerced
+into a seed term and never rendered as `unknown`.
+
+**The seed, and what put each term in it.** Six are the terms `nip-explorer.js` already maps
+(`clients`, `relay`, `identity`, `media`, `analytics`, `dev`). Exactly one is minted, and only because
+the data clustered:
+
+> **`wallet`** — **Zeus** ("A mobile Bitcoin wallet fit for the gods."), **Alby Hub** ("Your own
+> Bitcoin Lightning node"), **Mutiny Wallet** ("a self-custodial lightning wallet that runs in the
+> browser"), **Alby Browser Extension** ("The Bitcoin Lightning Browser Extension"). Four of 41
+> entries, each described as a wallet **by its own publisher**.
+
+All four were filed under `identity` in the collection, which the report states plainly was "the least
+wrong of six… a data error I am reporting rather than hiding". With `wallet` present, `identity`
+narrows to what it names — **Amber**, **nos2x**, **nsec.app** — and the Alby Browser Extension carries
+both `identity` and `wallet`, which is true of it.
+
+**Why nothing else is minted.** The other four misfits are **singletons in a 41-entry sample**:
+**Shopstr** (marketplace), **Zapstore** (app distribution), **Pokey** (notification bridge),
+**Blossom** (a specification repository, for which `state`, `homepage` and "NIP support" are all
+category errors). Minting four one-member terms from 41 entries would be taxonomy by imagination, and
+the brief forbids exactly that. Instead they publish the topic that is true of them —
+`t=commerce`, `t=distribution`, `t=notifications`, `t=spec` — as free values, and the row renders
+that string. **Shopstr is the proof this is necessary**: with no free-topic rendering it was filed
+`t=clients`, and the record now asserts something false. A free topic rendered as itself is honest
+with no vocabulary decision required from anyone.
+
+Promotion from free topic to seed term is by evidence and nothing else: a term is added when
+collected entries cluster on it, recorded with the entries that clustered — which is exactly how
+`wallet` got in. §5.1 rule 3's pointer to `30368` taxonomy records (§10.2) stands as the eventual
+decentralised mechanism; the seed is the bootstrap, and it is named as such in §16.2's terms.
+
+**Topics are multi-valued and the UI is not.** **Nostrcheck server** is one binary that is
+simultaneously a relay, a media host, a NIP-05 provider and a Lightning service, and it carries four
+`t` tags; **Ditto** is a relay *and* a Mastodon-API server *and* a web client, and carries two. §5.1
+rule 2 already requires one `t` tag per topic and already makes this work at the record level. The
+single-valued `tool.category` / `categoryLabel` pair in `data.js` and the `categories` array in
+`nip-explorer.js:9` cannot round-trip a multi-topic record. That is a code amendment (§21.10 item 1),
+not a schema change — the schema was already right.
+
+**`unknown` is reserved for its real meaning:** a record carrying no `t` beyond the mandatory
+`nosmaps`. A record with `t=commerce` is **not** uncategorised, and MUST NOT render as `unknown`
+merely because the client ships no label for that string.
+
+---
+
+### 21.7 DECISION R7 — eight `result` values, each carried by a collected entry, and none inferred from a checkbox
+
+**Decision.** `result` is a closed, case-sensitive enum of eight values. Yes, the model has both a
+partial level and an unknown level, and six more, because the real data has at least eight and
+collapsing them loses facts a user acts on.
+
+| `result` | meaning | evidencing entry — verbatim |
+|---|---|---|
+| `supported` | asserted, unqualified | **Damus** — 10 NIP lines, "no checkboxes and no status column: every line is an unqualified assertion" |
+| `partial` | asserted, with a stated limitation | **Snort** — `- [x] NIP-02: Contact List and Petnames (No petname support)`; **Shopstr** — `- [ ] NIP-50: Search Capability (partial: product search)` |
+| `not_supported` | explicitly denied | **Snort** lists NIP-03, 14, 39, 40 unchecked as unsupported; **Shopstr** lists NIP-42, 58, 61 |
+| `not_applicable` | the source says the capability does not apply | **Amethyst** — `- [ ] window.nostr for Web Browsers (NIP-07, Not applicable)` |
+| `planned` | listed as intended, not present | **Amber** — `- [x] Use nip-46 or make an addendum in nip-46`, inside a TODO list; **Nostrcheck server** — NIP17 unchecked in a roadmap section |
+| `disabled` | implemented and off | **nostr-rs-relay** — `- [ ] NIP-26 (implemented, but currently disabled)` |
+| `withdrawn` | was supported, no longer | **nostream** — `- [ ] NIP-26: Delegated Event Signing (REMOVED)` |
+| `unknown` | the source makes no statement | **23 of the 41 entries**, including the **Alby Browser Extension**, which certainly implements NIP-07 and whose README never says so |
+
+`disabled` and `withdrawn` are kept separate from `partial` because they are separate actions for a
+user: `disabled` is a configuration flag away, `withdrawn` is gone. Both are single-entry values and
+both are recorded verbatim from a primary source.
+
+**The checkbox rule, which is the whole point of R7.** **Checkbox polarity is project-local and
+inverts between projects.** Shopstr uses an *unchecked* box for partial support; Snort and Amethyst
+use unchecked for not supported; Amber uses a *checked* box for a roadmap item; Snort uses a *checked*
+box for partial support with the limitation in prose. Mechanically, Amber's
+`- [x] Use nip-46 or make an addendum in nip-46` is indistinguishable from Snort's support checklist.
+
+Therefore:
+
+> **`result` MUST be read from the prose, never from the checkbox glyph.** A transcriber MUST NOT
+> derive `result` from `[x]`/`[ ]` alone, and a `transcribed` claim MUST carry `source_text` — the
+> verbatim line — so a reader can check the derivation. Any tool that scrapes checkbox state without
+> reading the qualifier produces wrong data for at least Shopstr, Snort, Amber, nostr-rs-relay and
+> nostream, in both directions.
+
+Two further rules the data forces:
+
+- **A blanket hedge is not a per-capability status.** **strfry**'s README says "Supports **most
+  applicable** NIPs: 1, 2, 4, 9, 11, 28, 40, 42, 45, 70, 77". The hedge qualifies the whole list, so
+  every one of the eleven is `supported` with the hedge in `caveat`, and none may be shown unhedged.
+  Its bare integers are also normalised to `01`, `02`, `04`… only in the *key*; `source_text` keeps
+  `1, 2, 4` as written, because "normalising `1` → `NIP-01` is an inference the source does not make".
+- **A mention is not a claim.** **nostter** ("NIP-07 browser extensions (recommended)" under login),
+  **Rabbit** ("NIP-07に対応したブラウザ拡張機能のインストールが事前に必要です") and **Gossip**
+  ("my NIP-05 address of mike@mikedilger.com") all mention NIPs as *requirements* or *examples*, and a
+  mention-scraper captures all three as support. All three are `unknown`. Likewise **nostr-tools**,
+  **rust-nostr**, **go-nostr** and **nak**, whose NIP mentions are module, crate and subcommand names
+  (`@nostr/tools/nip19`, `nostr-connect (NIP-46)`) — a library shipping a `nip19` module provides
+  primitives, not user-facing NIP-19 behaviour. All `unknown`, which makes four of the ecosystem's
+  most-used projects look empty, and that is the correct and honest output.
+
+**What the UI MUST show for each.** `supported` reads as a positive; `partial`, `disabled` and
+`planned` MUST each render distinctly from `supported` **and from each other**, each with its
+`caveat` visible in the row, not in a tooltip; `not_supported` and `withdrawn` render as explicit
+negatives — a stronger statement than silence; `not_applicable` renders as out-of-scope and MUST NOT
+be counted in any denominator; `unknown` renders as §3's `unknown`, never as a negative, never as
+zero, and never participates in ordering as a low value (D7, invariant I8). `nip-explorer.js`'s
+existing four-value ladder `{implemented: 4, partial: 3, planned: 2, unknown: 1}` and its
+`['implemented','partial','planned','unknown']` filter cannot express six of the eight; that is a code
+amendment (§21.10 item 2).
+
+---
+
+### 21.8 The revised candidate-kind contracts
+
+Applied to §10.3 and §10.4. **Both kinds have zero published records** and no read-side validator
+(§W7.1, §W7.3), so these are **v1 definition changes before first publication, not version bumps and
+not migrations.**
+
+**`30369` conformance claim — revised (§10.3).** Changes from the text it replaces:
+
+- `feature` is renamed to `capability` and takes the §21.2 grammar. `spec_title`, `registry`,
+  `basis` are added and required. `source`, `source_text`, `asserted_at`, `caveat` are added and
+  conditionally required. `environment_hash` becomes conditional on `basis === "tested"`.
+- `result` replaces `pass | fail | partial | unknown` with the eight-value enum of §21.7.
+- `d` grammar, the `a`-tag equality rule, the `evidence` array, and every §10.1 envelope rule are
+  **unchanged**.
+
+**`30370` observation — extended (§10.4).** One registered `observation_type`,
+`org.nosmaps.liveness`, with the `value` shape of §21.4. No schema field changes; §10.4's `subject`
+grammar, `observed_at`, and `value` size cap already carry it.
+
+**New policy constant** (app configuration, §3):
+
+```text
+RECORD_AGE_WARN_AFTER = 365d
+```
+
+Set from the data rather than from taste: **habla.news** last shipped 2025-07-17 and **noauth**
+2025-05-26, both more than a year before the 2026-08-18 collection, while **khatru**'s 2025-09-22 is
+inside a year and is instead covered by an `archived` observation (§21.4). It flags the **record's**
+age only, and §7.1's prohibition on inferring withdrawal from age is unchanged.
+
+---
+
+### 21.9 What did NOT change, and what a `version` bump would have cost
+
+**`org.nosmaps.software` stays at `version: 1`.** No key is added, removed, or retyped in §4.2 rule 2.
+Checked decision by decision:
+
+| decision | touches the v1 profile? | where it lands instead |
+|---|---|---|
+| R1 — NIP claims | no | kind `30369` (§10.3) |
+| R2 — capability key | no | `30369` content |
+| R3 — spec families | no | `30369` content |
+| R4 — liveness | no | kind `30370` (§10.4); `state` enum unchanged |
+| R5 — `summary` | no | §4.2 rule 2b — a **clarification** of a rule the validator already implements |
+| R6 — topics | no | `t` tags, already multi-valued and already free (§5.1) |
+| R7 — result levels | no | `30369` content |
+
+**Had a bump been needed, this is what it would have cost**, recorded so the next person weighing one
+has the figure: the v1 profile rejects unknown keys (`unknown-field`, `nostr-catalog.js:311-315`), so
+a v2 key means every v1 record fails a v2 validator and every v2 record fails a v1 one. Every deployed
+client must accept both majors, `validateSoftwareEvent` grows a version branch, §5.3 winner selection
+must not let a v2 winner hide a v1 record from a v1-only client, and §20.2 needs cross-version
+fixtures. That is the price of one field, and none of the seven decisions was worth it.
+
+**Migration for existing records: none is required, because there are none.** Zero records are
+published (§21.0). Stated plainly as the brief requires: **there are currently zero published
+records, so the migration section for this revision is empty.** The `30369` and `30370` contract
+changes in §21.8 are likewise pre-publication definition changes, not migrations, for the same reason.
+
+---
+
+### 21.10 Code amendments required (none made here)
+
+This section changes no `.js`, `.css`, or `.html`. Recorded so they are not lost, in the manner of
+§17 and §W10.1.
+
+1. **Topics must be a set, not a scalar.** `data.js` `tool.category` / `tool.categoryLabel` and
+   `nip-explorer.js:9`'s `categories` array are single-valued and cannot round-trip Nostrcheck
+   server's four topics or Ditto's two (§21.6). Free topics must render verbatim rather than as
+   `unknown`. Add `wallet` to the seed.
+2. **The support ladder must carry eight values.** `nip-explorer.js:66`'s
+   `{implemented: 4, partial: 3, planned: 2, unknown: 1}` and the `['implemented','partial','planned',
+   'unknown']` filter at `:138` cannot express `not_supported`, `not_applicable`, `disabled` or
+   `withdrawn` (§21.7). Note the rename: `supported`, not `implemented` — a transcribed README claim
+   is not evidence of implementation.
+3. **NIP ids must be opaque tokens with a resolution status.** `nipByNumber` (`nip-explorer.js:10`)
+   returns `undefined` for `"5A"`, `"7D"` and `"12"`, and `supportRecords` silently drops them
+   (`.filter(Boolean)`, `:61`). They must render as `unresolvable` / `not_in_registry` rows (§21.2.3).
+   `nipCatalog[].number` must also admit non-numeric ids.
+4. **Record freshness and project liveness must be two fields.** `data.js`'s single
+   `status: active|stale|dead|unknown` conflates them (§21.4). `dead` must be derivable only from a
+   counted `30370` observation, and must render `unknown` when `graph: none`.
+5. **The per-NIP record shape is already observation-shaped and should be kept that way.**
+   `data.js`'s `nips[]` entries carry `{nip, status, evidence, observed, observer}` — an observer and
+   an observation date. That is the `30369` + `basis` shape, not a publisher-array shape, and it is
+   evidence that the UI was always rendering a claim rather than a fact. Wire it to real `30369`
+   records rather than replacing it with a bare array.
+
+None of these is unblocked by this section: §W7.1's ordering rule still holds, and `30369`/`30370`
+have no read-side validator.
+
+---
+
+### 21.11 OPEN — what this revision could not decide
+
+**OPEN-11 — STILL OPEN. Which registry snapshot the shipping client pins for `family: nip`.**
+§21.2.3 decides the *mechanism* (pin a commit; render unresolved ids explicitly) and reuses §19.1's
+`656cecc7c0a815b6a2b218d3b5d6f078b3f4dbab`, verified 2026-08-17, which `data.js`'s `nipCatalog`
+already cites. What is not decided is the update policy: who re-pins, how often, and what a client
+does with claims resolved against an older snapshot than its own. **Settled by:** a decision on
+snapshot cadence plus a fetch of the registry at two revisions to measure how many of the 41 entries'
+claims change `registry_status` between them. That fetch was not performed here.
+
+**OPEN-12 — STILL OPEN. Registries for `bud` and `lud`.** §21.3 registers both families from
+**Blossom server**'s BUD-01…09 and **NDK**'s "(LUD06, LUD16)", but neither family's spec repository
+was fetched or pinned in this revision, so both currently resolve `unresolvable` (§21.2.3), which is
+honest but renders every BUD claim as unresolved. **Settled by:** fetching `hzrd149/blossom` and the
+LUD repository and pinning a commit for each, in the manner of §19.1. Note §19.3's history: the
+Blossom repo was previously pinned at `b5bd2801d1763aa635fc8fea7a76597e0eb18990` for a *mechanism*
+claim that revision 2 deleted; re-pinning it as a spec-family registry is a different use and needs
+its own verification date.
+
+**OPEN-13 — STILL OPEN. Whether one product spanning several repositories is one coordinate or
+several.** **YakiHonne** is `web-app` + `mobile-app` + three archived predecessors, all declaring
+`https://yakihonne.com`; **0xchat** spans at least five repositories; **Primal** spans web, iOS,
+Android and cache; **NDK** is a monorepo where NIP-17 lives in `@nostr-dev-kit/messages` and NIP-77 in
+`@nostr-dev-kit/sync`; **nostr.watch** ships 12+ packages each with its own `alpha`/`docs` status. The
+collection picked one repository per product and dropped the rest, and recorded that as a loss.
+§21.2's `scope` component can express per-platform *capability* (Amethyst's Android/commonMain case)
+but says nothing about whether the *record* should be one coordinate or several. **Settled by:** a
+decision on record granularity — one coordinate per product versus one per artefact — which changes
+what `d` identifies and therefore what §4.3's "tool identity is the full coordinate" means. It cannot
+be decided from the data alone: both readings are consistent with every entry collected.
+
+**OPEN-14 — STILL OPEN, and outside this revision's seven decisions. FINDING 3, 4, 6, 29, 46 —
+licence, platform, distribution channel, extension/store id, and Nostr-native contact.** Every one of
+the 41 entries has a licence; **Amethyst** is Android-only and **Damus** is iOS 16+/macOS 13+;
+**Damus** links App Store `id1628663131` and **Amber** links a Zap Store `naddr`; **nos2x** and the
+**Alby Browser Extension** are identified in the real world by a Chrome Web Store extension id;
+**nostr-tools**' README says "Use NIP-34 to send your patches to: `naddr1qq…`" and **Pokey**'s declared
+homepage is `https://njump.me/npub1h2685…`. None has a home in the v1 profile, and `data.js` renders
+`platform` and `license` fields the record cannot supply. This revision deliberately did **not** decide
+them: each is a candidate for a `30370` observation, a `30371` evidence relation, or a `version` bump,
+and choosing between those three is a larger decision than the seven this section was scoped to.
+**Settled by:** a separate pass over FINDINGS 3, 4, 6, 29, 46 with the §21.9 bump cost in hand.
+
+**OPEN-2 — STILL OPEN, with new evidence. §11's "explicitly marks migration".** §W11's OPEN-2 says
+§11's second branch names no field the v1 profile can express, and offers two edits: delete the branch,
+or add a migration marker with a `version` bump. The real data adds four cases and does **not** settle
+it: **khatru**'s successor is a Go module path (`fiatjaf.com/nostr/khatru@master`), **Iris**'s is
+`htree://npub1xdhnr…/iris-client`, **Flotilla**'s is a Gitea instance, and **rust-nostr**'s org was
+renamed to `nostrdevkit` — none of the four is a `30078` coordinate, so `superseded_by` cannot hold
+any of them regardless of which branch of §11 survives, and none of the four projects is withdrawn.
+§21.4's `moved` / `superseded` liveness observation records all four **as observations**, which is
+strictly weaker than migration authority and is meant to be: §11 clause 7's rule that evidence carries
+no coordinate-migration authority is unchanged, and an observation must not become a back door to it.
+**Still settled by:** the same two edits §W11 names.
+
+**Not open, recorded to prevent re-litigation.** FINDING 50 (nostr.band could not be verified) and
+FINDING 51 (store-only products are structurally excluded) are collection-method limits, not schema
+gaps: §5.4 and §2 already say that an unobserved record is reported as incomplete and never as
+nonexistence, and §21.11's OPEN-14 covers the store-identifier half of FINDING 51.

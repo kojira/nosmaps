@@ -1,0 +1,3551 @@
+{
+  "_meta": {
+    "generated": "2026-08-18",
+    "generator": "manual collection; every value traced to a primary source listed per entry",
+    "head_commit": "822f56f",
+    "profile": "design-relay-native-data.md §4.2 rule 2 — content is exactly {schema:'org.nosmaps.software', version:1, state, name, summary, homepage?, superseded_by?}; unknown keys rejected in the v1 profile. Tag rules from §4.2 rules 1/1b/4/5 and §5.1.",
+    "profile_field_list": [
+      "schema",
+      "version",
+      "state",
+      "name",
+      "summary",
+      "homepage (optional)",
+      "superseded_by (optional)"
+    ],
+    "what_is_NOT_part_of_the_profile": "Everything in `provenance`, `nip_support_claim`, `facts_with_no_home_in_v1_profile` and `findings` is OUTSIDE the v1 content profile. It is recorded here because the brief requires source+date per entry and because the mismatch is the deliverable. None of it can be published in a valid v1 30078 record.",
+    "publisher_key": "not assigned — no events were signed or published. `coordinate_template` leaves <publisher-hex> as a placeholder.",
+    "unknown_convention": "the string \"Unknown\" is used where the brief requires it. The v1 profile itself has NO Unknown form for a required field."
+  },
+  "entries": [
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:io.damus",
+      "d_bytes": 16,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:io.damus"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Damus",
+          "summary": "A twitter-like nostr client for iPhone, iPad and MacOS.",
+          "homepage": "https://damus.io/"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/damus-io/damus",
+          "what": "README.md heading 'Damus' and line 'A twitter-like [nostr][nostr] client for iPhone, iPad and MacOS.'",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://damus.io/",
+          "what": "HTTP 200; <title>Damus</title>, meta description 'Damus is a new social network that you control. Available now on iOS, iPad and macOS (M1/M2)'. Note: the repo's own homepage field is EMPTY; damus.io is not asserted by the repo.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/damus-io/damus README 'NIPs' section",
+        "notation": "NIP-NN with markdown reference links",
+        "claimed": [
+          "NIP-01",
+          "NIP-04",
+          "NIP-08",
+          "NIP-10",
+          "NIP-12",
+          "NIP-19",
+          "NIP-21",
+          "NIP-25",
+          "NIP-42",
+          "NIP-56"
+        ],
+        "verbatim_caveats": [
+          "The list has no checkboxes and no status column: every line is an unqualified assertion.",
+          "NIP-12 was merged into NIP-01 and no longer exists as a separate NIP in the registry.",
+          "NIP-08 is deprecated in favour of NIP-27."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "GPL-3.0 (GitHub licence detection)",
+        "platforms": "iOS 16.0+, macOS 13.0+ (README 'Supported Platforms')",
+        "distribution": "Apple App Store id1628663131 (README badge link)",
+        "source_repo": "https://github.com/damus-io/damus"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        9,
+        12
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:social.amethyst",
+      "d_bytes": 23,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:social.amethyst"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Amethyst",
+          "summary": "Nostr client for Android",
+          "homepage": "https://amethyst.social"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/vitorpamplona/amethyst",
+          "what": "repository description: 'Nostr client for Android'",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/vitorpamplona/amethyst",
+          "what": "repository homepage field is 'http://amethyst.social' — HTTP, not HTTPS. The v1 profile requires HTTPS, so the recorded value is an ALTERED form of the primary source.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/vitorpamplona/amethyst README 'Current Features' NIP checklist",
+        "notation": "'- [x] Title (NIP-NN)'",
+        "claimed": [
+          "NIP-01",
+          "NIP-02",
+          "NIP-03",
+          "NIP-04",
+          "NIP-05",
+          "NIP-06",
+          "NIP-08",
+          "NIP-09",
+          "NIP-10",
+          "NIP-11",
+          "NIP-13",
+          "NIP-14",
+          "NIP-15",
+          "NIP-17",
+          "NIP-18",
+          "NIP-19",
+          "NIP-21",
+          "NIP-22",
+          "NIP-23",
+          "NIP-24",
+          "NIP-25",
+          "NIP-26",
+          "NIP-27",
+          "NIP-28",
+          "NIP-29",
+          "NIP-30",
+          "NIP-31",
+          "NIP-32",
+          "NIP-34",
+          "NIP-35",
+          "NIP-36",
+          "NIP-37",
+          "NIP-38",
+          "NIP-39",
+          "NIP-40",
+          "NIP-42",
+          "NIP-43",
+          "NIP-44",
+          "NIP-45",
+          "NIP-46",
+          "NIP-47",
+          "NIP-48",
+          "NIP-49",
+          "NIP-50",
+          "NIP-51",
+          "NIP-52",
+          "NIP-53",
+          "NIP-54",
+          "NIP-55",
+          "NIP-56",
+          "NIP-57",
+          "NIP-58",
+          "NIP-59",
+          "NIP-5A",
+          "NIP-60",
+          "NIP-61",
+          "NIP-62",
+          "NIP-64",
+          "NIP-65",
+          "NIP-66",
+          "NIP-68",
+          "NIP-69",
+          "NIP-70",
+          "NIP-71",
+          "NIP-72",
+          "NIP-73",
+          "NIP-75",
+          "NIP-77",
+          "NIP-78",
+          "NIP-7D",
+          "NIP-84",
+          "NIP-85",
+          "NIP-86",
+          "NIP-87",
+          "NIP-88",
+          "NIP-89",
+          "NIP-90",
+          "NIP-92",
+          "NIP-94",
+          "NIP-95",
+          "NIP-96",
+          "NIP-98",
+          "NIP-99"
+        ],
+        "explicitly_not_supported": [
+          "NIP-07 (marked '- [ ] window.nostr for Web Browsers (NIP-07, Not applicable)')"
+        ],
+        "verbatim_caveats": [
+          "NIP-5A and NIP-7D are hexadecimal identifiers, not integers; any numeric NIP key breaks on them.",
+          "NIP-57 appears on four separate lines (Lightning Zaps / Zap Splits / Private Zaps / Zapraiser) — these are features, not NIPs.",
+          "NIP-95 is annotated 'Draft'.",
+          "A separate README table ('NIP Support' rows) gives PER-PLATFORM verdicts that disagree with the checklist: NIP-46 is 'Full' on Android but 'Partial' in commonMain, NIP-03 is 'Full' on Android but 'No' in commonMain."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "applicationId": "com.vitorpamplona.amethyst (amethyst/build.gradle.kts)",
+        "platform": "Android",
+        "source_repo": "https://github.com/vitorpamplona/amethyst"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        8,
+        9,
+        12
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:net.primal.web",
+      "d_bytes": 22,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:net.primal.web"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Primal Web App",
+          "summary": "Primal's web app for Nostr, as experienced on primal.net.",
+          "homepage": "https://primal.net"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/PrimalHQ/primal-web-app",
+          "what": "repository description and homepage field",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://primal.net/",
+          "what": "HTTP 200; <title>Primal</title>, meta description is the slogan 'Live Free' — unusable as a summary.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/PrimalHQ/primal-web-app README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "The README contains zero occurrences of 'NIP'. No NIP support is claimed by the primary source."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/PrimalHQ/primal-web-app",
+        "product_vs_repo": "'Primal' the product also has iOS and Android apps and a caching-service backend in other repos; this record covers only the web app repo."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        12,
+        13
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:social.coracle",
+      "d_bytes": 22,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:social.coracle"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Coracle",
+          "summary": "An experimental Nostr client focused on unlocking the full potential of multiple relays. Browse, filter, zap, and create custom feeds to create a curated Nostr experience.",
+          "homepage": "https://app.coracle.social"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/coracle-social/coracle",
+          "what": "repository description and homepage field",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/coracle-social/coracle README feature checklist",
+        "notation": "mixed: 'NIP 05' (space) and 'NIP-50' (hyphen) in the same file",
+        "claimed": [
+          "NIP-04",
+          "NIP-05",
+          "NIP-17",
+          "NIP-24",
+          "NIP-32",
+          "NIP-42",
+          "NIP-50",
+          "NIP-51",
+          "NIP-52",
+          "NIP-65",
+          "NIP-72",
+          "NIP-87",
+          "NIP-89",
+          "NIP-96",
+          "NIP-99"
+        ],
+        "verbatim_caveats": [
+          "'NIP 04 and NIP 24' is listed under 'Direct messages'. NIP-24 in the current registry is 'Extra metadata fields and tags', not DMs — the claim is stale.",
+          "'NIP 87 closed groups' — NIP-87 is not a merged NIP in the official registry.",
+          "Every claim is a feature bullet, not a conformance statement."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/coracle-social/coracle"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        4,
+        9,
+        11,
+        12
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:social.phoenix",
+      "d_bytes": 22,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:social.phoenix"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Snort",
+          "summary": "Feature packed nostr web UI",
+          "homepage": "https://phoenix.social"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/v0l/snort",
+          "what": "repository description 'Feature packed nostr web UI' and homepage field 'https://phoenix.social'",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/v0l/snort README 'Supported NIPs' checklist",
+        "notation": "'- [x] NIP-NN: Title'",
+        "claimed": [
+          "NIP-01",
+          "NIP-02",
+          "NIP-04",
+          "NIP-05",
+          "NIP-06",
+          "NIP-07",
+          "NIP-08",
+          "NIP-09",
+          "NIP-10",
+          "NIP-11",
+          "NIP-13",
+          "NIP-18",
+          "NIP-19",
+          "NIP-21",
+          "NIP-23",
+          "NIP-25",
+          "NIP-26",
+          "NIP-27",
+          "NIP-28",
+          "NIP-30",
+          "NIP-31",
+          "NIP-36",
+          "NIP-38",
+          "NIP-42",
+          "NIP-44",
+          "NIP-46",
+          "NIP-47",
+          "NIP-50",
+          "NIP-51",
+          "NIP-53",
+          "NIP-55",
+          "NIP-57",
+          "NIP-58",
+          "NIP-59",
+          "NIP-65",
+          "NIP-75",
+          "NIP-78",
+          "NIP-89",
+          "NIP-90",
+          "NIP-94",
+          "NIP-96",
+          "NIP-98"
+        ],
+        "explicitly_not_supported": [
+          "NIP-03",
+          "NIP-14",
+          "NIP-39",
+          "NIP-40"
+        ],
+        "verbatim_caveats": [
+          "Two entries are checked but qualified in prose: 'NIP-02: Contact List and Petnames (No petname support)' and 'NIP-26: Delegated Event Signing (Display delegated signings only)'. These are partial, recorded as full by the checkbox.",
+          "'NIP-96: HTTP File Storage Integration (Draft)'."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/v0l/snort",
+        "name_domain_mismatch": "the repository is named 'snort' but its declared homepage is phoenix.social; the deployed product name and the repo name differ."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        4,
+        9,
+        12,
+        14
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:to.iris",
+      "d_bytes": 15,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:to.iris"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Iris",
+          "summary": "Highly performant and normie-friendly offline-first Nostr web client that is not dependent on any single relay or other server. Featuring a Cashu wallet, secure DMs and social graph based content filtering.",
+          "homepage": "https://iris.to"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/irislib/iris-client",
+          "what": "README.md heading 'Iris' and first descriptive paragraph; README states 'Source code for [iris.to](https://iris.to)'",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://iris.to",
+          "what": "HTTP 200. The repository homepage field is null; iris.to comes from the README.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/irislib/iris-client README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "Zero occurrences of 'NIP' in the README."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "canonical_repo": "README states 'Main development is on decentralized git: htree://npub1xdhnr9mrv47kkrn95k6cwecearydeh8e895990n3acntwvmgk2dsdeeycm/iris-client'. GitHub is a mirror.",
+        "source_repo_mirror": "https://github.com/irislib/iris-client"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        12,
+        15
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:app.nostter",
+      "d_bytes": 19,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:app.nostter"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "nostter",
+          "summary": "Nostr client for web.",
+          "homepage": "https://nostter.app"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/SnowCait/nostter",
+          "what": "repository description and homepage field",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/SnowCait/nostter README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "The only NIP mention is 'NIP-07 browser extensions (recommended)' under login instructions. That is a DEPENDENCY on a NIP-07 signer, not a claim that nostter implements NIP-07. Recorded as Unknown."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "AGPL-3.0",
+        "source_repo": "https://github.com/SnowCait/nostter"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        12,
+        16
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.mikedilger.gossip",
+      "d_bytes": 29,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.mikedilger.gossip"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Gossip",
+          "summary": "Gossip is a nostr client"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/mikedilger/gossip",
+          "what": "repository description 'Gossip is a nostr client'",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/mikedilger/gossip",
+          "what": "repository homepage field is empty and the README names no product site. homepage omitted (it is optional in the v1 profile).",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/mikedilger/gossip README",
+        "notation": null,
+        "claimed": "Unknown",
+        "explicitly_not_supported": [
+          "NIP-32",
+          "NIP-56",
+          "NIP-72 — README: 'In the future I intend for gossip to support one of the multiple competing standards ... (the options currently are NIP-32, NIP-56, and NIP-72), but none of these are defined well enough'"
+        ],
+        "verbatim_caveats": [
+          "The other NIP mention, 'my NIP-05 address of mike@mikedilger.com', is the author's own identifier, not a support claim.",
+          "The primary source states NON-support but no support. The v1 profile and the app's NIP model have no place for a negative claim."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "GitHub reports NOASSERTION (non-SPDX licence file)",
+        "source_repo": "https://github.com/mikedilger/gossip",
+        "d_choice": "no domain is asserted by the project; the reverse-DNS-shaped d is derived from the GitHub owner name, which the project does not own."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        16,
+        17,
+        18
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:ninja.nostrudel",
+      "d_bytes": 23,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:ninja.nostrudel"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "noStrudel",
+          "summary": "A sandbox for exploring nostr",
+          "homepage": "https://nostrudel.ninja/"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/hzrd149/nostrudel",
+          "what": "repository description and homepage field; README confirms 'Live Instance: nostrudel.ninja'",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://nostrudel.ninja",
+          "what": "HTTP 200",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/hzrd149/nostrudel README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "Zero occurrences of 'NIP' in the README."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/hzrd149/nostrudel",
+        "maturity_statement": "README: 'NOTE: This client is still in development and will have bugs' — a self-declared maturity level with no field in the v1 profile."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        12,
+        19
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:net.syusui.rabbit",
+      "d_bytes": 25,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:net.syusui.rabbit"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Rabbit",
+          "summary": "🐰 A nostr client like TweetDeck",
+          "homepage": "https://rabbit.syusui.net"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/syusui-s/rabbit",
+          "what": "repository description and homepage field",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/syusui-s/rabbit README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "The README is in Japanese and its NIP-07 mentions are install instructions ('NIP-07に対応したブラウザ拡張機能のインストールが事前に必要です' — a NIP-07 extension must be installed first). That is a dependency, not a support claim."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "AGPL-3.0",
+        "source_repo": "https://github.com/syusui-s/rabbit",
+        "readme_language": "Japanese. The v1 profile has one 'summary' with no language tag; the only English text available is the repository description."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        16,
+        20
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.0xchat",
+      "d_bytes": 18,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.0xchat"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "0xchat",
+          "summary": "A secure, open-source chat app built on the Nostr protocol. Available on Android, iOS, macOS, Linux and Windows."
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/0xchat-app/0xchat-app-main",
+          "what": "README heading '0xchat' and first two lines",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/0xchat-app/0xchat-app-main",
+          "what": "repository homepage field is empty; no product URL is asserted in the README. homepage omitted rather than guessed.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/0xchat-app/0xchat-app-main README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "Zero occurrences of 'NIP' in the app README. NIP work lives in sibling repos (0xchat-core, relay29 'NIP-29 relay', nostr-mls-package) which are not this record's coordinate."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "GitHub reports none for 0xchat-app-main; the sibling 0xchat-core is LGPL-3.0",
+        "product_spread": "the product is spread over at least 5 repos in the 0xchat-app org (0xchat-app-main, 0xchat-core, nostr-dart, relay29, nostr-mls-package).",
+        "source_repo": "https://github.com/0xchat-app/0xchat-app-main"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        13,
+        21
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.yakihonne.web",
+      "d_bytes": 25,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.yakihonne.web"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "YakiHonne Web App",
+          "summary": "A decentralized social payment client on Nostr & Bitcoin.",
+          "homepage": "https://yakihonne.com"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/YakiHonne/web-app",
+          "what": "README 'What is YakiHonne?' — 'A decentralized social payment client on `Nostr` & `Bitcoin`'; repository description 'YakiHonne official web app repository'",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/YakiHonne/web-app",
+          "what": "repository homepage field 'https://yakihonne.com'",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/YakiHonne/web-app README feature checklist",
+        "notation": "'- [x] Feature description (NIP-NN, NIP-NN)'",
+        "claimed": [
+          "NIP-01",
+          "NIP-02",
+          "NIP-07",
+          "NIP-09",
+          "NIP-12",
+          "NIP-19",
+          "NIP-21",
+          "NIP-23",
+          "NIP-51",
+          "NIP-57",
+          "NIP-65"
+        ],
+        "verbatim_caveats": [
+          "NIP claims are appended to feature bullets, several bullets carrying two NIPs, so no NIP has its own status.",
+          "'Topic-related search using hashtags (NIP-12)' — NIP-12 was merged into NIP-01 and no longer exists.",
+          "'URI scheme support (currenly only naddr) (NIP-21)' — a checked box with a partial-support caveat in prose."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "GitHub reports none",
+        "source_repo": "https://github.com/YakiHonne/web-app",
+        "product_spread": "the same product exists as YakiHonne/mobile-app (active) plus THREE archived predecessors (yakihonne-web-app, yakihonne-mobile-app, web-app-v4), all declaring homepage https://yakihonne.com.",
+        "also_operates": "README states YakiHonne runs its own relays nostr-01.yakihonne.com / nostr-02.yakihonne.com, based on strfry — the same publisher is a client AND a relay operator."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        4,
+        9,
+        13,
+        21,
+        22
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.pablof7z.olas",
+      "d_bytes": 25,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.pablof7z.olas"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Olas",
+          "summary": "Unknown"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name"
+          ],
+          "url": "https://github.com/pablof7z/olas",
+          "what": "README heading 'Olas Mobile App'",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "summary"
+          ],
+          "url": "https://github.com/pablof7z/olas",
+          "what": "NO primary-source summary exists. The GitHub repository description is the literal string 'Guess.'. The README's entire body is Maestro end-to-end-test instructions and contains no description of the product. Recorded as Unknown.",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/pablof7z/olas",
+          "what": "repository homepage field is null.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/pablof7z/olas README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "Zero occurrences of 'NIP'."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/pablof7z/olas"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        23
+      ],
+      "notes": "SCHEMA VIOLATION: the v1 profile makes `summary` REQUIRED and defines no Unknown/absent form. This entry cannot be published as a valid v1 record without inventing a summary."
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:news.habla",
+      "d_bytes": 18,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:news.habla"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Habla",
+          "summary": "Habla allows you to read, write, curate and monetize long form content over Nostr, a censorship-resistant protocol for social media.",
+          "homepage": "https://habla.news"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/verbiricha/habla.news",
+          "what": "README heading 'habla' and first paragraph. The repository description field is null, so the summary comes from the README.",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/verbiricha/habla.news",
+          "what": "README: 'Available in https://habla.news.'  The repository homepage field is empty.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/verbiricha/habla.news README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "The README links NIP-23 as an explanation of 'long form nostr content' but never states that Habla implements it. Recorded as Unknown, not NIP-23."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "GPL-3.0",
+        "source_repo": "https://github.com/verbiricha/habla.news",
+        "last_push": "2025-07-17 — over a year before the fetch date; the v1 profile has no field for project activity."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        16,
+        17
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:stream.zap",
+      "d_bytes": 18,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:stream.zap"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "t",
+            "media"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "zap.stream",
+          "summary": "Nostr live streaming",
+          "homepage": "https://zap.stream"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/v0l/zap.stream",
+          "what": "repository description and homepage field",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/v0l/zap.stream README",
+        "notation": "prose",
+        "claimed": [
+          "NIP-53"
+        ],
+        "verbatim_caveats": [
+          "The entire README is: 'This is a [NIP-53](...) nostr client.' One NIP, asserted as an identity statement rather than a support matrix."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/v0l/zap.stream"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        24
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:pub.ditto",
+      "d_bytes": 17,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:pub.ditto"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "t",
+            "relay"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Ditto",
+          "summary": "Your content. Your vibe. Your rules.",
+          "homepage": "https://ditto.pub"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/soapbox-pub/ditto",
+          "what": "repository description (a slogan) and homepage field",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/soapbox-pub/ditto README",
+        "notation": "feature bullet",
+        "claimed": [
+          "NIP-22"
+        ],
+        "verbatim_caveats": [
+          "Single NIP mention: 'Comments -- Comment on anything: posts, URLs, profiles, hashtags, books, and more (NIP-22)'. Ditto is also a relay and a Mastodon-API server, neither of which is NIP-describable."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "AGPL-3.0",
+        "source_repo": "https://github.com/soapbox-pub/ditto",
+        "summary_quality": "the only publisher-authored one-liner is a marketing slogan that conveys nothing about what the software does.",
+        "kind_of_thing": "Ditto is simultaneously a relay, a Mastodon-compatible API server and a web client — it is not one taxonomy row."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        13,
+        25,
+        26
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:market.shopstr",
+      "d_bytes": 22,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:market.shopstr"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "clients"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Shopstr",
+          "summary": "A global, permissionless Nostr marketplace for Bitcoin commerce",
+          "homepage": "https://shopstr.market"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/shopstr-eng/shopstr",
+          "what": "repository description and homepage field",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/shopstr-eng/shopstr README NIP checklist",
+        "notation": "'- [x] NIP-NN: Title'",
+        "claimed": [
+          "NIP-02",
+          "NIP-05",
+          "NIP-07",
+          "NIP-09",
+          "NIP-17",
+          "NIP-19",
+          "NIP-24",
+          "NIP-31",
+          "NIP-36",
+          "NIP-40",
+          "NIP-46",
+          "NIP-47",
+          "NIP-49",
+          "NIP-51",
+          "NIP-57",
+          "NIP-60",
+          "NIP-65",
+          "NIP-72",
+          "NIP-85",
+          "NIP-89",
+          "NIP-98",
+          "NIP-99"
+        ],
+        "explicitly_not_supported": [
+          "NIP-42",
+          "NIP-58",
+          "NIP-61"
+        ],
+        "verbatim_caveats": [
+          "UNCHECKED boxes are used for PARTIAL support here: '- [ ] NIP-50: Search Capability (partial: product search)' and '- [ ] NIP-56: Reporting (partial: profile/listing reports)'. Reading '[ ]' as 'not supported' would be wrong for this project and right for Snort and Amethyst. Checkbox semantics are project-local.",
+          "NIP-85 is listed as 'Reviews'; the registry number is contested (Amethyst calls NIP-85 'Trusted Assertions')."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "GPL-3.0",
+        "source_repo": "https://github.com/shopstr-eng/shopstr",
+        "category": "e-commerce / marketplace — none of the six shipped categories (clients, relay, identity, media, analytics, dev) describes it."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        9,
+        25,
+        27
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.greenart7c3.nostrsigner",
+      "d_bytes": 35,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.greenart7c3.nostrsigner"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "identity"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Amber",
+          "summary": "Amber is a nostr event signer for Android. It allows users to keep their nsec segregated in a single, dedicated app. The goal of Amber is to have your smartphone act as a NIP-46 signing device without any need for servers or additional hardware."
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/greenart7c3/Amber",
+          "what": "README heading and first paragraph. The repository description field is null.",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/greenart7c3/Amber",
+          "what": "repository homepage field is empty; no product site is asserted. homepage omitted.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/greenart7c3/Amber README",
+        "notation": "prose",
+        "claimed": [
+          "NIP-46",
+          "NIP-55"
+        ],
+        "verbatim_caveats": [
+          "NIP-46 comes from the first paragraph ('act as a NIP-46 signing device'). NIP-55 comes from 'Check NIP 55 and NIP 46 for more information' in the developer-integration section — Amber is the reference implementation of NIP-55.",
+          "A third mention, '- [x] Use nip-46 or make an addendum in nip-46', is a TODO/roadmap checklist item, not a support statement. Checkbox notation appears in this README with a completely different meaning from Snort's."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "applicationId": "com.greenart7c3.nostrsigner (app/build.gradle.kts)",
+        "distribution": "Zap Store naddr link and GitHub releases (README badges)",
+        "source_repo": "https://github.com/greenart7c3/Amber",
+        "d_note": "the Android applicationId com.greenart7c3.nostrsigner is a genuine reverse-DNS identifier the project itself declares, and it disagrees with the product name 'Amber'."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        17,
+        28
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.fiatjaf.nos2x",
+      "d_bytes": 25,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.fiatjaf.nos2x"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "identity"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "nos2x",
+          "summary": "nostr signer extension"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/fiatjaf/nos2x",
+          "what": "repository description 'nostr signer extension'",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/fiatjaf/nos2x",
+          "what": "repository homepage field is empty. The real distribution point is a Chrome Web Store / Firefox add-on listing, which the repo does not assert in a machine-readable field. homepage omitted.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/fiatjaf/nos2x README",
+        "notation": "prose + API listing",
+        "claimed": [
+          "NIP-07"
+        ],
+        "verbatim_caveats": [
+          "'It implements [NIP-07](...), i.e. provides a window.nostr object which has the following methods'. The listed methods include window.nostr.nip04.* and window.nostr.nip44.* — those are NIP-07 sub-capabilities, not independent NIP-04/NIP-44 support claims, so they are NOT recorded as NIP-04/NIP-44."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "GitHub reports none",
+        "source_repo": "https://github.com/fiatjaf/nos2x",
+        "distribution": "browser extension — its stable public identifier is a browser-store extension ID, which has no field."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        17,
+        28,
+        29
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:app.nsec",
+      "d_bytes": 16,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:app.nsec"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "identity"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "nsec.app (noauth)",
+          "summary": "Noauth Nostr key manager.",
+          "homepage": "https://use.nsec.app"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/nostrband/noauth",
+          "what": "repository description 'Noauth Nostr key manager.' and homepage field 'https://use.nsec.app'",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/nostrband/noauth README",
+        "notation": "prose, lowercase unhyphenated 'nip46'",
+        "claimed": [
+          "NIP-46"
+        ],
+        "verbatim_caveats": [
+          "Written as 'nip46' three times, never as 'NIP-46'. A fifth distinct notation across this catalogue.",
+          "The product name (nsec.app) and the repository name (noauth) differ; the v1 profile has one `name`."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "GitHub reports none",
+        "source_repo": "https://github.com/nostrband/noauth",
+        "last_push": "2025-05-26"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        9,
+        13,
+        17
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.getalby.extension",
+      "d_bytes": 29,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.getalby.extension"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "identity"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Alby Browser Extension",
+          "summary": "The Bitcoin Lightning Browser Extension that brings deep Lightning & Nostr integration to the web. Wallet interface to multiple lightning nodes and key signer for Nostr, Liquid and onchain use.",
+          "homepage": "https://getalby.com/#extension"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/getAlby/lightning-browser-extension",
+          "what": "repository description and homepage field (note the homepage carries a URL fragment '#extension')",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/getAlby/lightning-browser-extension README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "Zero occurrences of 'NIP' in the README, despite the repository description asserting 'key signer for Nostr'. The obvious NIP-07 support is NOT stated by the primary source, so it is Unknown."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/getAlby/lightning-browser-extension",
+        "scope": "the product is mostly a Bitcoin Lightning wallet; Nostr signing is one feature. A Nostr catalogue row overstates it."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        16,
+        26,
+        29,
+        30
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:me.njump.pokey",
+      "d_bytes": 22,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:me.njump.pokey"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "identity"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Pokey",
+          "summary": "Display live notifications for your nostr events and allow other apps to receive and interact with them.",
+          "homepage": "https://njump.me/npub1h2685kkxa4q50qpexuae9geqep7frr0u8t8pcy9zj0xnza9phvtsnkd9tm"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/KoalaSat/pokey",
+          "what": "README heading 'Pokey' and description line; repository description 'Nostr \"Pull Notifications\" on Android'",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/KoalaSat/pokey",
+          "what": "the repository homepage field is 'https://njump.me/npub1h2685kkxa4q50qpexuae9geqep7frr0u8t8pcy9zj0xnza9phvtsnkd9tm' — the project's declared homepage is a Nostr profile rendered through a third-party njump gateway, not a site the project controls.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/KoalaSat/pokey README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "Zero occurrences of 'NIP'."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/KoalaSat/pokey",
+        "category": "push/notification bridge — fits none of the six shipped categories.",
+        "note": "greenart7c3/pokey is a fork; KoalaSat/pokey is the upstream the badges point to."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        27,
+        31
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.hoytech.strfry",
+      "d_bytes": 26,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.hoytech.strfry"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "relay"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "strfry",
+          "summary": "strfry is a relay for the nostr protocol. No external database required: all data is stored locally on the filesystem in LMDB."
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/hoytech/strfry",
+          "what": "README heading 'strfry - a nostr relay' and the first two feature bullets. Repository description is the lowercase fragment 'a nostr relay'.",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/hoytech/strfry",
+          "what": "repository homepage field is empty. homepage omitted.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/hoytech/strfry README",
+        "notation": "bare comma-separated integers, no 'NIP-' prefix, no zero padding",
+        "claimed": [
+          "1",
+          "2",
+          "4",
+          "9",
+          "11",
+          "28",
+          "40",
+          "42",
+          "45",
+          "70",
+          "77"
+        ],
+        "verbatim_caveats": [
+          "Verbatim: 'Supports most applicable NIPs: 1, 2, 4, 9, 11, 28, 40, 42, 45, 70, 77'. The hedge 'most applicable' qualifies the whole list — it is not a per-NIP status.",
+          "Numbers are bare integers. Normalising '1' to 'NIP-01' is an inference the source does not make."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "GPL-3.0",
+        "source_repo": "https://github.com/hoytech/strfry",
+        "runtime_truth": "for a relay, the authoritative and machine-readable NIP claim is the `supported_nips` array of its live NIP-11 document, which is a property of each DEPLOYED INSTANCE, not of the software. The v1 profile has no relay-instance concept at all."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        9,
+        10,
+        32
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:io.sourcehut.nostr-rs-relay",
+      "d_bytes": 35,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:io.sourcehut.nostr-rs-relay"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "relay"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "nostr-rs-relay",
+          "summary": "A nostr relay written in Rust."
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/scsibug/nostr-rs-relay",
+          "what": "README. NOTE: the GitHub repository description is 'Mirror of https://sr.ht/~gheartsfield/nostr-rs-relay/' — the GitHub repo is explicitly a MIRROR, and its description describes the mirroring, not the software.",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/scsibug/nostr-rs-relay",
+          "what": "repository homepage field empty. The canonical project home is https://sr.ht/~gheartsfield/nostr-rs-relay/ per the mirror's own description, but that was not independently fetched, so homepage is omitted rather than asserted.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/scsibug/nostr-rs-relay README 'Supported NIPs' checklist (mirror content)",
+        "notation": "'- [x] NIP-NN: [Title](link)'",
+        "claimed": [
+          "NIP-01",
+          "NIP-02",
+          "NIP-05",
+          "NIP-09",
+          "NIP-11",
+          "NIP-12",
+          "NIP-15",
+          "NIP-16",
+          "NIP-20",
+          "NIP-22",
+          "NIP-28",
+          "NIP-33",
+          "NIP-40",
+          "NIP-42",
+          "NIP-91"
+        ],
+        "explicitly_not_supported": [
+          "NIP-03",
+          "NIP-26 (marked '- [ ]' with the note '(implemented, but currently disabled)')"
+        ],
+        "verbatim_caveats": [
+          "THE CENTRAL COLLISION: this README lists 'NIP-15: End of Stored Events Notice'. Amethyst's README lists 'Nostr Marketplace (NIP-15)'. Both are primary sources. NIP-15 was reassigned after the original was merged into NIP-01, so the SAME KEY means two different specifications depending on which project wrote it and when.",
+          "NIP-12, NIP-15, NIP-16, NIP-20 and NIP-33 were all merged into NIP-01 and deleted from the registry. Five of the fifteen claimed NIPs no longer exist.",
+          "'NIP-91: AND operator for filters' links to a nostr-protocol/nips PULL REQUEST (#1365), not a merged NIP. It is a number that only exists in a proposal.",
+          "NIP-22 here is 'Event created_at limits' with the qualifier '(future-dated events only)'; NIP-22 in the current registry is 'Comment' — another reassigned number.",
+          "'- [ ] NIP-26 (implemented, but currently disabled)' is a fifth support state that none of implemented/partial/planned/unknown captures."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "canonical_home": "https://sr.ht/~gheartsfield/nostr-rs-relay/ (per the mirror's description)",
+        "mirror": "https://github.com/scsibug/nostr-rs-relay",
+        "identity_problem": "the publisher of the record would most likely cite the GitHub mirror, whose owner (scsibug) is the author, but the primary source of truth is a SourceHut project."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        9,
+        15,
+        32,
+        33,
+        34
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:technology.nostr.khatru",
+      "d_bytes": 31,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:technology.nostr.khatru"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "relay"
+          ],
+          [
+            "t",
+            "dev"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "khatru",
+          "summary": "a framework for making custom Nostr relays",
+          "homepage": "https://khatru.nostr.technology/"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/fiatjaf/khatru",
+          "what": "repository description and homepage field",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/fiatjaf/khatru README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "The single NIP mention is a code comment: '// set up some basic properties (will be returned on the NIP-11 endpoint)'. Not a support claim."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "Unlicense",
+        "source_repo": "https://github.com/fiatjaf/khatru",
+        "archived": "the GitHub repository is ARCHIVED (last push 2025-09-22).",
+        "successor": "README banner: 'This repository is in maintenance mode and adventurous programmers are encouraged to try fiatjaf.com/nostr/khatru@master instead.' The successor is a Go module path / pkg.go.dev URL. The v1 `superseded_by` field accepts ONLY another 30078 coordinate, so this real, publisher-asserted succession cannot be recorded."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        17,
+        35,
+        36
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.cameri.nostream",
+      "d_bytes": 27,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.cameri.nostream"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "relay"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "nostream",
+          "summary": "A Nostr Relay written in TypeScript"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/cameri/nostream",
+          "what": "repository description",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/cameri/nostream",
+          "what": "repository homepage field empty. homepage omitted.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/cameri/nostream README 'Supported NIPs' checklist",
+        "notation": "'- [x] NIP-NN: Title'",
+        "claimed": [
+          "NIP-01",
+          "NIP-02",
+          "NIP-03",
+          "NIP-04",
+          "NIP-05",
+          "NIP-09",
+          "NIP-11",
+          "NIP-12",
+          "NIP-13",
+          "NIP-14",
+          "NIP-15",
+          "NIP-16",
+          "NIP-20",
+          "NIP-22",
+          "NIP-25",
+          "NIP-28",
+          "NIP-33",
+          "NIP-40",
+          "NIP-44",
+          "NIP-45",
+          "NIP-62",
+          "NIP-65"
+        ],
+        "explicitly_not_supported": [
+          "NIP-26 (marked '- [ ] NIP-26: Delegated Event Signing (REMOVED)')"
+        ],
+        "verbatim_caveats": [
+          "'(REMOVED)' is a SIXTH support state: support that once existed and was deliberately taken out. Distinct from 'never implemented' and from 'implemented but disabled' (nostr-rs-relay).",
+          "Like nostr-rs-relay it claims NIP-12/15/16/20/33, all merged into NIP-01 and deleted.",
+          "A separate README section is headed 'NIP-43 invite codes'. NIP-43 is not 'invite codes' in the registry (Amethyst calls it 'Relay Access Metadata and Requests'). Same number, third meaning."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/cameri/nostream"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        9,
+        10,
+        32,
+        33,
+        34
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:me.nostrcheck.server",
+      "d_bytes": 28,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:me.nostrcheck.server"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "relay"
+          ],
+          [
+            "t",
+            "media"
+          ],
+          [
+            "t",
+            "identity"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Nostrcheck server",
+          "summary": "The community's Nostr brain: The only server with relay, File Hosting (NIP-96 & Blossom), Nostr Address (NIP-05), Lightning Redirects, NWC, WoT, and much more.",
+          "homepage": "https://nostrcheck.me/"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/quentintaranpino/nostrcheck-server",
+          "what": "repository description and homepage field",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/quentintaranpino/nostrcheck-server README 'Supported NIPs' checklist",
+        "notation": "'NIPNN' — NO hyphen and NO zero-padding separator, e.g. 'NIP01', 'NIP05'",
+        "claimed": [
+          "NIP01",
+          "NIP02",
+          "NIP03",
+          "NIP04",
+          "NIP05",
+          "NIP07",
+          "NIP09",
+          "NIP11",
+          "NIP13",
+          "NIP14",
+          "NIP19",
+          "NIP40",
+          "NIP42",
+          "NIP45",
+          "NIP47",
+          "NIP48",
+          "NIP50",
+          "NIP62",
+          "NIP70",
+          "NIP78",
+          "NIP94",
+          "NIP96",
+          "NIP98"
+        ],
+        "explicitly_not_supported": [
+          "NIP17 (listed unchecked in a roadmap section)"
+        ],
+        "verbatim_caveats": [
+          "Notation 'NIP01' has no separator at all — a sixth distinct notation.",
+          "This project claims NIP-78, the very kind Nosmaps publishes its catalogue records on. A Nosmaps client scanning kind 30078 will see this server's foreign records and must quarantine them (design §4.2 separation 1).",
+          "The project is one server binary that is simultaneously a relay, a media host, a NIP-05 provider and a Lightning service."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/quentintaranpino/nostrcheck-server",
+        "kind_of_thing": "four categories at once; the six shipped categories force a single choice."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        9,
+        25,
+        26,
+        37
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.bitvora.haven",
+      "d_bytes": 25,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.bitvora.haven"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "relay"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "HAVEN",
+          "summary": "High Availability Vault for Events on Nostr"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/barrydeen/haven",
+          "what": "repository description",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/barrydeen/haven",
+          "what": "repository homepage field empty. homepage omitted.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/barrydeen/haven README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "The single NIP mention is inside an nginx config comment: '# Proxy for HTTP traffic (NIP-11 relay info page)'."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/barrydeen/haven",
+        "identity_drift": "the repo was collected as bitvora/haven and GitHub redirected it to barrydeen/haven — the owner changed. A reverse-DNS `d` derived from the GitHub owner would now be wrong; a coordinate is not supposed to change."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        15,
+        32
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.hzrd149.blossom-server",
+      "d_bytes": 34,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.hzrd149.blossom-server"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "media"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Blossom server",
+          "summary": "A blossom server written in Deno"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/hzrd149/blossom-server",
+          "what": "repository description",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/hzrd149/blossom-server",
+          "what": "repository homepage field empty. homepage omitted.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/hzrd149/blossom-server README",
+        "notation": "BUD-NN, not NIP-NN",
+        "claimed": "Unknown",
+        "claimed_in_a_different_spec_family": [
+          "BUD-01",
+          "BUD-02",
+          "BUD-03",
+          "BUD-04",
+          "BUD-05",
+          "BUD-06",
+          "BUD-08",
+          "BUD-09"
+        ],
+        "verbatim_caveats": [
+          "This project's capability surface is expressed entirely in BUDs (Blossom Upgrade Documents), a spec family that is NOT the NIPs. Its two NIP mentions are incidental: 'BUD-08 — nip94 field in all blob descriptor responses' and 'BUD-09 — Blob reports (PUT /report) accepting NIP-56 kind:1984 events'.",
+          "NIP support is therefore Unknown, and recording only NIPs would say this project supports almost nothing, which is the opposite of true."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/hzrd149/blossom-server"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        38
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.hzrd149.blossom",
+      "d_bytes": 27,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.hzrd149.blossom"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "media"
+          ],
+          [
+            "t",
+            "dev"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Blossom",
+          "summary": "Blobs stored simply on mediaservers — the specification documents (BUDs) for the Blossom protocol."
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/hzrd149/blossom",
+          "what": "repository description 'Blobs stored simply on mediaservers'; the repository contains the BUD specification documents.",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/hzrd149/blossom",
+          "what": "repository homepage field empty. homepage omitted.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/hzrd149/blossom",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "This is a SPECIFICATION, not software. 'NIP support' is not a meaningful question for it, and neither is `state: active|withdrawn` in the sense of a running product."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "Unlicense",
+        "source_repo": "https://github.com/hzrd149/blossom",
+        "kind_of_thing": "a protocol specification. The catalogue's whole model assumes a tool."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        38,
+        39
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:build.nostr",
+      "d_bytes": 19,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:build.nostr"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "media"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "nostr.build",
+          "summary": "nostr.build media uploader — media hosting for Nostr.",
+          "homepage": "https://nostr.build/"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name"
+          ],
+          "url": "https://nostr.build/",
+          "what": "HTTP 200; <title>nostr.build media uploader</title>",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "summary"
+          ],
+          "url": "https://nostr.build/",
+          "what": "page <title> plus meta description, which is truncated marketing copy beginning 'Your media, your relay. nostr.build has hosted Nostr'. No clean one-line self-description exists.",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/nostrbuild/nostr.build",
+          "what": "repository description 'FOSS version of nostr.build', homepage field 'https://nostr.build'",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/nostrbuild/nostr.build",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "No NIP support statement was located in the primary sources fetched."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/nostrbuild/nostr.build",
+        "service_vs_software": "the repo is the 'FOSS version'; the operated service at nostr.build is not the same artefact. One `homepage` cannot distinguish them."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        13,
+        16,
+        40
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:cat.void",
+      "d_bytes": 16,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:cat.void"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "media"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "void.cat",
+          "summary": "Free, simple file hosting."
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/v0l/void.cat",
+          "what": "README heading 'Void.cat' and line 'Free, simple file hosting'; repository description 'Free file hosting website'",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://void.cat",
+          "what": "DNS RESOLUTION FAILED (curl: (6) Could not resolve host: void.cat). The repository's declared homepage no longer exists. homepage omitted rather than record a dead URL as a live one.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/v0l/void.cat README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "Zero occurrences of 'NIP'."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "GitHub reports none",
+        "source_repo": "https://github.com/v0l/void.cat",
+        "archived": "repository ARCHIVED, last push 2024-09-26.",
+        "reality": "the software is unmaintained AND the service's domain does not resolve. The record must still be published with state 'active', because per design §7.1 only the publisher can set 'withdrawn' and 'ceasing to publish is not retraction'."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        17,
+        36,
+        41
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.zeusln",
+      "d_bytes": 18,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.zeusln"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "identity"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Zeus",
+          "summary": "A mobile Bitcoin wallet fit for the gods.",
+          "homepage": "https://zeusln.com"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/ZeusLN/zeus",
+          "what": "repository description 'A mobile Bitcoin wallet fit for the gods. ⚡️ Est. 563345' (the trailing block-height suffix was dropped as it is not descriptive)",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/ZeusLN/zeus",
+          "what": "repository homepage field is 'https://ZeusLN.com' — mixed case host. Lowercased here; the v1 profile says nothing about URL normalisation.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/ZeusLN/zeus README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "Zero occurrences of 'NIP' in the README, although Zeus is widely used for zaps."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "GitHub reports NOASSERTION",
+        "source_repo": "https://github.com/ZeusLN/zeus",
+        "category": "Bitcoin Lightning wallet. Not a Nostr tool by its own description at all; it appears in Nostr catalogues by association.",
+        "summary_edited": "the publisher's own description contains an emoji and a bitcoin block height; recording it verbatim or edited are both defensible."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        16,
+        27,
+        30,
+        42
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.albyhub",
+      "d_bytes": 19,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.albyhub"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "identity"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Alby Hub",
+          "summary": "Alby Hub - Your own Bitcoin Lightning node: easy, connectable, feature-rich. Run anywhere. Become self-sovereign.",
+          "homepage": "https://albyhub.com"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/getAlby/hub",
+          "what": "repository description (emoji removed) and homepage field",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/getAlby/hub README section 'NIP-47 Supported Methods'",
+        "notation": "prose + per-method table",
+        "claimed": [
+          "NIP-47"
+        ],
+        "verbatim_caveats": [
+          "The README does not claim NIP-47 as a whole; it publishes a PER-METHOD support table ('NIP-47 info event', pay_invoice, etc.). Sub-NIP granularity has no representation in a per-NIP status model.",
+          "README: 'NIP-47 - requests encrypted by NIP-04 ...' — NIP-04 appears as an internal transport detail, not a feature claim, so it is not recorded."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "Apache-2.0",
+        "source_repo": "https://github.com/getAlby/hub",
+        "category": "self-hosted Lightning node + NWC service — fits none of the six shipped categories."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        27,
+        43
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.mutinywallet.app",
+      "d_bytes": 28,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.mutinywallet.app"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "identity"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Mutiny Wallet",
+          "summary": "Mutiny is a self-custodial lightning wallet that runs in the browser.",
+          "homepage": "https://app.mutinywallet.com"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://app.mutinywallet.com",
+          "what": "HTTP 200; <title>Mutiny Wallet</title>, meta description 'Mutiny is a self-custodial lightning wallet that runs in the browser.' — present tense, still served.",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "summary"
+          ],
+          "url": "https://github.com/MutinyWallet/mutiny-web",
+          "what": "repository description is 'The frontend for Mutiny Wallet' and the README body is build/test instructions only — no product description. The repository is ARCHIVED (last push 2024-09-04).",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/MutinyWallet/mutiny-web README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "Zero occurrences of 'NIP'."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/MutinyWallet/mutiny-web",
+        "contradiction": "TWO primary sources disagree about whether this exists: the archived repo says the code is frozen, the live site describes the product in the present tense. The v1 profile has one `summary`, one `homepage`, one `state`, and no as-of stamp or source-precedence rule.",
+        "category": "Lightning wallet — no fitting category."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        17,
+        27,
+        41,
+        44
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:wtf.nbd.nostr-tools",
+      "d_bytes": 27,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:wtf.nbd.nostr-tools"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "dev"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "nostr-tools",
+          "summary": "Tools for developing Nostr clients."
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/nbd-wtf/nostr-tools",
+          "what": "repository description",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/nbd-wtf/nostr-tools",
+          "what": "repository homepage field empty. homepage omitted.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/nbd-wtf/nostr-tools README",
+        "notation": "module names ('@nostr/tools/nip19') and section headings",
+        "claimed": "Unknown",
+        "modules_named_after_nips": [
+          "nip05",
+          "nip07",
+          "nip10",
+          "nip19",
+          "nip27",
+          "nip42",
+          "nip46"
+        ],
+        "verbatim_caveats": [
+          "Every NIP mention is a MODULE PATH or a how-to heading ('### Encoding and decoding NIP-19 codes', 'import * as nip19 from \"@nostr/tools/nip19\"'). A library shipping a `nip19` module provides primitives; it does not implement user-facing NIP-19 behaviour. Treating a module name as a support claim would be exactly the inference the brief forbids, so this is Unknown."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "Unlicense",
+        "source_repo": "https://github.com/nbd-wtf/nostr-tools",
+        "patches_via": "README: 'Use NIP-34 to send your patches to: <naddr...>' — the project's contribution channel is a Nostr address, not a URL."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        45,
+        46
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:dev.nostr.ndk",
+      "d_bytes": 21,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:dev.nostr.ndk"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "dev"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "NDK (Nostr Development Kit)",
+          "summary": "Nostr Development Kit with outbox-model support",
+          "homepage": "https://nostr-dev-kit.github.io/ndk/"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/nostr-dev-kit/ndk",
+          "what": "repository description and homepage field",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/nostr-dev-kit/ndk README 'NIP support' list",
+        "notation": "'- ✅ **NIP-NN** - Title'",
+        "claimed": [
+          "NIP-01",
+          "NIP-04",
+          "NIP-07",
+          "NIP-17",
+          "NIP-18",
+          "NIP-22",
+          "NIP-23",
+          "NIP-29",
+          "NIP-42",
+          "NIP-44",
+          "NIP-46",
+          "NIP-47",
+          "NIP-57",
+          "NIP-59",
+          "NIP-60",
+          "NIP-61",
+          "NIP-65",
+          "NIP-77",
+          "NIP-89",
+          "NIP-90"
+        ],
+        "verbatim_caveats": [
+          "A seventh notation (green-tick emoji instead of checkboxes).",
+          "The claims belong to a MONOREPO of many separately versioned npm packages (@nostr-dev-kit/ndk, /messages, /sync, /svelte, ...). NIP-17 is in `messages`, NIP-77 is in `sync`. One coordinate cannot say which package supports what.",
+          "NIP-57 is annotated '(LUD06, LUD16)' — support conditioned on a different spec family."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/nostr-dev-kit/ndk"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        9,
+        22,
+        45,
+        47
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:org.nostrdevkit",
+      "d_bytes": 23,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:org.nostrdevkit"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "dev"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "rust-nostr",
+          "summary": "Rust implementation of the nostr protocol, high-level client library, Nostr Wallet Connect and more.",
+          "homepage": "https://nostrdevkit.org"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/nostrdevkit/nostr",
+          "what": "repository description and homepage field. NOTE: the repo was requested as rust-nostr/nostr and GitHub redirected to nostrdevkit/nostr — the org was renamed.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/nostrdevkit/nostr README 'Project structure'",
+        "notation": "crate descriptions",
+        "claimed": "Unknown",
+        "crates_named_after_nips": [
+          "nostr-browser-signer (NIP-07)",
+          "nostr-connect (NIP-46)",
+          "nwc (NIP-47)"
+        ],
+        "verbatim_caveats": [
+          "As with nostr-tools, NIP numbers appear only as crate descriptions. No support matrix in the README. Unknown."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/nostrdevkit/nostr",
+        "renamed": "org rust-nostr -> nostrdevkit. The project NAME in common use ('rust-nostr') no longer matches its own repository path or domain. Any reverse-DNS `d` chosen before the rename is now misleading, and design §11 only permits a coordinate migration via a withdrawn record pointing at a new 30078 coordinate — not applicable to an upstream rename."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        13,
+        35,
+        45,
+        48
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:com.fiatjaf.nak",
+      "d_bytes": 23,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:com.fiatjaf.nak"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "dev"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "nak",
+          "summary": "a command line tool for doing all things nostr"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://github.com/fiatjaf/nak",
+          "what": "repository description; README heading 'nak, the nostr army knife'",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/fiatjaf/nak",
+          "what": "repository homepage field empty. homepage omitted.",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/fiatjaf/nak README",
+        "notation": "CLI subcommand names ('nak encode', 'nak fs')",
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "The README is 87 KB of generated CLI help. NIP numbers appear as subcommand and flag documentation, not as a support matrix. Unknown."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "Unlicense",
+        "source_repo": "https://github.com/fiatjaf/nak",
+        "category": "CLI developer tool — 'dev' is the nearest of six categories but the shipped label is '開発者向け' (for developers), which also covers libraries, relays frameworks and debuggers."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        10,
+        45
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:watch.nostr",
+      "d_bytes": 19,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:watch.nostr"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "analytics"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "nostr.watch",
+          "summary": "nostr.watch provides the infrastructure for observing the Nostr relay network.",
+          "homepage": "https://nostr.watch"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary",
+            "homepage"
+          ],
+          "url": "https://github.com/sandwichfarm/nostr-watch",
+          "what": "README first paragraph; repository description is the fragment 'NIP-66 stack'; homepage field 'https://nostr.watch'",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/sandwichfarm/nostr-watch README",
+        "notation": "prose + package table",
+        "claimed": [
+          "NIP-66"
+        ],
+        "verbatim_caveats": [
+          "README: 'It implements [NIP-66]'. That is the one affirmative claim.",
+          "The repo is a monorepo of 12+ packages each carrying its own maturity marker ('alpha', 'docs'). The v1 profile has no maturity field, so publishing this as one row loses every one of those markers."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/sandwichfarm/nostr-watch",
+        "default_branch": "next"
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        19,
+        47
+      ]
+    },
+    {
+      "coordinate_template": "30078:<publisher-hex>:nosmaps:dev.zapstore",
+      "d_bytes": 20,
+      "event_skeleton": {
+        "kind": 30078,
+        "tags": [
+          [
+            "d",
+            "nosmaps:dev.zapstore"
+          ],
+          [
+            "t",
+            "nosmaps"
+          ],
+          [
+            "t",
+            "dev"
+          ],
+          [
+            "state",
+            "active"
+          ],
+          [
+            "v",
+            "1"
+          ]
+        ],
+        "content": {
+          "schema": "org.nosmaps.software",
+          "version": 1,
+          "state": "active",
+          "name": "Zapstore",
+          "summary": "The open app store where users meet builders. Curated by communities. Android apps.",
+          "homepage": "https://zapstore.dev"
+        }
+      },
+      "provenance": [
+        {
+          "field": [
+            "name",
+            "summary"
+          ],
+          "url": "https://zapstore.dev/",
+          "what": "HTTP 200; <title>Zapstore — The Open App Store</title>, meta description 'The open app store where users meet builders. Curated by communities. Android apps.'",
+          "fetched": "2026-08-18"
+        },
+        {
+          "field": [
+            "homepage"
+          ],
+          "url": "https://github.com/zapstore/zapstore",
+          "what": "repository description 'The open app store' and homepage field 'https://zapstore.dev'",
+          "fetched": "2026-08-18"
+        }
+      ],
+      "nip_support_claim": {
+        "source": "https://github.com/zapstore/zapstore README",
+        "notation": null,
+        "claimed": "Unknown",
+        "verbatim_caveats": [
+          "Zero occurrences of 'NIP' in the README, even though Zapstore's whole model is Nostr-published app listings."
+        ],
+        "fetched": "2026-08-18"
+      },
+      "facts_with_no_home_in_v1_profile": {
+        "license": "MIT",
+        "source_repo": "https://github.com/zapstore/zapstore",
+        "category": "app distribution / app store — no fitting category, and it is a DIRECT FUNCTIONAL OVERLAP with Nosmaps itself (a Nostr-native catalogue of Nostr software).",
+        "identifier_note": "Zapstore addresses apps by naddr; e.g. Citrine's README download button links naddr1qvzqqqr7pvpzqateqake4lc2fn77lflzq30jfpk8uhvtccalc66989er8cdmljceqqtkxmmd9enhyet9deshyaphvvejucmfw3exjmn9hzj8uf (118 chars). A publisher wanting THAT as the identifier would need d = 'nosmaps:' + 118 = 126 bytes, which fits, but it is opaque and case-sensitive bech32."
+      },
+      "findings": [
+        1,
+        2,
+        3,
+        27,
+        49
+      ]
+    }
+  ],
+  "not_collected": [
+    {
+      "name": "nostr.band",
+      "why": "https://nostr.band did not respond to two curl attempts (20 s and 30 s timeouts) from this network on 2026-08-18. No primary source could be read, so no fields could be established. Excluded rather than filled from third-party listings.",
+      "finding": 50
+    },
+    {
+      "name": "Fountain, Primal iOS/Android, Damus Purple and other closed-source or store-only products",
+      "why": "Their primary source is an app-store listing whose text is written by the publisher but is not fetchable as a stable document from this environment, and the v1 profile's `homepage` cannot hold an app-store product identifier as a first-class field.",
+      "finding": 51
+    }
+  ]
+}
