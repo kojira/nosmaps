@@ -36,6 +36,53 @@
   font-size: .72rem;
 }
 
+/* NIP-07 のサインイン欄。npub は63文字あるので、375px でも横に溢れず折り返す。 */
+.viewer-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .18rem .4rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.viewer-identity .viewer-state {
+  color: var(--ink);
+  font-weight: 850;
+}
+
+.viewer-identity[data-viewer-status="signedOut"] .viewer-state,
+.viewer-identity[data-viewer-status="pending"] .viewer-state {
+  color: var(--muted);
+}
+
+.viewer-identity .viewer-reason {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--muted);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.viewer-npub {
+  min-width: 0;
+  max-width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .66rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.viewer-action[aria-disabled="true"] {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.profile-npub.is-signed-out {
+  color: var(--muted);
+}
+
 .feature-search {
   padding: .35rem 0 .55rem;
 }

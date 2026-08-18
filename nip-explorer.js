@@ -78,6 +78,124 @@
     return `<div class="language-switch${compact ? ' compact' : ''}" role="group" aria-label="${esc(t('language'))}"><button type="button" data-language="ja" aria-pressed="${i18n.language === 'ja'}">日本語</button><button type="button" data-language="en" aria-pressed="${i18n.language === 'en'}">English</button></div>`;
   }
 
+  /* ---- NIP-07 サインイン (issue #9) --------------------------------------------------
+     この画面が持つのは「拡張が返した公開鍵」だけ。秘密鍵にも署名にも触れないし、
+     このスライスでは何も publish しない。
+
+     サインインしていないときに身元らしきものを出さないのが唯一の不変条件。以前ここには
+     `npub1currentviewer8q4k2p7cx` という固定文字列が居て、拡張が無くても誰かがログイン
+     しているように読めた。失敗したら必ず「未サインイン」に落とし、npub は絶対に作らない。
+
+     失敗の原因は畳まない。拡張が入っていない / 拡張で断られた / 拡張がエラーを返した /
+     拡張が黙ったままだった、は利用者にとって次の行動が違う別の出来事なので、別の文言で出す。
+     拒否とエラーは NIP-07 が機械可読な区別を定義していないので、拡張が返した文言で判定し、
+     判定に使った文言そのものも併記して、こちらの分類だけを信じさせないようにする。 */
+  const VIEWER_SESSION_KEY = 'nosmaps.viewer.pubkey';
+  const NIP07_TIMEOUT_MS = (() => {
+    const requested = Number(params.get('nip07timeout'));
+    return Number.isFinite(requested) && requested > 0 ? requested : 20000;
+  })();
+  const DENIAL_PATTERN = /denied|deny|rejected|reject|declined|decline|refused|refuse|cancell?ed|cancel|not allowed|unauthori[sz]ed|拒否|却下|キャンセル/i;
+  const viewer = {status: 'signedOut', reason: null, detail: '', pubkey: null, npub: null, pending: false};
+  let signInAttempt = 0;
+
+  /* NIP-07 は 32 バイト hex を返すと決めているが、npub を返す実装も現に在る。どちらも
+     受けて npub に正規化し、どちらでもない値は鍵として扱わない (null)。 */
+  function normalizeViewerKey(value) {
+    const catalog = window.NOSMAPS_CATALOG;
+    if (!catalog || typeof catalog.decodeNpub !== 'function' || typeof catalog.encodeNpub !== 'function') return null;
+    const pubkey = catalog.decodeNpub(typeof value === 'string' ? value : '');
+    if (!pubkey) return null;
+    const npub = catalog.encodeNpub(pubkey);
+    return npub ? {pubkey, npub} : null;
+  }
+  function signedInWith(key) {
+    Object.assign(viewer, {status: 'signedIn', reason: null, detail: '', pubkey: key.pubkey, npub: key.npub, pending: false});
+    // セッション限り。sessionStorage はタブを閉じれば消えるし、localStorage と違って
+    // 別タブに漏れない。書けない環境 (プライベートモード等) でも画面は動き続ける。
+    try { sessionStorage.setItem(VIEWER_SESSION_KEY, key.pubkey); } catch (_) {}
+  }
+  function signedOutBecause(reason, detail) {
+    Object.assign(viewer, {status: 'signedOut', reason: reason || null, detail: detail || '', pubkey: null, npub: null, pending: false});
+    try { sessionStorage.removeItem(VIEWER_SESSION_KEY); } catch (_) {}
+  }
+  function restoreViewerSession() {
+    let stored = null;
+    try { stored = sessionStorage.getItem(VIEWER_SESSION_KEY); } catch (_) { stored = null; }
+    const key = stored ? normalizeViewerKey(stored) : null;
+    if (key) signedInWith(key); else signedOutBecause(null, '');
+  }
+  function signerErrorText(error) {
+    if (error == null) return '';
+    if (typeof error === 'string') return error;
+    const message = typeof error === 'object' ? (error.message ?? error.reason ?? error.error) : null;
+    return typeof message === 'string' ? message : '';
+  }
+  async function signIn() {
+    if (viewer.pending) return;
+    const attempt = ++signInAttempt;
+    const signer = window.nostr && typeof window.nostr === 'object' ? window.nostr : null;
+    if (!signer || typeof signer.getPublicKey !== 'function') { signedOutBecause('noExtension', ''); renderViewer(); return; }
+    Object.assign(viewer, {pending: true, reason: null, detail: ''});
+    renderViewer();
+    let timer = null;
+    // getPublicKey() は利用者にプロンプトを出す。プロンプトを閉じずに放置された拡張は
+    // 永遠に settle しないので、待ち続けて「接続中…」のまま固まらないよう時間で切る。
+    const answered = new Promise(resolve => { timer = setTimeout(() => resolve({outcome: 'timeout'}), NIP07_TIMEOUT_MS); });
+    // 遅れて settle しても unhandledrejection にならないよう、ここで両方に手を付けておく。
+    const asked = Promise.resolve().then(() => signer.getPublicKey())
+      .then(value => ({outcome: 'resolved', value}), error => ({outcome: 'rejected', error}));
+    let result;
+    try { result = await Promise.race([asked, answered]); } finally { clearTimeout(timer); }
+    // 打ち切った後に届いた古い応答で画面を書き換えない。
+    if (attempt !== signInAttempt) return;
+    if (result.outcome === 'timeout') signedOutBecause('timeout', '');
+    else if (result.outcome === 'rejected') {
+      const message = signerErrorText(result.error);
+      signedOutBecause(DENIAL_PATTERN.test(message) ? 'rejected' : 'error', message);
+    } else {
+      const key = normalizeViewerKey(result.value);
+      if (key) signedInWith(key); else signedOutBecause('badKey', '');
+    }
+    renderViewer();
+  }
+  function signOut() { signInAttempt += 1; signedOutBecause(null, ''); renderViewer(); }
+  function viewerReasonText() {
+    if (!viewer.reason) return '';
+    const reason = viewer.reason === 'timeout'
+      ? t('explorer.viewer.reasons.timeout', {seconds: Math.round(NIP07_TIMEOUT_MS / 1000)})
+      : t(`explorer.viewer.reasons.${viewer.reason}`);
+    return viewer.detail ? t('explorer.viewer.reasonDetail', {reason, detail: viewer.detail}) : reason;
+  }
+  function viewerMarkup() {
+    if (viewer.status === 'signedIn') {
+      return `<span class="viewer-state">${esc(t('explorer.viewer.signedIn'))}</span>`
+        + `<code class="viewer-npub" data-viewer-npub>${esc(viewer.npub)}</code>`
+        + `<button class="text-button viewer-action" type="button" data-viewer-signout>${esc(t('explorer.viewer.signOut'))}</button>`;
+    }
+    const reason = viewerReasonText();
+    return `<span class="viewer-state">${esc(t('explorer.viewer.signedOut'))}</span>`
+      + (reason ? `<span class="viewer-reason" data-viewer-reason="${esc(viewer.reason)}">${esc(reason)}</span>` : '')
+      + `<button class="text-button viewer-action" type="button" data-viewer-signin aria-disabled="${viewer.pending}">${esc(viewer.pending ? t('explorer.viewer.signingIn') : t('explorer.viewer.signIn'))}</button>`;
+  }
+  function viewerControl() {
+    return `<div class="viewer-identity" id="viewer-identity" role="status" aria-live="polite" aria-label="${esc(t('explorer.viewer.label'))}" data-viewer-status="signedOut"></div>`;
+  }
+  function renderViewer() {
+    const host = $('#viewer-identity');
+    if (!host) return;
+    // innerHTML の入れ替えでボタンごと消えるので、そこに居たフォーカスは呼び戻す。
+    const hadFocus = host.contains(document.activeElement);
+    host.dataset.viewerStatus = viewer.pending ? 'pending' : viewer.status;
+    host.innerHTML = viewerMarkup();
+    if (hadFocus) host.querySelector('button')?.focus();
+  }
+  // サインインしていないビューアには npub が無い。無いことを「—」ではなく言葉で出す。
+  function reviewerNpub(profileId) {
+    if (profileId !== 'local') return profiles[profileId]?.npub || '';
+    return viewer.status === 'signedIn' ? viewer.npub : t('explorer.viewer.signedOut');
+  }
+
   function featureName(id) { return localizedFeature(id).name; }
   /* §21.10 item 3: the old form mapped each feature NIP through `tool.nips.find` and then dropped
      every miss with `.filter(Boolean)`, so a claim against an id the registry does not hold vanished
@@ -161,7 +279,8 @@
     document.title = t('explorer.pageTitle');
     $('meta[name="description"]').content = t('explorer.pageDescription');
     $('#skip-link').textContent = t('skip');
-    $('#compact-identity').innerHTML = `<a href="index.html" aria-label="${esc(t('explorer.back'))}"><span class="identity-mark" aria-hidden="true">N</span><span>nosmaps</span></a><span aria-hidden="true">/</span><span>${esc(t('explorer.location'))}</span>${languageControl(false)}`;
+    $('#compact-identity').innerHTML = `<a href="index.html" aria-label="${esc(t('explorer.back'))}"><span class="identity-mark" aria-hidden="true">N</span><span>nosmaps</span></a><span aria-hidden="true">/</span><span>${esc(t('explorer.location'))}</span>${viewerControl()}${languageControl(false)}`;
+    renderViewer();
     $('#search-title').textContent = t('explorer.search');
     els.query.placeholder = t('explorer.searchPlaceholder');
     els.chips.setAttribute('aria-label', t('explorer.featureGroup'));
@@ -217,10 +336,13 @@
     return types.map(type => `<button class="resource-link" type="button" data-resource-tool="${tool.id}" data-resource-type="${type}">${esc(t(`explorer.${type}`))}</button>`).join('');
   }
 
+  /* `a` と `b` はサンプル入口専用の作り物のレビュアー (seedReviews と同じ扱い)。
+     ビューア自身の欄はここには無い。かつて `local` として固定の npub と参加時期と
+     役立ち票 0 を持っていたが、どれも観測していない値だったので viewer (下) が持つ
+     「NIP-07 が返した公開鍵」だけに置き換えた。 */
   const profiles = {
     a: {name: 'Mina / relay walker', npub: 'npub1mina7q3f4k8reva2x90cx', joined: '2023-04', useful: 31, notUseful: 4},
-    b: {name: 'Tao / quiet tester', npub: 'npub1tao8r5f7k4review2p9cx', joined: '2024-11', useful: 18, notUseful: 3},
-    local: {name: '', npub: 'npub1currentviewer8q4k2p7cx', joined: '2026-08', useful: 0, notUseful: 0}
+    b: {name: 'Tao / quiet tester', npub: 'npub1tao8r5f7k4review2p9cx', joined: '2024-11', useful: 18, notUseful: 3}
   };
 
   const shotPalette = ['#5a46b8', '#08745e', '#a34c62', '#3f668c'];
@@ -248,7 +370,7 @@
 
   function reviewItem(tool, review) {
     const counts = reviewCounts(review);
-    return `<article class="review-item" data-review-id="${esc(review.id)}"><div class="review-author"><button type="button" class="reviewer-link" data-reviewer="${review.profile}"><strong>${esc(review.author)}</strong><small>${esc(profiles[review.profile]?.npub || '')}</small></button><time>${esc(review.date)}</time></div><p>${esc(review.body || t('explorer.imageOnly'))}</p>${review.image ? `<button type="button" class="review-image-button" data-open-image="${tool.id}" data-image-review="${review.id}">${screenshotMarkup(review.image, true, t('explorer.imageAlt', {author: review.author, date: review.date}))}<span>${esc(t('explorer.enlarge'))}</span></button>` : ''}<dl><div><dt>${esc(t('explorer.os'))}</dt><dd>${esc(review.os || t('explorer.notEntered'))}</dd></div><div><dt>${esc(t('explorer.appVersion'))}</dt><dd>${esc(review.version || t('explorer.notEntered'))}</dd></div><div><dt>${esc(t('explorer.rating'))}</dt><dd>${review.rating || t('explorer.notEntered')}</dd></div><div><dt>${esc(t('explorer.use'))}</dt><dd>${esc(review.use || t('explorer.notEntered'))}</dd></div></dl><div class="helpful-actions"><button type="button" data-review-vote="helpful" data-review-id="${review.id}" data-review-tool-id="${tool.id}" aria-pressed="${counts.vote === 'helpful'}">${esc(t('explorer.helpful', {count: counts.helpful}))}</button><button type="button" data-review-vote="unhelpful" data-review-id="${review.id}" data-review-tool-id="${tool.id}" aria-pressed="${counts.vote === 'unhelpful'}">${esc(t('explorer.unhelpful', {count: counts.unhelpful}))}</button><button class="text-button" type="button" data-vote-basis="${review.id}" data-vote-tool="${tool.id}">${esc(t('explorer.voters', {count: counts.helpful + counts.unhelpful}))}</button></div></article>`;
+    return `<article class="review-item" data-review-id="${esc(review.id)}"><div class="review-author"><button type="button" class="reviewer-link" data-reviewer="${review.profile}"><strong>${esc(review.author)}</strong><small>${esc(reviewerNpub(review.profile))}</small></button><time>${esc(review.date)}</time></div><p>${esc(review.body || t('explorer.imageOnly'))}</p>${review.image ? `<button type="button" class="review-image-button" data-open-image="${tool.id}" data-image-review="${review.id}">${screenshotMarkup(review.image, true, t('explorer.imageAlt', {author: review.author, date: review.date}))}<span>${esc(t('explorer.enlarge'))}</span></button>` : ''}<dl><div><dt>${esc(t('explorer.os'))}</dt><dd>${esc(review.os || t('explorer.notEntered'))}</dd></div><div><dt>${esc(t('explorer.appVersion'))}</dt><dd>${esc(review.version || t('explorer.notEntered'))}</dd></div><div><dt>${esc(t('explorer.rating'))}</dt><dd>${review.rating || t('explorer.notEntered')}</dd></div><div><dt>${esc(t('explorer.use'))}</dt><dd>${esc(review.use || t('explorer.notEntered'))}</dd></div></dl><div class="helpful-actions"><button type="button" data-review-vote="helpful" data-review-id="${review.id}" data-review-tool-id="${tool.id}" aria-pressed="${counts.vote === 'helpful'}">${esc(t('explorer.helpful', {count: counts.helpful}))}</button><button type="button" data-review-vote="unhelpful" data-review-id="${review.id}" data-review-tool-id="${tool.id}" aria-pressed="${counts.vote === 'unhelpful'}">${esc(t('explorer.unhelpful', {count: counts.unhelpful}))}</button><button class="text-button" type="button" data-vote-basis="${review.id}" data-vote-tool="${tool.id}">${esc(t('explorer.voters', {count: counts.helpful + counts.unhelpful}))}</button></div></article>`;
   }
 
   function cardReviewThumbnails(tool) {
@@ -685,9 +807,16 @@
     if (shouldOpen) openDialog(els.reviewDialog, context);
     if (context.reviewId) restoreFocus(`[data-review-id="${CSS.escape(context.reviewId)}"] button`, els.reviewDialog);
   }
+  /* ビューアの欄には「拡張が返した公開鍵」しか無い。参加時期も役立ち票も一度も観測して
+     いないので、0 や今月を埋めずに null で返し、他の未観測値と同じ「—（不明）」で出す。 */
   function profileDetails(id) {
     const seed = i18n.value('explorer.reviewsSeed');
-    if (id === 'local') return {...profiles.local, name: seed.localName, bio: seed.localBio, spread: t('explorer.notEntered'), posts: t('explorer.notEntered')};
+    if (id === 'local') {
+      return {
+        name: seed.localName, bio: seed.localBio, npub: viewer.status === 'signedIn' ? viewer.npub : null,
+        joined: null, spread: null, posts: null, useful: null, notUseful: null
+      };
+    }
     return {...profiles[id], bio: id === 'a' ? seed.aBio : seed.bBio, spread: id === 'a' ? seed.aSpread : seed.bSpread, posts: id === 'a' ? seed.aPosts : seed.bPosts};
   }
   function profileHistory(profileId) {
@@ -696,8 +825,14 @@
   function renderProfile(context, shouldOpen = true) {
     const profile = profileDetails(context.profileId);
     const history = profileHistory(context.profileId);
+    // 観測していない欄はカードの「—（不明）」と同じマーカーで出す。0 も今日の日付も埋めない。
+    const fact = value => value == null ? unknownMarker() : esc(value);
+    const votes = profile.useful == null || profile.notUseful == null ? unknownMarker() : `${profile.useful} / ${profile.notUseful}`;
+    const npubLine = profile.npub
+      ? `<p class="profile-npub" data-profile-npub>${esc(profile.npub)}</p>`
+      : `<p class="profile-npub is-signed-out" data-profile-npub>${esc(t('explorer.viewer.signedOut'))}</p>`;
     els.profileDialog.setAttribute('aria-label', t('explorer.profileTitle'));
-    els.profileContent.innerHTML = `${dialogHead(t('explorer.profileTitle'), profile.name)}<p class="profile-npub">${esc(profile.npub)}</p><p>${esc(profile.bio)}</p><dl class="profile-facts"><div><dt>${esc(t('explorer.joined'))}</dt><dd>${esc(profile.joined)}</dd></div><div><dt>${esc(t('explorer.activity'))}</dt><dd>${esc(profile.spread)}</dd></div><div><dt>${esc(t('explorer.posting'))}</dt><dd>${esc(profile.posts)}</dd></div><div><dt>${esc(t('explorer.voteHistory'))}</dt><dd>${profile.useful} / ${profile.notUseful}</dd></div></dl><section class="profile-history"><h3>${esc(t('explorer.history'))}</h3>${history.map(({tool, review}) => `<article><div><strong>${esc(tool.name)}</strong><span>${esc(review.date)}</span></div><p>${esc(review.body)}</p><button class="secondary" type="button" data-review-tool="${tool.id}" data-review-jump="${review.id}">${esc(t('explorer.originalReview'))}</button></article>`).join('')}</section>`;
+    els.profileContent.innerHTML = `${dialogHead(t('explorer.profileTitle'), profile.name)}${npubLine}<p>${esc(profile.bio)}</p><dl class="profile-facts"><div><dt>${esc(t('explorer.joined'))}</dt><dd>${fact(profile.joined)}</dd></div><div><dt>${esc(t('explorer.activity'))}</dt><dd>${fact(profile.spread)}</dd></div><div><dt>${esc(t('explorer.posting'))}</dt><dd>${fact(profile.posts)}</dd></div><div><dt>${esc(t('explorer.voteHistory'))}</dt><dd>${votes}</dd></div></dl><section class="profile-history"><h3>${esc(t('explorer.history'))}</h3>${history.map(({tool, review}) => `<article><div><strong>${esc(tool.name)}</strong><span>${esc(review.date)}</span></div><p>${esc(review.body)}</p><button class="secondary" type="button" data-review-tool="${tool.id}" data-review-jump="${review.id}">${esc(t('explorer.originalReview'))}</button></article>`).join('')}</section>`;
     if (shouldOpen) openDialog(els.profileDialog, context);
   }
   function renderGallery(context, shouldOpen = true) {
@@ -761,6 +896,8 @@
       restoreFocus(key, dialogs.filter(dialog => dialog.open).at(-1) || document);
       return;
     }
+    if (event.target.closest('[data-viewer-signin]')) { signIn(); return; }
+    if (event.target.closest('[data-viewer-signout]')) { signOut(); return; }
     const feature = event.target.closest('[data-select-feature]');
     if (feature) { const id = feature.dataset.selectFeature; state.features = state.features.includes(id) ? state.features.filter(value => value !== id) : [...state.features, id]; if (!state.features.length) state.support = 'all'; state.uiState = 'normal'; renderAll(); restoreFocus(`[data-select-feature="${id}"]`); return; }
     const categoryButton = event.target.closest('[data-category-filter]');
@@ -839,6 +976,9 @@
   const legacy = location.hash.match(/^#feature-([a-z]+)$/)?.[1];
   const initial = location.hash.match(/^#features-([a-z-]+)$/)?.[1]?.split('-') || [];
   state.features = legacy && featureById[legacy] ? [legacy] : initial.filter(id => featureById[id]);
+  // 読み込み時に getPublicKey() は呼ばない。プロンプトはページを開いた行為への同意ではない。
+  // 同じタブで既にサインインしていたときだけ、保存した公開鍵から状態を復元する。
+  restoreViewerSession();
   renderAll();
   window.__NOSMAPS_RELAY_LOAD__ = loadRelayCatalog;
   if (relayRequested) {
