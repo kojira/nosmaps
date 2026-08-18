@@ -6,6 +6,21 @@
    既存の保証は落とさない。 */
 const {test, expect} = require('@playwright/test');
 
+/* issue #6 で公式情報リンクとレビュー入口はカードから詳細ビュー (#evidence-dialog) へ移った。
+   保証は変わらないので、入口を一段開いてから同じことを確かめる。カード側には「アンカーを
+   一つも描かない」という形で残っている。 */
+/** @param {import('@playwright/test').Page} page @param {string} id */
+async function openDetail(page, id) {
+  await page.locator(`[data-tool-id="${id}"] [data-feature-detail]`).click();
+  await expect(page.locator('#evidence-dialog')).toBeVisible();
+}
+
+/** @param {import('@playwright/test').Page} page */
+async function closeEvidence(page) {
+  await page.locator('#evidence-dialog [data-close-dialog]').click();
+  await expect(page.locator('#evidence-dialog')).toBeHidden();
+}
+
 function collectErrors(page) {
   const errors = [];
   page.on('console', message => { if (message.type() === 'error') errors.push(`console: ${message.text()}`); });
@@ -54,7 +69,8 @@ test('a declared homepage renders a new-tab anchor and an entry without one rend
   expect(sample.withoutHomepageCount, 'entries that declare no homepage').toBeGreaterThan(0);
 
   // (1) homepage を持つエントリ: 公式サイトの URL 欄が本物のリンクになっている。
-  await page.locator(`[data-tool-id="${sample.withHomepage.id}"] [data-resource-type="site"]`).click();
+  await openDetail(page, sample.withHomepage.id);
+  await page.locator('#evidence-dialog [data-resource-type="site"]').click();
   await expect(page.locator('#evidence-dialog')).toBeVisible();
   const urlCell = page.locator('#evidence-content .nip-evidence-grid > div').first();
   await expect(urlCell.locator('dt')).toHaveText('URL');
@@ -64,20 +80,22 @@ test('a declared homepage renders a new-tab anchor and an entry without one rend
   await expect(link).toHaveAttribute('target', '_blank');
   await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   await expect(link).toHaveText(sample.withHomepage.homepage);
-  await page.locator('#evidence-dialog [data-close-dialog]').click();
+  await closeEvidence(page);
 
   // (2) homepage の無いエントリ: 公式サイトの入口そのものが無く、アンカーは一つも描かれない。
   const withoutCard = page.locator(`[data-tool-id="${sample.withoutHomepage.id}"]`);
   await expect(withoutCard).toHaveCount(1);
-  await expect(withoutCard.locator('[data-resource-type="site"]')).toHaveCount(0);
   await expect(withoutCard.locator('a')).toHaveCount(0);
-  const siteControlsForEntriesWithoutHomepage = await page.evaluate(ids => ids.filter(id =>
-    document.querySelector(`[data-tool-id="${CSS.escape(id)}"] [data-resource-type="site"]`)), sample.withoutHomepageIds);
-  expect(siteControlsForEntriesWithoutHomepage, 'site controls on entries with no homepage').toEqual([]);
+  for (const id of sample.withoutHomepageIds) {
+    await openDetail(page, id);
+    await expect(page.locator('#evidence-dialog [data-resource-type="site"]'), `site control for ${id}`).toHaveCount(0);
+    await closeEvidence(page);
+  }
 
   // (3) URL ではない値はリンクにしない。行き先を作れないところに行き先を書かない。
   if (sample.nonUrlResource) {
-    await page.locator(`[data-tool-id="${sample.nonUrlResource.id}"] [data-resource-type="distribution"]`).click();
+    await openDetail(page, sample.nonUrlResource.id);
+    await page.locator('#evidence-dialog [data-resource-type="distribution"]').click();
     await expect(page.locator('#evidence-dialog')).toBeVisible();
     await expect(page.locator('#evidence-content .nip-evidence-grid > div').first().locator('dd a')).toHaveCount(0);
     await expect(page.locator('#evidence-content .nip-evidence-grid > div').first().locator('dd')).toHaveText(sample.nonUrlResource.value);
@@ -90,7 +108,8 @@ test('the homepage link keeps its href in Japanese and stays inside 375x812', as
   await page.setViewportSize({width: 375, height: 812});
   await page.goto('nip-explorer.html');
   const sample = await catalogSample(page);
-  await page.locator(`[data-tool-id="${sample.withHomepage.id}"] [data-resource-type="site"]`).click();
+  await openDetail(page, sample.withHomepage.id);
+  await page.locator('#evidence-dialog [data-resource-type="site"]').click();
   const link = page.locator('#evidence-content .nip-evidence-grid > div').first().locator('dd a');
   await expect(link).toHaveAttribute('href', sample.withHomepage.homepage);
   await expect(link).toHaveAttribute('title', 'Opens in a new tab');
@@ -112,21 +131,23 @@ test('exactly one language control exists on the page and none inside an opened 
 
   const sample = await catalogSample(page);
   const openers = [
-    ['#evidence-dialog', `[data-tool-id="${sample.withHomepage.id}"] [data-resource-type="site"]`],
-    ['#evidence-dialog', `[data-tool-id="${sample.withHomepage.id}"] [data-feature-detail]`],
-    ['#review-dialog', `[data-tool-id="${sample.withHomepage.id}"] [data-review-tool]`]
+    {dialogSelector: '#evidence-dialog', open: async () => { await openDetail(page, sample.withHomepage.id); }},
+    {dialogSelector: '#evidence-dialog', open: async () => { await openDetail(page, sample.withHomepage.id); await page.locator('#evidence-dialog [data-resource-type="site"]').click(); }},
+    {dialogSelector: '#review-dialog', open: async () => { await openDetail(page, sample.withHomepage.id); await page.locator('#evidence-dialog [data-review-tool]').click(); }}
   ];
-  for (const [dialogSelector, openerSelector] of openers) {
-    await page.locator(openerSelector).click();
+  for (const {dialogSelector, open} of openers) {
+    await open();
     const dialog = page.locator(dialogSelector);
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('.language-switch'), `${dialogSelector} language switch`).toHaveCount(0);
     await expect(dialog.locator('[data-language]'), `${dialogSelector} language buttons`).toHaveCount(0);
     await expect(page.locator('.language-switch'), `${dialogSelector} page total`).toHaveCount(1);
     await page.locator(`${dialogSelector} [data-close-dialog]`).click();
+    if (await page.locator('#evidence-dialog').isVisible()) await closeEvidence(page);
   }
 
-  await page.locator(`[data-tool-id="${sample.withHomepage.id}"] [data-review-tool]`).click();
+  await openDetail(page, sample.withHomepage.id);
+  await page.locator('#evidence-dialog [data-review-tool]').click();
   await page.locator('#review-dialog [data-gallery-tool]').click();
   await expect(page.locator('#gallery-dialog')).toBeVisible();
   await expect(page.locator('#gallery-dialog .language-switch')).toHaveCount(0);
@@ -134,6 +155,7 @@ test('exactly one language control exists on the page and none inside an opened 
   await expect(page.locator('.language-switch')).toHaveCount(1);
   await page.locator('#gallery-dialog [data-close-dialog]').click();
   await page.locator('#review-dialog [data-close-dialog]').click();
+  await closeEvidence(page);
 
   await page.locator('[data-compare-tool]').nth(0).check();
   await page.locator('[data-compare-tool]').nth(1).check();
@@ -158,7 +180,8 @@ test('the single page-level control still switches language and preserves dialog
   await page.locator('[data-select-feature="media"]').click();
   await page.locator('[data-compare-tool]').nth(0).check();
   await page.locator('[data-compare-tool]').nth(1).check();
-  await page.locator(`[data-tool-id="${sample.withHomepage.id}"] [data-review-tool]`).click();
+  await openDetail(page, sample.withHomepage.id);
+  await page.locator('#evidence-dialog [data-review-tool]').click();
   const form = page.locator(`[data-review-form="${sample.withHomepage.id}"]`);
   await expect(form).toBeVisible();
   await form.locator('textarea[name="body"]').fill('Keep this review draft');

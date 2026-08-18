@@ -15,6 +15,9 @@
 .carousel-slide{flex:0 0 var(--slide-width);box-sizing:border-box;display:grid;gap:.5rem;min-width:0;min-height:11rem;align-content:start;padding:1rem;border:1px solid var(--line);border-radius:.85rem;background:#fbfcfa;transform:scale(.86);opacity:.45;transition:transform .55s cubic-bezier(.22,.61,.36,1),opacity .55s cubic-bezier(.22,.61,.36,1),border-color .55s ease}
 .carousel-slide.is-side{opacity:.6}
 .carousel-slide.is-current{transform:scale(1);opacity:1;border-color:#7866d3;box-shadow:var(--shadow)}
+.slide-link{display:grid;gap:.5rem;min-width:0;align-content:start;color:inherit;text-decoration:none}
+.slide-link:hover .slide-name{text-decoration:underline}
+.slide-link:focus-visible{outline:2px solid #7866d3;outline-offset:3px;border-radius:.6rem}
 .slide-icon{display:grid;place-items:center;width:2.5rem;height:2.5rem;border-radius:.65rem;background:#edf0ec;font-size:1.25rem}
 .slide-name{margin:0;font-size:1.15rem;overflow-wrap:anywhere}
 .slide-description{margin:0;color:var(--muted);overflow-wrap:anywhere}

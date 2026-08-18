@@ -35,6 +35,15 @@ const VECTORS = {
   }
 };
 
+/* issue #6 でレビュー入口は一覧カードから詳細ビュー (#evidence-dialog) の中へ移った。 */
+/** @param {import('@playwright/test').Page} page */
+async function openReviews(page) {
+  await page.locator('#tool-results .feature-tool-card [data-feature-detail]').first().click();
+  await expect(page.locator('#evidence-dialog')).toBeVisible();
+  await page.locator('#evidence-dialog [data-review-tool]').click();
+  await expect(page.locator('#review-dialog')).toHaveAttribute('open', '');
+}
+
 function collectErrors(page) {
   const errors = [];
   page.on('console', message => { if (message.type() === 'error') errors.push(`console: ${message.text()}`); });
@@ -308,8 +317,8 @@ test.describe('NIP-07 sign-in (issue #9)', () => {
     await installSigner(page, {mode: 'resolve', value: VECTORS.b.hex});
     await page.goto(EXPLORER);
 
-    await page.locator('[data-review-tool]').first().click();
-    await expect(page.locator('#review-dialog')).toHaveAttribute('open', '');
+    // issue #6: レビュー入口はカードから詳細ビューへ移った。開く手数が一つ増えただけで中身は同じ。
+    await openReviews(page);
     await page.locator('#review-dialog textarea[name="body"]').fill('Checked on this screen.');
     await page.locator('#review-dialog form[data-review-form] button[type="submit"]').click();
 
@@ -321,11 +330,13 @@ test.describe('NIP-07 sign-in (issue #9)', () => {
     expect(signedOutLine).not.toMatch(NPUB_LIKE);
 
     await page.locator('#review-dialog [data-close-dialog]').click();
+    // 詳細ビューはレビューダイアログの下に開いたままなので、ページ上部を触る前に閉じる。
+    await page.locator('#evidence-dialog [data-close-dialog]').click();
+    await expect(page.locator('#evidence-dialog')).toBeHidden();
     await signInButton(page).click();
     await expect(viewer(page)).toHaveAttribute('data-viewer-status', 'signedIn');
 
-    await page.locator('[data-review-tool]').first().click();
-    await expect(page.locator('#review-dialog')).toHaveAttribute('open', '');
+    await openReviews(page);
     await expect(page.locator('#review-dialog .review-item').last().locator('.reviewer-link small'))
       .toHaveText(VECTORS.b.npub);
     expect(errors).toEqual([]);

@@ -56,7 +56,12 @@
     const facts = [label ? fact(t('landing.category'), label) : '', tool.platformText ? fact(t('landing.platform'), tool.platformText) : ''].filter(Boolean);
     const accessibleName = t('landing.slideLabel', {name: tool.name, index: item.index + 1, total: entries.length});
     const identity = item.clone ? 'data-clone="true"' : `data-slide-index="${item.index}"`;
-    return `<article class="carousel-slide" role="group" aria-label="${esc(accessibleName)}" aria-hidden="true" data-slot-index="${slot}" ${identity}>${record?.icon ? `<span class="slide-icon" aria-hidden="true">${icons.svg(record.icon)}</span>` : ''}<h3 class="slide-name">${esc(tool.name)}</h3><p class="slide-description${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(tool.summaryAbsent ? t('explorer.summaryAbsent') : tool.summary)}</p>${facts.length ? `<div class="slide-facts">${facts.join('')}</div>` : ''}</article>`;
+    /* issue #2: a slide is the entry, so the whole slide is one link into the explorer opened on
+       that entry. `tabindex` starts at -1 on every slide including the padding copies: only the
+       centred slide is exposed to assistive technology, and paint() hands it the tab stop. */
+    const href = `nip-explorer.html?tool=${encodeURIComponent(tool.id)}`;
+    const body = `${record?.icon ? `<span class="slide-icon" aria-hidden="true">${icons.svg(record.icon)}</span>` : ''}<h3 class="slide-name">${esc(tool.name)}</h3><p class="slide-description${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(tool.summaryAbsent ? t('explorer.summaryAbsent') : tool.summary)}</p>${facts.length ? `<div class="slide-facts">${facts.join('')}</div>` : ''}`;
+    return `<article class="carousel-slide" role="group" aria-label="${esc(accessibleName)}" aria-hidden="true" data-slot-index="${slot}" ${identity}><a class="slide-link" href="${esc(href)}" data-slide-link="${esc(tool.id)}" aria-label="${esc(t('landing.openEntry', {name: tool.name}))}" tabindex="-1">${body}</a></article>`;
   }
 
   function carousel() {
@@ -106,8 +111,13 @@
       const distance = Number(element.dataset.slotIndex) - centre;
       element.classList.toggle('is-current', distance === 0);
       element.classList.toggle('is-side', Math.abs(distance) === 1);
-      if (!element.dataset.clone && Number(element.dataset.slideIndex) === state.index) element.removeAttribute('aria-hidden');
+      const exposed = !element.dataset.clone && Number(element.dataset.slideIndex) === state.index;
+      if (exposed) element.removeAttribute('aria-hidden');
       else element.setAttribute('aria-hidden', 'true');
+      /* Only the exposed slide's link is a tab stop. A focusable link inside an aria-hidden
+         slide would be reachable by Tab and invisible to a screen reader at the same time. */
+      const link = element.querySelector('.slide-link');
+      if (link instanceof HTMLAnchorElement) link.tabIndex = exposed ? 0 : -1;
     });
     const indicator = document.querySelector('#carousel-position');
     if (indicator) indicator.textContent = position();

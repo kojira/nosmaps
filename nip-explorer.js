@@ -26,10 +26,15 @@
   const validStates = ['normal', 'loading', 'empty', 'error', 'partial', 'offline', 'stale', 'incomplete', 'unavailable'];
   const params = new URLSearchParams(location.search);
   const requestedState = params.get('state');
+  /* issue #2: `?tool=<id>` is how the top-page carousel hands an entry over. An id the catalogue
+     does not hold is not a filter and not an error -- it is simply absent, and the list stays whole. */
+  const requestedTool = params.get('tool');
+  const initialTool = tools.some(item => item.id === requestedTool) ? String(requestedTool) : '';
   const relayRequested = params.get('relay') === '1';
   let relayState = null;
   const state = {
     features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: 'all', oss: 'all',
+    tool: initialTool,
     savedOnly: false, nipQuery: '', compare: [], likes: {}, bookmarks: {}, reviews: {}, reviewVotes: {}, reviewDrafts: {},
     uiState: validStates.includes(requestedState) ? requestedState : 'normal'
   };
@@ -270,7 +275,8 @@
       const nipMatch = !nipQuery || relevant.some(record => `${record.id} ${record.key} ${record.registryTitle || ''}`.toLowerCase().includes(nipQuery));
       /* §21.4 invariant I9: nothing about liveness removes a row. There is no dead filter, because
          `dead` is only derivable from a counted 30370 observation and this build counts none. */
-      return toolMatchesQuery(tool, source) && (!source.savedOnly || Boolean(source.bookmarks[tool.id])) &&
+      return (source.tool === '' || tool.id === source.tool) &&
+        toolMatchesQuery(tool, source) && (!source.savedOnly || Boolean(source.bookmarks[tool.id])) &&
         (source.platform === 'all' || String(tool.platformText || '').toLowerCase().includes(source.platform.toLowerCase())) &&
         (source.category === 'all' || (tool.topics || []).includes(source.category)) &&
         (source.toolStatus === 'all' || tool.recordState === source.toolStatus) &&
@@ -445,19 +451,26 @@
     const outOf = outOfFamily(tool) ? ` <span class="out-of-family">${esc(t('explorer.noNipClaims'))}</span>` : '';
     return `<p class="claim-summary" data-claim-summary="${esc(String(summary.total))}" data-claim-families="${esc(Object.keys(summary.byFamily).join(','))}">${esc(families)}${outOf}</p>`;
   }
+  /* issue #6: the collapsed card is a row to scan, not a dossier. It carries only what every one of
+     the catalogue's records actually holds -- the name, the topics it published, its one-line
+     summary, and the id that identifies it -- plus the two controls that belong to the list rather
+     than to the record: the comparison checkbox (picking candidates is a multi-row act, so it
+     cannot live inside a single record's dialog) and the button that opens the record. Everything
+     that used to be printed here -- licence, OS, observation date, official links, capability
+     chips, claim summary, liveness, likes, bookmarks, review thumbnails -- is in the detail dialog.
+
+     `recommendationMarkup` stays because it is the relay list's own ordering key, and it renders
+     nothing at all for a record that did not come from a relay: for all 41 collected entries the
+     card is exactly the four fields above. */
   function featureCard(tool) {
-    const selected = state.features.map(id => localizedFeature(id));
-    const supports = selected.map(feature => ({feature, support: featureSupport(tool, feature)}));
-    const records = [...new Map(selected.flatMap(feature => supportRecords(tool, feature)).map(record => [record.key, record])).values()];
-    const bookmark = state.bookmarks[tool.id];
-    return `<article class="feature-tool-card" data-tool-id="${esc(tool.id)}" data-record-state="${esc(tool.recordState)}"><div class="nip-card-top"><span class="tool-icon" aria-hidden="true">${iconSvg(category(primaryTopic(tool) || 'clients').icon)}</span><span class="card-top-meta">${provenanceBadge(tool)}<span class="record-state ${esc(tool.recordState)}">${esc(t(`recordStates.${tool.recordState}`))}</span></span></div><h2>${esc(tool.name)}</h2><p class="tool-summary${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(toolDescription(tool))}</p>
-      <section class="card-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><div class="support-line">${supports.length ? supports.map(item => `<span class="feature-support-summary">${esc(item.feature.name)} ${supportBadge(item.support)}</span>`).join('') : `<span class="tag">${esc(t('explorer.noFeatureCondition'))}</span>`}${topicTags(tool)}${platformTags(tool)}</div><dl class="tool-facts"><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(categoryText(tool))}</dd></div><div><dt>OSS</dt><dd>${esc(displayLicense(tool))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool))}</dd></div></dl>${claimSummaryMarkup(tool)}${livenessMarkup(tool)}<nav class="resource-links" aria-label="${esc(t('explorer.officialLinks', {name: tool.name}))}">${resourceLinks(tool)}</nav>${records.length ? `<div class="basis-nips">${records.map(record => capabilityChip(tool, record)).join('')}</div>` : ''}</section>
-      <section class="card-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${recommendationMarkup(tool)}${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${esc(tool.id)}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCountMarkup(tool)}</button><button type="button" data-bookmark-tool="${esc(tool.id)}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${esc(tool.id)}">${esc(t('explorer.reviews', {count: allReviews(tool).length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${esc(tool.id)}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}</section>
-      <div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${esc(tool.id)}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${esc(tool.id)}">${esc(t('explorer.details'))}</button></div></article>`;
+    return `<article class="feature-tool-card" data-tool-id="${esc(tool.id)}" data-record-state="${esc(tool.recordState)}"><div class="card-headline"><h2>${esc(tool.name)}</h2><code class="tool-identifier">${esc(tool.id)}</code></div><p class="tool-summary${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(toolDescription(tool))}</p><div class="card-topics">${topicTags(tool)}</div>${recommendationMarkup(tool)}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${esc(tool.id)}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${esc(tool.id)}">${esc(t('explorer.details'))}</button></div></article>`;
   }
 
   function activeConditions() {
     const conditions = state.features.map(id => ({key: `feature:${id}`, label: t('explorer.conditionFeature', {value: featureName(id)}), overrides: {features: state.features.filter(value => value !== id)}}));
+    /* The entry the carousel handed over is a removable condition like any other, so landing on one
+       entry is never a dead end: the pill says which entry it is and clearing it restores the list. */
+    if (state.tool) conditions.unshift({key: 'tool', label: t('explorer.conditionTool', {value: findTool(state.tool)?.name || state.tool}), overrides: {tool: ''}});
     if (state.query) conditions.push({key: 'query', label: t('explorer.conditionQuery', {value: state.query}), overrides: {query: ''}});
     if (state.platform !== 'all') conditions.push({key: 'platform', label: t('explorer.conditionPlatform', {value: state.platform}), overrides: {platform: 'all'}});
     if (state.category !== 'all') conditions.push({key: 'category', label: t('explorer.conditionCategory', {value: topicLabel(state.category)}), overrides: {category: 'all'}});
@@ -890,16 +903,24 @@
       + `${claim.source ? `<a href="${esc(claim.source)}" target="_blank" rel="noreferrer">${esc(t('explorer.claimSource'))}</a>` : ''}${nonClaims}`
       + `${caveats ? `<details class="claim-caveats"><summary>${esc(t('explorer.claimCaveats'))}</summary><ul>${caveats}</ul></details>` : ''}</section>`;
   }
+  /* issue #6: everything the collapsed card used to print now lands here, behind one press.
+     The order is the order of the questions: what is it, what is observed about it, what does it
+     claim, what have people said. Nothing is invented on the way in -- every helper is the same
+     one the card called, so an absent field still renders as its own explicit absence. */
   function renderToolDetail(context, shouldOpen = true) {
     const tool = findTool(context.toolId);
     if (!tool) return;
     // 説明文は署名済み content の summary だけ。空文字は「未公開」として明示する (§21.5)。
     const description = relayEntry(tool) ? (tool.summary || t('explorer.summaryAbsent')) : toolDescription(tool);
     const reviews = allReviews(tool);
+    const bookmark = state.bookmarks[tool.id];
+    // 選択中の機能に対する対応まとめ。カードから移したが、条件は一覧の状態のままを映す。
+    const supports = state.features.map(id => localizedFeature(id)).map(feature => ({feature, support: featureSupport(tool, feature)}));
     els.evidenceDialog.setAttribute('aria-label', tool.name);
-    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.details'), tool.name)}<p class="tool-summary${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(description)}</p><section class="dialog-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.recordState'))}</dt><dd>${esc(t(`recordStates.${tool.recordState}`))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool))}</dd></div><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(topicsText(tool))}</dd></div><div><dt>${esc(t('explorer.os'))}</dt><dd>${esc(osText(tool))}</dd></div><div><dt>${esc(t('explorer.license'))}</dt><dd>${esc(displayLicense(tool))}</dd></div><div><dt>${esc(t('explorer.coordinate'))}</dt><dd><code>${esc(tool.coordinate || tool.id)}</code></dd></div></dl>${livenessMarkup(tool)}${tool.topicCorrection ? `<p class="topic-correction">${esc(t('explorer.topicCorrection', {collected: (tool.collectedTopics || []).join(', ') || t('none')}))} ${esc(tool.topicCorrection)}</p>` : ''}<h4>${esc(t('explorer.primarySources'))}</h4>${sourceListMarkup(tool)}</section>${claimBlockMarkup(tool)}<section class="dialog-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${reviews.length ? `<button type="button" class="secondary" data-review-tool="${esc(tool.id)}">${esc(t('explorer.reviews', {count: reviews.length}))}</button>` : `<p class="no-support-record">${esc(t('explorer.noReviewsObserved'))}</p>`}</section>`;
+    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.details'), tool.name)}<p class="detail-provenance">${provenanceBadge(tool)}<span class="record-state ${esc(tool.recordState)}">${esc(t(`recordStates.${tool.recordState}`))}</span></p><p class="tool-summary${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(description)}</p><section class="dialog-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><div class="support-line">${supports.length ? supports.map(item => `<span class="feature-support-summary">${esc(item.feature.name)} ${supportBadge(item.support)}</span>`).join('') : `<span class="tag">${esc(t('explorer.noFeatureCondition'))}</span>`}${topicTags(tool)}${platformTags(tool)}</div><dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.recordState'))}</dt><dd>${esc(t(`recordStates.${tool.recordState}`))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool))}</dd></div><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(topicsText(tool))}</dd></div><div><dt>${esc(t('explorer.os'))}</dt><dd>${esc(osText(tool))}</dd></div><div><dt>${esc(t('explorer.license'))}</dt><dd>${esc(displayLicense(tool))}</dd></div><div><dt>${esc(t('explorer.coordinate'))}</dt><dd><code>${esc(tool.coordinate || tool.id)}</code></dd></div></dl>${livenessMarkup(tool)}${tool.topicCorrection ? `<p class="topic-correction">${esc(t('explorer.topicCorrection', {collected: (tool.collectedTopics || []).join(', ') || t('none')}))} ${esc(tool.topicCorrection)}</p>` : ''}<nav class="resource-links" aria-label="${esc(t('explorer.officialLinks', {name: tool.name}))}">${resourceLinks(tool)}</nav><h4>${esc(t('explorer.primarySources'))}</h4>${sourceListMarkup(tool)}</section>${claimBlockMarkup(tool)}<section class="dialog-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${esc(tool.id)}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCountMarkup(tool)}</button><button type="button" data-bookmark-tool="${esc(tool.id)}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${esc(tool.id)}">${esc(t('explorer.reviews', {count: reviews.length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${esc(tool.id)}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}${reviews.length ? '' : `<p class="no-support-record">${esc(t('explorer.noReviewsObserved'))}</p>`}</section>`;
     if (shouldOpen) openDialog(els.evidenceDialog, context);
   }
+
   function resourceUrl(tool, type) {
     if (tool.provenance === 'sample') { const slug = tool.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'); return ({site: `https://${slug}.example.invalid/`, distribution: `https://store.example.invalid/apps/${slug}`, docs: `https://docs.${slug}.example.invalid/`, source: `https://code.example.invalid/${slug}/source`}[type]); }
     // 収集済みエントリは一次情報が述べた値だけ。生成した URL は一つも出さない。
@@ -1076,7 +1097,7 @@
   }
 
   function toast(message) { els.toast.textContent = message; els.toast.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => els.toast.classList.remove('show'), 1800); }
-  function resetFilters() { Object.assign(state, {features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: 'all', oss: 'all', savedOnly: false, nipQuery: '', uiState: 'normal'}); renderAll(); }
+  function resetFilters() { Object.assign(state, {features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: 'all', oss: 'all', tool: '', savedOnly: false, nipQuery: '', uiState: 'normal'}); renderAll(); }
   function removeCondition(key) { const item = activeConditions().find(condition => condition.key === key); if (!item) return; Object.assign(state, item.overrides); if (!state.features.length) state.support = 'all'; state.uiState = 'normal'; renderAll(); }
   function toggleCompare(id, checked) { if (checked && state.compare.length >= 3) { document.querySelector(`[data-compare-tool="${CSS.escape(id)}"]`).checked = false; toast(t('explorer.compareLimit')); return; } state.compare = checked ? [...state.compare, id] : state.compare.filter(value => value !== id); renderCompareActions(); }
   function syncComparisonCheckboxes() { document.querySelectorAll('[data-compare-tool]').forEach(input => { input.checked = state.compare.includes(input.dataset.compareTool); }); }
@@ -1107,8 +1128,9 @@
     const detail = event.target.closest('[data-feature-detail]'); if (detail) { renderToolDetail({type: 'toolDetail', toolId: detail.dataset.featureDetail}); return; }
     const evidence = event.target.closest('[data-evidence-tool]'); if (evidence) { renderEvidence({type: 'evidence', toolId: evidence.dataset.evidenceTool, nip: evidence.dataset.evidenceNip, featureId: evidence.dataset.evidenceFeature}); return; }
     const resource = event.target.closest('[data-resource-tool]'); if (resource) { renderResource({type: 'resource', toolId: resource.dataset.resourceTool, resourceType: resource.dataset.resourceType}); return; }
-    const like = event.target.closest('[data-like-tool]'); if (like) { state.likes[like.dataset.likeTool] = !state.likes[like.dataset.likeTool]; renderResults(); toast(t('explorer.toastLiked')); return; }
-    const bookmark = event.target.closest('[data-bookmark-tool]'); if (bookmark) { const id = bookmark.dataset.bookmarkTool; state.bookmarks[id] = state.bookmarks[id] ? null : {public: false}; renderResults(); toast(t('explorer.toastBookmarked')); return; }
+    // いいねとブックマークは詳細ダイアログの中にあるので、一覧と一緒に開いているダイアログも描き直す。
+    const like = event.target.closest('[data-like-tool]'); if (like) { state.likes[like.dataset.likeTool] = !state.likes[like.dataset.likeTool]; renderResults(); rerenderOpenDialogs(); toast(t('explorer.toastLiked')); return; }
+    const bookmark = event.target.closest('[data-bookmark-tool]'); if (bookmark) { const id = bookmark.dataset.bookmarkTool; state.bookmarks[id] = state.bookmarks[id] ? null : {public: false}; renderResults(); rerenderOpenDialogs(); toast(t('explorer.toastBookmarked')); return; }
     const reviewer = event.target.closest('[data-reviewer]'); if (reviewer) { renderProfile({type: 'profile', profileId: reviewer.dataset.reviewer}); return; }
     const vote = event.target.closest('[data-review-vote]'); if (vote) { const current = state.reviewVotes[vote.dataset.reviewId]; state.reviewVotes[vote.dataset.reviewId] = current === vote.dataset.reviewVote ? null : vote.dataset.reviewVote; renderReview({type: 'review', toolId: vote.dataset.reviewToolId, reviewId: vote.dataset.reviewId}, false); toast(t('explorer.toastVoted')); return; }
     const basis = event.target.closest('[data-vote-basis]'); if (basis) { renderVoteBasis({type: 'voteBasis', toolId: basis.dataset.voteTool, reviewId: basis.dataset.voteBasis}); return; }
@@ -1136,7 +1158,7 @@
     if (mapping[event.target.id]) { state[mapping[event.target.id]] = event.target.value; state.uiState = 'normal'; renderAll(); return; }
     if (event.target.id === 'saved-only') { state.savedOnly = event.target.checked; renderAll(); return; }
     if (event.target.matches('[data-compare-tool]')) { toggleCompare(event.target.dataset.compareTool, event.target.checked); return; }
-    if (event.target.matches('[data-public-bookmark]')) { const bookmark = state.bookmarks[event.target.dataset.publicBookmark]; if (bookmark) bookmark.public = event.target.checked; renderResults(); toast(t('explorer.toastPublic')); return; }
+    if (event.target.matches('[data-public-bookmark]')) { const bookmark = state.bookmarks[event.target.dataset.publicBookmark]; if (bookmark) bookmark.public = event.target.checked; renderResults(); rerenderOpenDialogs(); toast(t('explorer.toastPublic')); return; }
     if (event.target.matches('input[name="imageChoice"]')) {
       const form = event.target.closest('[data-review-form]');
       captureReviewDraft();

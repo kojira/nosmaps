@@ -423,14 +423,73 @@
 }
 
 .feature-tool-card h2 {
-  margin: .48rem 0 .12rem;
+  margin: 0 0 .1rem;
   font-size: .98rem;
+  overflow-wrap: anywhere;
 }
 
 .feature-tool-card > p {
   margin: .12rem 0;
   color: var(--muted);
   font-size: .78rem;
+}
+
+/* issue #6: the collapsed card is one scannable row. The id is one line and the summary is one
+   line; both truncate rather than wrap, so a long value cannot push the card wider or taller. */
+.feature-tool-card {
+  gap: .12rem;
+  padding: .6rem .7rem;
+}
+
+.feature-tool-card .card-headline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .45rem;
+  min-width: 0;
+}
+
+.feature-tool-card .card-headline h2 {
+  min-width: 0;
+}
+
+.feature-tool-card .tool-identifier {
+  flex: 0 1 auto;
+  margin: 0;
+  color: var(--muted);
+  font-size: .68rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feature-tool-card .tool-summary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  margin: .18rem 0 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.feature-tool-card .card-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem;
+  margin-top: .3rem;
+  min-width: 0;
+}
+
+.feature-tool-card .card-topics .tag {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* `margin-top: auto` is inherited from the base rule on purpose: in the multi-column grid the
+   cards stretch to the row height and the action rows line up along the bottom edge. */
+.feature-tool-card .nip-card-actions {
+  padding-top: .42rem;
 }
 
 .support-line {
@@ -1423,6 +1482,15 @@
   margin-top: .18rem;
   color: var(--muted);
   font-size: .66rem;
+}
+
+/* issue #6: 由来バッジとレコード状態はカードから詳細ビューの見出し直下へ移った。 */
+.detail-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+  margin: .3rem 0 .2rem;
 }
 
 .card-layer {
