@@ -500,6 +500,11 @@
     return '';
   }
   // data.js の observed は "YYYY-MM-DD HH:MM UTC" 形式の文字列。リレー由来の asOf は Date.now() のミリ秒なので、境界でこの形式に揃える。
+  // 受け取るのは「整形済み文字列かエポックミリ秒」の二択で、返すのは常に整形済み文字列。この署名が境界そのもの。
+  /**
+   * @param {string | number} value
+   * @returns {string}
+   */
   function formatObserved(value) {
     if (typeof value === 'string') return value;
     const ms = Number(value);
@@ -510,6 +515,10 @@
   // kind 30078 の v1 content にカテゴリ・OS・ライセンスの欄はない。`t` トピックが
   // UI のカテゴリ id と一致したときだけ観測値として使い、それ以外は不明のまま出す。
   function categoryFromTopics(topics) { return (Array.isArray(topics) ? topics.find(value => categories.includes(value)) : null) || null; }
+  /**
+   * @param {number | string} asOf エポックミリ秒（NosmapsCatalogResult.asOf）。整形はこの関数の責任。
+   * @returns {NosmapsRelayTool}
+   */
   function relayEntryToTool(entry, asOf) {
     const fields = (entry && entry.fields) || {};
     const observedCategory = categoryFromTopics(entry && entry.topics);
@@ -591,6 +600,10 @@
       + `<label class="graph-npub-field">${esc(t('explorer.graphPasteLabel'))}<input id="graph-npub" type="text" inputmode="text" autocomplete="off" placeholder="npub1…" value="${esc(relayViewer.viewerPubkey)}"></label>`
       + `<button class="secondary" type="button" data-graph-apply>${esc(t('explorer.graphApply'))}</button></div></div>`;
   }
+  /**
+   * @param {NosmapsCatalogResult | null} result
+   * @returns {void}
+   */
   function applyRelayResult(result) {
     if (!result) { relayState = {active: true, result: null, entries: []}; state.uiState = 'unavailable'; renderResults(); return; }
     const asOf = result.asOf || '';

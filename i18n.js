@@ -2,6 +2,10 @@
 (() => {
   'use strict';
 
+  /* Typed as translation nodes rather than as the literal shape the two objects happen to have:
+     the point of the type is that a lookup lands on a node -- a leaf string, a tuple, or a group --
+     and nothing else, so a miss surfaces as `undefined` instead of being read back as `any`. */
+  /** @type {Record<NosmapsLanguage, NosmapsI18nNode>} */
   const dictionaries = {
     ja: {
       localeName: '日本語', otherLocale: 'English', language: '言語', skip: '本文へスキップ', close: '閉じる',
@@ -215,15 +219,31 @@
     language = /^en\b/i.test(detected || '') ? 'en' : 'ja';
   }
   const listeners = new Set();
-  const read = (object, path) => path.split('.').reduce((value, key) => value == null ? undefined : value[key], object);
-  const format = (value, variables = {}) => value.replace(/\{(\w+)\}/g, (_, key) => variables[key] ?? `{${key}}`);
+  /* Indexing is deliberately loose at runtime -- a path that walks past a leaf, or off the end of a
+     tuple, yields undefined instead of throwing -- so the step itself is cast. What the signature
+     states is the part that matters: the answer is a node or nothing, never `any`. */
+  /** @type {(object: NosmapsI18nNode | undefined, path: string) => NosmapsI18nNode | undefined} */
+  const read = (object, path) => path.split('.').reduce((value, key) => value == null ? undefined : /** @type {Record<string, NosmapsI18nNode | undefined>} */ (/** @type {unknown} */ (value))[key], object);
+  /* String.prototype.replace applies ToString to whatever the replacer returns, so a numeric
+     variable renders as its digits; the lib signature admits only a string, so the returned value is
+     cast rather than the expression rewritten. */
+  /** @type {(value: string, variables?: NosmapsI18nVariables) => string} */
+  const format = (value, variables = {}) => value.replace(/\{(\w+)\}/g, (_, key) => /** @type {string} */ (/** @type {unknown} */ (variables[key] ?? `{${key}}`)));
 
   /* Missing-key contract: a lookup that resolves to nothing is reported, never rendered.
      t() is the only lookup whose result reaches markup, so it always returns a string --
      the key path itself when the key is missing, which is visible, greppable and searchable,
      unlike the "undefined" that String() used to produce silently. */
+  /** @type {NosmapsI18nMissing[]} */
   const missing = [];
+  /** @type {Set<string>} */
   const reported = new Set();
+  /**
+   * @param {string} path
+   * @param {NosmapsLanguage} selectedLanguage
+   * @param {string} detail
+   * @returns {void}
+   */
   function reportMissing(path, selectedLanguage, detail) {
     const signature = `${selectedLanguage}:${path}:${detail}`;
     missing.push({path, language: selectedLanguage, detail});
@@ -236,12 +256,30 @@
     get language() { return language; },
     get dictionaries() { return dictionaries; },
     get missing() { return missing.map(entry => ({...entry})); },
+    /**
+     * @param {string} path
+     * @param {NosmapsLanguage} [selectedLanguage]
+     * @returns {boolean}
+     */
     has(path, selectedLanguage = language) { return read(dictionaries[selectedLanguage], path) !== undefined || read(dictionaries.ja, path) !== undefined; },
+    /** The raw node, undefined and all: `value` is the lookup that is allowed to come back empty, and
+       saying so is what stops a miss from being stringified further down. Callers that reach markup
+       go through `t`, which does not have that hole.
+       @param {string} path
+       @param {NosmapsLanguage} [selectedLanguage]
+       @returns {NosmapsI18nNode | undefined} */
     value(path, selectedLanguage = language) {
       const found = read(dictionaries[selectedLanguage], path) ?? read(dictionaries.ja, path);
       if (found === undefined) reportMissing(path, selectedLanguage, 'missing translation key');
       return found;
     },
+    /** Always a string, per the missing-key contract above -- the key path stands in for a missing or
+       non-string key. Declaring the return type is what makes handing `found` straight back an
+       error rather than a silent "undefined" in the page.
+       @param {string} path
+       @param {NosmapsI18nVariables} [variables]
+       @param {NosmapsLanguage} [selectedLanguage]
+       @returns {string} */
     t(path, variables, selectedLanguage = language) {
       const found = api.value(path, selectedLanguage);
       if (typeof found === 'string') return format(found, variables);

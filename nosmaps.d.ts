@@ -222,6 +222,11 @@ type NosmapsI18nNode =
   | readonly NosmapsI18nNode[]
   | {readonly [key: string]: NosmapsI18nNode};
 
+/** The `{name}` placeholders a translation carries. Numbers are passed as numbers (counts, totals)
+    and rendered by ToString, so the type admits them rather than forcing the call sites to
+    pre-stringify. */
+type NosmapsI18nVariables = {readonly [key: string]: string | number};
+
 interface NosmapsI18nMissing {
   readonly path: string;
   readonly language: string;
@@ -239,11 +244,7 @@ interface NosmapsI18n {
   value(path: string, selectedLanguage?: NosmapsLanguage): NosmapsI18nNode | undefined;
   /** Always a string: the key path itself stands in for a missing or
       non-string key, so nothing ever renders as "undefined". */
-  t(
-    path: string,
-    variables?: {readonly [key: string]: string | number} | undefined,
-    selectedLanguage?: NosmapsLanguage
-  ): string;
+  t(path: string, variables?: NosmapsI18nVariables | undefined, selectedLanguage?: NosmapsLanguage): string;
   set(next: string): void;
   onChange(listener: (language: NosmapsLanguage) => void): () => void;
   applyDocument(): void;
@@ -338,6 +339,36 @@ interface NosmapsRelayEntry {
   readonly relays: readonly string[];
   /** Served from the derived cache rather than re-observed this round. */
   readonly stale: boolean;
+}
+
+/** A relay-derived row as the explorer renders it, built from a NosmapsRelayEntry by
+    relayEntryToTool. It is deliberately not a NosmapsTool: the live record states none of the
+    fields the collected catalogue supplies, so license/OS/NIPs are empty rather than observed. */
+interface NosmapsRelayTool {
+  /** "relay:" + the coordinate, so it never collides with a collected id. */
+  readonly id: string;
+  readonly name: string;
+  /** Display fallback when the record's topics name no seed category. */
+  readonly category: string;
+  /** Whether `category` was actually observed, which is what the vocabulary keys off. */
+  readonly categoryObserved: boolean;
+  readonly status: 'active' | 'stale';
+  readonly platform: string;
+  readonly os: readonly string[];
+  readonly license: string;
+  /** The formatted "YYYY-MM-DD HH:MM UTC" string, the same contract as NosmapsTool.observed. The
+      relay result carries epoch milliseconds in `asOf`; converting at this one boundary is the
+      whole point of formatObserved, and the type is what holds the boundary. */
+  readonly observed: string;
+  readonly nips: readonly string[];
+  readonly provenance: 'relay';
+  readonly coordinate: string;
+  readonly summary: string;
+  readonly homepage: string | null;
+  /** Null when the viewer has no graph — unknown, never 0 (invariant I8). */
+  readonly recommendations: number | null;
+  readonly recommenders: readonly string[];
+  readonly quarantinedNewer: unknown;
 }
 
 type NosmapsCatalogStatus = 'fresh' | 'stale' | 'incomplete' | 'unavailable';
