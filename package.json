@@ -5,6 +5,8 @@
   "description": "Relay-native catalog of Nostr tools. Static site, no backend.",
   "scripts": {
     "build": "esbuild build/entry-rx-nostr.js --bundle --format=esm --platform=browser --outfile=dist/rx-nostr.js && esbuild build/entry-rx-nostr-crypto.js --bundle --format=esm --platform=browser --outfile=dist/rx-nostr-crypto.js",
+    "data": "node tools/build-data.mjs",
+    "verify-catalogue": "node tools/verify-catalogue.mjs",
     "test": "playwright test",
     "typecheck": "tsc --noEmit"
   },

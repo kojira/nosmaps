@@ -1,8 +1,20 @@
-/* Generates data.js from the collected primary-source catalogue.
+/* Generates data.js from the signed catalogue. data.js is a build artefact; it is never edited by
+   hand and holds no value this build did not read from one of the inputs below.
 
-   Inputs, both pinned artefacts that live in the repo:
-     real-catalog-draft.json    41 entries, every field traced to a primary source (see
-                                real-catalog-draft-report.md for the 56 findings).
+   Inputs, all pinned artefacts that live in the repo:
+     catalogue-events.jsonl     THE CANONICAL CATALOGUE. One signed kind 30078 event per line, as it
+                                would arrive from a relay. Every record here is read through
+                                tools/catalogue-events.mjs, which refuses a line whose signature,
+                                id, kind, `d` namespace or `nosmaps` topic does not hold — so
+                                data.js cannot be generated from anything unsigned or tampered with.
+                                Written by tools/sign-catalogue.mjs; checked by
+                                tools/verify-catalogue.mjs. Who collected a record is its `pubkey`.
+     real-catalog-draft.json    The collection notes. The signed event carries only the v1 profile
+                                (§4.2 rule 2: schema/version/state/name/summary/homepage?), so the
+                                provenance, the capability claims, the licence/platform/distribution
+                                facts and the finding numbers — everything the draft itself files
+                                under `facts_with_no_home_in_v1_profile` — are joined on from here by
+                                `d`. These are annotations about a record, not the record.
      nips-registry-656cecc.json the NIP registry snapshot the client resolves ids against,
                                 parsed from the pinned revision design-relay-native-data.md §19.1
                                 already cites.
@@ -18,9 +30,23 @@
    renders its own unknown state. Run: node tools/build-data.mjs
 */
 import {readFileSync, writeFileSync} from 'node:fs';
+import {loadVerifiedEvents, KIND} from './catalogue-events.mjs';
 
 const catalog = JSON.parse(readFileSync(new URL('../real-catalog-draft.json', import.meta.url), 'utf8'));
 const registry = JSON.parse(readFileSync(new URL('../nips-registry-656cecc.json', import.meta.url), 'utf8'));
+
+/* The canonical records. Order is file order, which is the order they were collected in. */
+const signed = loadVerifiedEvents();
+const signers = [...new Set(signed.map(item => item.event.pubkey))];
+if (signers.length !== 1) throw new Error(`expected one collector, the jsonl carries ${signers.length}`);
+const collectorPubkey = signers[0];
+
+/* The draft's annotations, keyed by the `d` of the record they annotate. A signed record with no
+   notes would still build; a note for a record nobody signed is dropped, because the signed events
+   are what the catalogue is. */
+const notesByD = new Map(catalog.entries.map(entry => [
+  (entry.event_skeleton.tags.find(tag => tag[0] === 'd') || [])[1], entry
+]));
 
 /* R6: six terms nip-explorer.js already maps, plus `wallet`, minted because four of the 41 are
    described as a wallet by their own publisher (§21.6). Everything else is a free topic. */
@@ -307,21 +333,25 @@ const DESCRIPTIONS_JA = {
   'nosmaps:dev.zapstore': '利用者と作り手が出会うオープンなアプリストア。コミュニティが選ぶ。Androidアプリ。'
 };
 
-function buildTool(entry) {
-  const content = entry.event_skeleton.content;
-  const tags = entry.event_skeleton.tags;
-  const d = tags.find(tag => tag[0] === 'd')[1];
+/* One row of data.js, built from one signed event. `signedRecord` is {event, content, d}: the event
+   as it sits in the jsonl, already verified. `entry` is that record's collection notes from
+   real-catalog-draft.json, joined on `d` — it supplies only the annotations the v1 profile has no
+   room for, never a name, summary, homepage, state or topic, which come from the signed event. */
+function buildTool(signedRecord) {
+  const {event, content, d} = signedRecord;
+  const entry = notesByD.get(d);
+  if (!entry) throw new Error(`no collection notes for the signed record ${d}`);
+  const tags = event.tags;
   const facts = entry.facts_with_no_home_in_v1_profile || {};
   const claim = entry.nip_support_claim || {};
   const collected = tags.filter(tag => tag[0] === 't' && tag[1] !== 'nosmaps').map(tag => tag[1]);
   const correction = TOPIC_CORRECTIONS[d];
   const capabilities = buildCapabilities(entry, d);
 
-  /* R5 — "" is the normative absent form. The collection wrote the string "Unknown" for Olas and
-     flagged the record invalid; §21.5 says a cataloguer-authored placeholder is forbidden and the
-     empty string is what the schema means. This is the one content value the build rewrites, and it
-     removes an invented value rather than adding one. */
-  const summary = content.summary === 'Unknown' ? '' : content.summary;
+  /* R5 — "" is the normative absent form, and the signed record already carries it that way:
+     tools/sign-catalogue.mjs signed Olas's collector-authored "Unknown" as "" (its own header says
+     why) rather than sealing an invented value into a signature. Read straight through here. */
+  const summary = content.summary;
 
   /* A plain language-code -> text map. `summary` above stays the canonical text and is what every
      language falls back to; `descriptions.en` is that same original, named by its language so the
@@ -335,7 +365,10 @@ function buildTool(entry) {
 
   return {
     id: d,
-    coordinate: entry.coordinate_template,
+    /* The record's real address. The draft could only write `30078:<publisher-hex>:…` because
+       nothing had signed it yet; now something has, so the publisher is the signer of the line this
+       row was built from rather than a placeholder. */
+    coordinate: `${KIND}:${event.pubkey}:${d}`,
     name: content.name,
     summary,
     summaryAbsent: summary === '',
@@ -371,7 +404,7 @@ function buildTool(entry) {
   };
 }
 
-const tools = catalog.entries.map(buildTool);
+const tools = signed.map(buildTool);
 
 const nipCatalog = registry.entries.map(entry => ({
   number: entry.number,
@@ -383,7 +416,9 @@ const nipCatalog = registry.entries.map(entry => ({
 
 const payload = {
   meta: {
-    collected: catalog._meta.generated,
+    /* The date the signed records themselves carry, not a date written down twice: every event's
+       created_at is the collection date, so the catalogue states when it was collected. */
+    collected: new Date(signed[0].event.created_at * 1000).toISOString().slice(0, 10),
     collector: 'primary sources only; see real-catalog-draft-report.md',
     entryCount: tools.length,
     notCollected: catalog.not_collected.map(item => ({name: item.name, why: item.why}))
@@ -397,9 +432,13 @@ const payload = {
 
 const banner = `/* Generated by tools/build-data.mjs — do not edit by hand.
 
-   Source: real-catalog-draft.json (${tools.length} entries, every field from a primary source, see
-   real-catalog-draft-report.md) and nips-registry-656cecc.json (the pinned NIP registry snapshot,
-   design-relay-native-data.md §19.1). Schema decisions: §21 R1-R7.
+   Canonical source: catalogue-events.jsonl — ${tools.length} signed kind 30078 events, one per line, all
+   signed by ${collectorPubkey}.
+   That signature is the attribution: no record here names its collector in a field. Annotations
+   with no room in the v1 content profile (provenance, capability claims, licence/platform facts,
+   finding numbers) are joined on by \`d\` from real-catalog-draft.json, see
+   real-catalog-draft-report.md. Ids resolve against nips-registry-656cecc.json (the pinned NIP
+   registry snapshot, design-relay-native-data.md §19.1). Schema decisions: §21 R1-R7.
 
    Unknown is absent, never zero and never a placeholder string. A capability claim carries its
    family, its verbatim source line, and the status it resolves to against the pinned snapshot; an

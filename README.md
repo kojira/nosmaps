@@ -74,6 +74,28 @@ npx playwright test
 
 Playwright設定はChromiumとWebKitを対象にし、デスクトップと375×812のシナリオを含みます。ビルド工程はありません。
 
+## カタログの正本（catalogue-events.jsonl）
+
+リポジトリ内カタログの正本は `catalogue-events.jsonl` です。1行が1件の**署名済み生Nostrイベント**（kind `30078`、`d` は `nosmaps:` 前置、`t=nosmaps`）で、リレーから流れてくる形とまったく同じです。誰が収集したかは `pubkey` が示すので、収集者名のフィールドは持ちません（署名で分かることを二重に書かない）。
+
+現在の41件を署名した収集者の公開鍵は次のとおりです。
+
+```
+pubkey 3ce2f3e7dc1dfc7cab278e57d75384c7fcf6ad768ed189acba3b80fe4aa782b6
+npub   npub18n308e7urh78e2e83etaw5uycl70dttk3mgcnt968wq0uj48s2mqkdmj4u
+```
+
+秘密鍵はこのリポジトリには存在しません。`tools/new-collector-key.mjs` は作業ツリー内へは書き込みを拒否し、署名時は環境変数 `NOSMAPS_COLLECTOR_KEY_FILE` が指すリポジトリ外のファイルから読みます。検証と `data.js` の再生成に秘密鍵は不要です。
+
+```sh
+node tools/new-collector-key.mjs <リポジトリ外のパス>                       # 鍵生成（初回のみ）
+NOSMAPS_COLLECTOR_KEY_FILE=<そのパス> node tools/sign-catalogue.mjs        # 収集結果に署名して jsonl を書く
+node tools/build-data.mjs                                                 # jsonl から data.js を生成
+node tools/verify-catalogue.mjs                                           # 全行の署名・kind・d・t と data.js との一致を検証
+```
+
+`data.js` は `catalogue-events.jsonl` からの**派生ビルド成果物**です。手で編集しません。`tools/build-data.mjs` は署名が通らない行があればビルドを中断するので、未署名や改竄された記述から `data.js` が生成されることはありません。v1のcontentプロファイルに入らない注記（provenance、NIPクレーム、ライセンス等）は `real-catalog-draft.json` から `d` で突き合わせて付けています。
+
 ## データと構成
 
 `data.js` の36件をトップページのサンプル表示と機能探索で共有します。NIPの番号・英語見出し・一次資料URLは `nostr-protocol/nips` の固定commitを参照し、ツール名と観測記録は画面設計用のデータです。

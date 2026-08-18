@@ -1,4 +1,8 @@
 .DS_Store
 node_modules/
+# The collector's signing key never belongs in the repository. tools/new-collector-key.mjs already
+# refuses to write inside the working tree; this is the second lock on the same door.
+*.key
+
 playwright-report/
 test-results/
