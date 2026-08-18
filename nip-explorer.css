@@ -1029,6 +1029,31 @@
   text-align: center;
 }
 
+/* issue #7: the entries the support mode set aside are stated, not hidden. Wraps rather than
+   scrolls sideways so it stays inside 375px. */
+.unstated-notice {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .4rem;
+  margin-bottom: .65rem;
+  padding: .55rem .7rem;
+  border: 1px solid #a99ada;
+  border-radius: .65rem;
+  background: #f1edff;
+  color: #35217e;
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.unstated-notice p {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .state-message.error {
   border-color: #c3616b;
   background: #fff0f1;

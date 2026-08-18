@@ -17,6 +17,20 @@
      is not a low rank, it is what is shown when no stated result exists (D7 / invariant I8). */
   const RESULT_VALUES = [...resultPrecedence, 'unknown'];
   const precedenceOf = result => { const index = resultPrecedence.indexOf(result); return index === -1 ? -1 : resultPrecedence.length - index; };
+  /* issue #7: a feature filter produces a result set that reads as "these do the thing", so the two
+     values that mean *no stated result* -- `unknown` (no claim at all) and `out_of_family` (claims
+     exist, none of them NIP claims) -- must not sit in it silently. They are not turned into a
+     negative either: the filter gets a third state instead of picking a side.
+       all       — every entry, unknown included (labelled as including unknown)
+       confirmed — the default: only the affirmative claims (supported / partial)
+       <value>   — exactly one of the eight results, `unknown` among them, so unknown stays reachable
+     The filter is inert while no feature is selected: with nothing asked about, no row is an answer
+     to anything and nothing is removed (§21.4 invariant I9). */
+  const UNSTATED_SUPPORT = ['unknown', 'out_of_family'];
+  const CONFIRMED_SUPPORT = ['supported', 'partial'];
+  const DEFAULT_SUPPORT = 'confirmed';
+  const supportFilterValues = ['all', DEFAULT_SUPPORT, ...RESULT_VALUES, 'out_of_family'];
+  const supportPasses = (value, mode) => mode === 'all' || (mode === DEFAULT_SUPPORT ? CONFIRMED_SUPPORT.includes(value) : value === mode);
   const featureDefinitions = [
     ['posts', 'edit', ['01', '09', '25']], ['dm', 'mail', ['44']], ['search', 'search', ['01', '19', '21']], ['media', 'image', ['01', '19']],
     ['notifications', 'notifications', ['25', '57']], ['accounts', 'account', ['19', '46']], ['signing', 'key', ['46']], ['wallet', 'wallet', ['47', '57']],
@@ -33,7 +47,7 @@
   const relayRequested = params.get('relay') === '1';
   let relayState = null;
   const state = {
-    features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: 'all', oss: 'all',
+    features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: DEFAULT_SUPPORT, oss: 'all',
     tool: initialTool,
     savedOnly: false, nipQuery: '', compare: [], likes: {}, bookmarks: {}, reviews: {}, reviewVotes: {}, reviewDrafts: {},
     uiState: validStates.includes(requestedState) ? requestedState : 'normal'
@@ -64,6 +78,10 @@
   const ossState = tool => !tool.license ? 'unknown' : SPDX_OSS.test(tool.license) ? 'yes' : 'unknown';
   const isOss = tool => ossState(tool) === 'yes';
   const statusLabel = status => t(`support.${status}`);
+  /* The two modes that are not a single result value name themselves: "all" says out loud that it
+     includes unknown, "confirmed" says out loud which two results it keeps. Neither hides that a
+     choice was made about the unstated ones (issue #7). */
+  const supportModeLabel = mode => ['all', DEFAULT_SUPPORT].includes(mode) ? t(`explorer.supportModes.${mode}`) : statusLabel(mode);
   const registryStatusLabel = status => t(`registryStatus.${status}`);
   const els = {
     query: $('#feature-query'), chips: $('#feature-chips'), results: $('#tool-results'), resultCount: $('#result-count'), selected: $('#selected-feature-summary'),
@@ -280,9 +298,29 @@
         (source.platform === 'all' || String(tool.platformText || '').toLowerCase().includes(source.platform.toLowerCase())) &&
         (source.category === 'all' || (tool.topics || []).includes(source.category)) &&
         (source.toolStatus === 'all' || tool.recordState === source.toolStatus) &&
-        (source.support === 'all' || (supports.length && supports.every(value => value === source.support))) &&
+        /* issue #7: with a feature selected, every selected feature must pass the support mode --
+           AND across features as before, but `unknown`/`out_of_family` now only pass when they were
+           asked for. With no feature selected there is nothing to be unknown *about*, so the mode is
+           inert and the list stays whole. */
+        (!selected.length || supports.every(value => supportPasses(value, source.support))) &&
         (source.oss === 'all' || ossState(tool) === source.oss) && nipMatch;
     });
+  }
+
+  /* issue #7: the entries the support mode set aside are never silently gone. These are the rows
+     that pass every other condition and whose only disqualification is that a selected feature has
+     no stated result for them -- they are counted, said out loud, and one press away. */
+  function unstatedSetAside(source = state) {
+    const selected = source.features.map(id => featureById[id]).filter(Boolean);
+    if (!selected.length || source.support === 'all') return [];
+    const shown = new Set(filteredTools(source).map(tool => tool.id));
+    return filteredTools({...source, support: 'all'}).filter(tool => !shown.has(tool.id) &&
+      selected.map(feature => featureSupport(tool, feature)).some(value => UNSTATED_SUPPORT.includes(value)));
+  }
+  function unstatedNoticeMarkup() {
+    const setAside = unstatedSetAside();
+    if (!setAside.length) return '';
+    return `<div class="unstated-notice" data-unstated-count="${setAside.length}"><p>${esc(t('explorer.unstatedSetAside', {count: setAside.length}))}</p><button class="secondary" type="button" data-support-mode="all">${esc(t('explorer.showUnstated'))}</button></div>`;
   }
 
   function renderIdentity() {
@@ -321,7 +359,7 @@
     $('#feature-filter-grid').innerHTML = `<label class="field">${esc(t('explorer.platform'))}<select id="platform-filter">${option('all', t('all'), state.platform)}${['Android', 'iOS', 'macOS'].map(value => option(value, value, state.platform)).join('')}</select><small class="filter-prerequisite">${esc(t('explorer.platformSourced'))}</small></label>
       <fieldset class="category-filter"><legend>${esc(t('explorer.categoryGroup'))}</legend><div class="category-icon-group" role="group" aria-label="${esc(t('explorer.categoryGroup'))}">${categoryFilterButton('all', 'apps', t('all'), t('explorer.allCategoriesDescription'))}${allTopics.map(id => { const item = category(id); return categoryFilterButton(id, item.icon, item.name, item.description); }).join('')}</div></fieldset>
       <label class="field">${esc(t('explorer.recordStateFilter'))}<select id="tool-status-filter">${option('all', t('all'), state.toolStatus)}${['active', 'withdrawn'].map(value => option(value, t(`recordStates.${value}`), state.toolStatus)).join('')}</select><small class="filter-prerequisite">${esc(t('explorer.recordStateHelp'))}</small></label>
-      <label class="field">${esc(t('explorer.support'))}<select id="support-filter" aria-describedby="support-filter-help" ${state.features.length ? '' : 'disabled'}>${option('all', t('all'), state.support)}${RESULT_VALUES.concat(['out_of_family']).map(value => option(value, statusLabel(value), state.support)).join('')}</select><small id="support-filter-help" class="filter-prerequisite">${esc(t('explorer.featureNeeded'))}</small></label>
+      <label class="field">${esc(t('explorer.support'))}<select id="support-filter" aria-describedby="support-filter-help" ${state.features.length ? '' : 'disabled'}>${supportFilterValues.map(value => option(value, supportModeLabel(value), state.support)).join('')}</select><small id="support-filter-help" class="filter-prerequisite">${esc(state.features.length ? t('explorer.supportModeHelp') : t('explorer.featureNeeded'))}</small></label>
       <label class="field">${esc(t('explorer.oss'))}<select id="oss-filter">${option('all', t('all'), state.oss)}${option('yes', 'OSS', state.oss)}${option('unknown', t('unknown'), state.oss)}</select></label>
       <label class="include-dead"><input id="saved-only" type="checkbox" ${state.savedOnly ? 'checked' : ''}> ${esc(t('explorer.savedOnly'))}</label>
       <label class="field advanced-nip">${esc(t('explorer.nipSearch'))}<input id="nip-query" type="search" value="${esc(state.nipQuery)}" placeholder="46 / remote signing"></label>
@@ -479,7 +517,11 @@
     if (state.platform !== 'all') conditions.push({key: 'platform', label: t('explorer.conditionPlatform', {value: state.platform}), overrides: {platform: 'all'}});
     if (state.category !== 'all') conditions.push({key: 'category', label: t('explorer.conditionCategory', {value: topicLabel(state.category)}), overrides: {category: 'all'}});
     if (state.toolStatus !== 'all') conditions.push({key: 'toolStatus', label: t('explorer.conditionStatus', {value: t(`recordStates.${state.toolStatus}`)}), overrides: {toolStatus: 'all'}});
-    if (state.support !== 'all') conditions.push({key: 'support', label: t('explorer.conditionSupport', {value: statusLabel(state.support)}), overrides: {support: 'all'}});
+    /* issue #7: the default is a real condition, so it is a removable pill like any other and is
+       stated rather than applied behind the user's back. It is only listed while a feature is
+       selected, because that is the only time it removes anything. Clearing it goes to `all`, which
+       is how unknown comes back into view. */
+    if (state.features.length && state.support !== 'all') conditions.push({key: 'support', label: t('explorer.conditionSupport', {value: supportModeLabel(state.support)}), overrides: {support: 'all'}});
     if (state.oss !== 'all') conditions.push({key: 'oss', label: t('explorer.conditionOss', {value: state.oss === 'yes' ? 'OSS' : t('unknown')}), overrides: {oss: 'all'}});
     if (state.savedOnly) conditions.push({key: 'savedOnly', label: t('explorer.conditionSaved'), overrides: {savedOnly: false}});
     if (state.nipQuery) conditions.push({key: 'nipQuery', label: t('explorer.conditionNip', {value: state.nipQuery}), overrides: {nipQuery: ''}});
@@ -684,7 +726,9 @@
     const diagnostics = relayActive ? relayDiagnosticsMarkup(relayState.result) : '';
     if (['loading', 'empty', 'error', 'unavailable'].includes(state.uiState)) { els.results.hidden = true; els.resultCount.textContent = t('explorer.count', {count: 0}); els.uiState.innerHTML = stateMarkup(state.uiState) + relayContext + diagnostics; return; }
     els.results.hidden = false;
-    els.uiState.innerHTML = (['partial', 'offline', 'stale', 'incomplete'].includes(state.uiState) ? stateMarkup(state.uiState) : '') + relayContext + diagnostics;
+    /* The set-aside notice sits above the list, so it is present whether the list has rows or none:
+       "no candidates" and "no candidates with a stated result" are different sentences (issue #7). */
+    els.uiState.innerHTML = (['partial', 'offline', 'stale', 'incomplete'].includes(state.uiState) ? stateMarkup(state.uiState) : '') + relayContext + diagnostics + (relayActive ? '' : unstatedNoticeMarkup());
     let list = relayActive ? relayState.entries : filteredTools();
     if (!relayActive && state.uiState === 'partial') list = list.slice(0, 7);
     els.resultCount.textContent = t('explorer.count', {count: list.length});
@@ -1101,8 +1145,8 @@
   }
 
   function toast(message) { els.toast.textContent = message; els.toast.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => els.toast.classList.remove('show'), 1800); }
-  function resetFilters() { Object.assign(state, {features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: 'all', oss: 'all', tool: '', savedOnly: false, nipQuery: '', uiState: 'normal'}); renderAll(); }
-  function removeCondition(key) { const item = activeConditions().find(condition => condition.key === key); if (!item) return; Object.assign(state, item.overrides); if (!state.features.length) state.support = 'all'; state.uiState = 'normal'; renderAll(); }
+  function resetFilters() { Object.assign(state, {features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: DEFAULT_SUPPORT, oss: 'all', tool: '', savedOnly: false, nipQuery: '', uiState: 'normal'}); renderAll(); }
+  function removeCondition(key) { const item = activeConditions().find(condition => condition.key === key); if (!item) return; Object.assign(state, item.overrides); if (!state.features.length) state.support = DEFAULT_SUPPORT; state.uiState = 'normal'; renderAll(); }
   function toggleCompare(id, checked) { if (checked && state.compare.length >= 3) { document.querySelector(`[data-compare-tool="${CSS.escape(id)}"]`).checked = false; toast(t('explorer.compareLimit')); return; } state.compare = checked ? [...state.compare, id] : state.compare.filter(value => value !== id); renderCompareActions(); }
   function syncComparisonCheckboxes() { document.querySelectorAll('[data-compare-tool]').forEach(input => { input.checked = state.compare.includes(input.dataset.compareTool); }); }
 
@@ -1126,7 +1170,9 @@
     if (event.target.closest('[data-viewer-signin]')) { signIn(); return; }
     if (event.target.closest('[data-viewer-signout]')) { signOut(); return; }
     const feature = event.target.closest('[data-select-feature]');
-    if (feature) { const id = feature.dataset.selectFeature; state.features = state.features.includes(id) ? state.features.filter(value => value !== id) : [...state.features, id]; if (!state.features.length) state.support = 'all'; state.uiState = 'normal'; renderAll(); restoreFocus(`[data-select-feature="${id}"]`); return; }
+    if (feature) { const id = feature.dataset.selectFeature; state.features = state.features.includes(id) ? state.features.filter(value => value !== id) : [...state.features, id]; if (!state.features.length) state.support = DEFAULT_SUPPORT; state.uiState = 'normal'; renderAll(); restoreFocus(`[data-select-feature="${id}"]`); return; }
+    const supportMode = event.target.closest('[data-support-mode]');
+    if (supportMode) { state.support = supportMode.dataset.supportMode; state.uiState = 'normal'; renderAll(); restoreFocus('#support-filter'); return; }
     const categoryButton = event.target.closest('[data-category-filter]');
     if (categoryButton) { state.category = categoryButton.dataset.categoryFilter; renderAll(); restoreFocus(`[data-category-filter="${state.category}"]`); return; }
     const detail = event.target.closest('[data-feature-detail]'); if (detail) { renderToolDetail({type: 'toolDetail', toolId: detail.dataset.featureDetail}); return; }
