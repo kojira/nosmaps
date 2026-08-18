@@ -39,6 +39,6 @@
 
     "resolveJsonModule": true
   },
-  "include": ["*.js", "build/**/*.js", "tools/**/*.mjs", "tests/**/*.js"],
+  "include": ["*.d.ts", "*.js", "build/**/*.js", "tools/**/*.mjs", "tests/**/*.js"],
   "exclude": ["node_modules", "dist"]
 }
