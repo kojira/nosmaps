@@ -8,13 +8,70 @@ const {stubExternalImages} = require('./support/stub-external-images');
    expected set is read out of data.js here instead of being written down. A literal `7` was what
    broke this assertion -- it stayed 7 while the catalogue grew four free topics past it, and a frozen
    number reports the catalogue growing as a regression. */
-function catalogueCategoryIds() {
+function catalogueData() {
   const source = fs.readFileSync(path.join(__dirname, '..', 'data.js'), 'utf8');
   const sandbox = {};
   new Function('window', source)(sandbox);
-  const {tools, seedTopics} = sandbox.NOSMAPS_DATA;
+  return sandbox.NOSMAPS_DATA;
+}
+
+function catalogueCategoryIds() {
+  const {tools, seedTopics} = catalogueData();
   const free = [...new Set(tools.flatMap(tool => tool.topics || []).filter(topic => !seedTopics.includes(topic)))].sort();
   return ['all', ...seedTopics, ...free];
+}
+
+/* The searchable text nip-explorer.js builds for an entry, restricted to what data.js itself holds:
+   name, id, OS text, licence (plus the OSS words the licence earns), the metadata strings, the free
+   topics rendered verbatim, and every capability claim with the registry title it resolves to. The
+   two term sources that come from the dictionary rather than the record -- the seed-topic labels and
+   the feature names/scenes/aliases -- are deliberately left out, so this is a *lower bound* on what
+   the page matches and it is only used for queries whose words live in data.js. */
+function catalogueSearchTerms(data, tool) {
+  const flatten = value => value == null ? [] : Array.isArray(value) ? value.flatMap(flatten)
+    : typeof value === 'object' ? Object.values(value).flatMap(flatten) : [String(value)];
+  const nipByNumber = Object.fromEntries(data.nipCatalog.map(nip => [nip.number, nip]));
+  const oss = tool.license && /^(MIT|AGPL|GPL|LGPL|Apache|BSD|MPL|Unlicense|ISC|CC0)/i.test(tool.license);
+  const nipTerms = (tool.capabilities || []).flatMap(record => {
+    const nip = record.family === data.registry.family ? nipByNumber[record.id] : null;
+    return [record.key, `${record.family.toUpperCase()}-${record.id}`, `${record.family.toUpperCase()} ${record.id}`,
+      record.id, record.registryTitle || '', nip ? nip.title : '', record.sourceText || ''];
+  });
+  return [tool.name, tool.id, tool.platformText || '', tool.license || '', oss ? 'OSS open source オープンソース' : '',
+    ...flatten(tool.summary), ...flatten(tool.homepage), ...flatten(tool.sourceRepo), ...flatten(tool.distribution),
+    ...(tool.topics || []).filter(topic => !data.seedTopics.includes(topic)),
+    ...nipTerms].join(' ').toLowerCase();
+}
+
+/* The feature -> NIP mapping nip-explorer.js publishes in `featureDefinitions`, restated here so the
+   expected result set of a feature filter is computed from the catalogue rather than read back off
+   the page. Only the two features this file selects are needed. A feature counts as confirmed for a
+   record when its best-ranked claim among those NIPs is `supported` or `partial` -- the same
+   `confirmed` support mode the explorer defaults to (issue #7); `unknown` is not a no. */
+const FEATURE_NIPS = {media: ['01', '19'], dm: ['44']};
+
+function confirmedFeature(data, tool, featureId) {
+  const rank = result => { const index = data.resultPrecedence.indexOf(result); return index === -1 ? -1 : data.resultPrecedence.length - index; };
+  const claims = (tool.capabilities || []).filter(record => record.family === data.registry.family && FEATURE_NIPS[featureId].includes(record.id) && rank(record.result) > 0);
+  if (!claims.length) return false;
+  const best = claims.reduce((winner, record) => rank(record.result) > rank(winner.result) ? record : winner);
+  return ['supported', 'partial'].includes(best.result);
+}
+
+/* Names of the entries data.js says a query has to bring back. Sorted, so it can be compared with
+   the names on screen without depending on the render order. */
+function catalogueSearchMatches(data, query) {
+  return data.tools.filter(tool => catalogueSearchTerms(data, tool).includes(query.toLowerCase())).map(tool => tool.name).sort();
+}
+
+/* The one term that will not go stale: a name the catalogue holds, chosen because it identifies
+   exactly one entry. `LumaPost` -- a name from the sample fixtures, absent from the 41 collected
+   records -- is what used to be typed here, and a query nothing can match is a query that proves
+   nothing about search. */
+function uniqueCatalogueName(data) {
+  const name = data.tools.map(tool => tool.name).find(candidate => catalogueSearchMatches(data, candidate).length === 1);
+  expect(name, 'catalogue has an entry whose name matches only itself').toBeTruthy();
+  return name;
 }
 
 /* Icons in the catalogue point at ~25 real third-party hosts. Serve those bytes locally so a remote
@@ -142,6 +199,7 @@ test('explorer search records descriptions and tags in either UI language', asyn
 
 test('feature controls show localized labels below SVG icons, multi-select uses AND, search covers ja/en and Android/iOS', async ({page}) => {
   const errors = collectErrors(page);
+  const data = catalogueData();
   await page.goto('nip-explorer.html');
   const chips = page.locator('.feature-chip');
   const labels = chips.locator('.feature-chip-label');
@@ -163,12 +221,45 @@ test('feature controls show localized labels below SVG icons, multi-select uses 
   await expect(chips.first()).toHaveAttribute('aria-label', /Posts & replies.+timeline/);
   await expect(chips.first()).toHaveAttribute('title', /Posts & replies.+timeline/);
   await expect(page.locator('.feature-chip[aria-pressed="true"]')).toHaveCount(0);
-  const initial = await page.evaluate(() => window.NOSMAPS_DATA.tools.filter(tool => tool.status !== 'dead').length);
-  await expect(page.locator('.feature-tool-card')).toHaveCount(initial);
-  for (const query of ['LumaPost', 'timeline', 'クライアント', 'Web app', 'Android', 'iOS', 'OSS', 'MIT', '暗号化DM', 'image video', 'NIP-44', 'Basic protocol flow description']) {
+  /* No filter is set, so every record the catalogue holds is on screen. The count used to be read
+     off `tool.status !== 'dead'`, a field no collected entry has -- it happened to equal the whole
+     catalogue by accident rather than by saying so. */
+  await expect(page.locator('.feature-tool-card')).toHaveCount(data.tools.length);
+
+  /* Two kinds of query, kept apart on purpose.
+
+     Catalogue terms: words data.js itself holds (a name, the OS text, a licence, a registry title).
+     For those the catalogue can say exactly which records must come back, so the whole result set is
+     compared by name -- a search that quietly returns everything, or nothing, fails here. */
+  const uniqueName = uniqueCatalogueName(data);
+  for (const query of [uniqueName, 'Web app', 'Android', 'iOS', 'OSS', 'MIT', 'NIP-44', 'Basic protocol flow description']) {
+    const expected = catalogueSearchMatches(data, query);
+    expect(expected.length, `${query} matches something in data.js`).toBeGreaterThan(0);
+    await page.locator('#feature-query').fill(query);
+    await expect.poll(() => page.locator('.feature-tool-card h2').allTextContents().then(names => names.sort()), {message: query}).toEqual(expected);
+  }
+  expect(catalogueSearchMatches(data, uniqueName)).toEqual([uniqueName]);
+
+  /* Dictionary terms: words that live in the translations, not in the record. A seed topic is
+     searchable by its label in either language whatever the UI is set to, so the answer is still
+     fixed: every entry carrying that topic, plus any entry whose own text happens to contain the
+     word (several relay and library summaries say "clients" in prose). Both halves come from the
+     catalogue, so neither an over-broad match nor a dropped topic hit can pass. */
+  const clientTopicNames = data.tools.filter(tool => (tool.topics || []).includes('clients')).map(tool => tool.name);
+  expect(clientTopicNames.length, 'catalogue has entries under the clients seed topic').toBeGreaterThan(0);
+  for (const query of ['クライアント', 'Clients']) {
+    const expected = [...new Set([...clientTopicNames, ...catalogueSearchMatches(data, query)])].sort();
+    await page.locator('#feature-query').fill(query);
+    await expect.poll(() => page.locator('.feature-tool-card h2').allTextContents().then(names => names.sort()), {message: query}).toEqual(expected);
+  }
+  /* Feature names, scenes and aliases are searchable in both languages for every entry, because a
+     row is described by the feature vocabulary whatever its claims say. The catalogue cannot name
+     the expected set here, so this only asserts the ja and en vocabulary both reach the list. */
+  for (const query of ['timeline', '暗号化DM', 'image video']) {
     await page.locator('#feature-query').fill(query);
     expect(await page.locator('.feature-tool-card').count(), query).toBeGreaterThan(0);
   }
+
   await page.locator('#feature-query').fill('');
   await page.locator('[data-select-feature="media"]').click();
   await page.locator('[data-select-feature="dm"]').click();
@@ -177,9 +268,18 @@ test('feature controls show localized labels below SVG icons, multi-select uses 
   await page.locator('#oss-filter').selectOption('yes');
   await expect(page.locator('#selected-feature-summary')).toContainText('Images & video');
   await expect(page.locator('#selected-feature-summary')).toContainText('AND');
-  await expect(page.locator('.feature-tool-card')).toHaveCount(1);
-  await expect(page.locator('.feature-tool-card')).toContainText('NsecVault');
-  await expect(page.locator('.feature-tool-card')).toContainText('Android / iOS');
+  /* Four conditions ANDed: media AND dm (both confirmed), Android in the OS text, and a licence the
+     OSS filter recognises. The answer is whatever data.js says satisfies all four -- `NsecVault`,
+     the name that stood here, is from the sample fixtures and is in no collected record. */
+  const andMatches = data.tools.filter(tool => ['media', 'dm'].every(feature => confirmedFeature(data, tool, feature))
+    && String(tool.platformText || '').toLowerCase().includes('android')
+    && /^(MIT|AGPL|GPL|LGPL|Apache|BSD|MPL|Unlicense|ISC|CC0)/i.test(tool.license || ''));
+  expect(andMatches.length, 'catalogue has an entry passing all four conditions').toBeGreaterThan(0);
+  await expect(page.locator('.feature-tool-card h2')).toHaveText(andMatches.map(tool => tool.name));
+  /* The OS text is on the record's own detail dialog (the card carries four fields since 457d74c),
+     and it is shown exactly as the source stated it -- never normalised into a tidier platform list. */
+  await page.locator('.feature-tool-card').first().getByRole('button', {name: 'Details & evidence'}).click();
+  await expect(page.locator('#evidence-dialog')).toContainText(andMatches[0].platformText);
   expect(errors).toEqual([]);
 });
 
