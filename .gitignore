@@ -6,3 +6,7 @@ node_modules/
 
 playwright-report/
 test-results/
+
+# Scratch copy of the pre-port page, rebuilt on demand by
+# tools/restore-original-explorer.mjs for the differential check.
+original/

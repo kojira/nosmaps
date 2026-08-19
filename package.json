@@ -4,11 +4,12 @@
   "version": "0.0.0",
   "description": "Relay-native catalog of Nostr tools. Static site, no backend.",
   "scripts": {
-    "build": "esbuild build/entry-rx-nostr.js --bundle --format=esm --platform=browser --outfile=dist/rx-nostr.js && esbuild build/entry-rx-nostr-crypto.js --bundle --format=esm --platform=browser --outfile=dist/rx-nostr-crypto.js",
+    "build": "esbuild build/entry-rx-nostr.js --bundle --format=esm --platform=browser --outfile=dist/rx-nostr.js && esbuild build/entry-rx-nostr-crypto.js --bundle --format=esm --platform=browser --outfile=dist/rx-nostr-crypto.js && esbuild src/entry/landing.ts --bundle --format=esm --platform=browser --outfile=dist/landing.js && esbuild src/entry/nip-explorer.ts --bundle --format=esm --platform=browser --outfile=dist/nip-explorer.js",
     "data": "node tools/build-data.mjs",
     "verify-catalogue": "node tools/verify-catalogue.mjs",
     "test": "playwright test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && node tools/check-layering.mjs",
+    "check-layering": "node tools/check-layering.mjs"
   },
   "dependencies": {
     "@rx-nostr/crypto": "3.1.6",

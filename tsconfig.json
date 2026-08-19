@@ -1,10 +1,9 @@
 {
   "compilerOptions": {
-    /* Type-check the existing plain-JS sources in place. Nothing is renamed to
-       .ts and nothing is emitted — tsc is used purely as a checker. */
-    "allowJs": true,
-    "checkJs": true,
+    /* The sources are TypeScript now. tsc is still a checker only — esbuild does
+       the emitting (see the `build` script), so nothing here writes output. */
     "noEmit": true,
+    "allowImportingTsExtensions": true,
 
     "target": "esnext",
     "module": "preserve",
@@ -39,6 +38,6 @@
 
     "resolveJsonModule": true
   },
-  "include": ["*.d.ts", "*.js", "build/**/*.js", "tools/**/*.mjs", "tests/**/*.js"],
+  "include": ["src/**/*.ts", "src/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }
