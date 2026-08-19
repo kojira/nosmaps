@@ -21,6 +21,7 @@
 | D3 | **旧 `d`（`nosmaps:<逆ドメイン>`）は捨てて 41 件を全件出し直す**（kojira 承認済み） | M1.7（新設）, M4, M5 |
 | D4 | **投稿数のスケール懸念は皮算用として設計から外す。** 当面は自分たちで整備する前提 | M2.4（縮小）, M4 |
 | D5 | **`d` に使う URI は「ソース配布先の canonical URI をそのまま」。GitHub へ寄せる統一はしない。** ミラーの GitHub URL は捨てず、別フィールドで保持する（kojira の判断。旧 M6-1 の決着） | M1.6.2a（新設）, M1.6.3（再実測）, M1.6.4（N1–N6 に改訂）, M1.6.5（新設）, M5.2, M6 |
+| D6 | **`d` には `nosmaps:` 前置を残す。形は `nosmaps:<正規化済み canonical URI>`。** 生 URI をそのまま入れる（前置なし・正規化なし）案は採らない。正規化規則 N1–N6 はそのまま維持する（kojira の判断。旧 M6-3 の決着） | M1.6.4a（新設）, M1.6.4, M5.2, M6 |
 
 初版にあった「既定は収集鍵」案と「常に最新」案は **どちらも採らない**。初版の M6-1（未解決論点「既定表示をどちらにするか」）は D1 によって解消したので、未解決論点から外した。§0（`design-relay-native-data.md`）が捨てた "shipped default curator" への懸念も、**そもそも既定を選ばないので発生しない**（M2.1 参照）。
 
@@ -281,9 +282,23 @@ d = "nosmaps:" + <正規化済み canonical URI（スキームを含む）>
 
 **ミラー URL を `d` の正規化で吸収しない。** `https://github.com/irislib/iris-client` は iris の canonical（`htree://…`）とは**別の文字列であり、正規化しても一致しない**。これは意図した設計で、ミラーは識別子ではなく M1.6.5 のフィールドに置く。
 
-**なぜ `nosmaps:` 前置を残すか:** 前置は `d` の名前空間マーカーであり、URI 形式への移行とは独立した話。実測で `SOFTWARE_D_PREFIX` / `D_PREFIX` は `src/domain/policy.ts:54`、`tools/catalogue-events.mjs:13`、`tools/verify-catalogue.mjs`、`tools/sign-catalogue.mjs` の 4 か所でゲートとして効いている。前置を外すと `d` が「ただの URI」になり、他アプリの kind 30078 と混ざる可能性が出る（kind 30078 は NIP-78 の汎用 application-specific data であり、名前空間の分離は我々の責任）。**したがって前置は残す。**
+**`nosmaps:` 前置は残す（D6）。** 前置は `d` の名前空間マーカーであり、URI 形式への移行とは独立した話。理由と根拠（4 か所のゲートの実測を含む）は M1.6.4a にまとめた。
 
-> **未解決（M6-3）:** kojira の指示は「ソース配布先の canonical URI を*そのまま*使う」だった。上の決定は「`nosmaps:` 前置 + 正規化済み URI」なので、厳密には「そのまま」ではない。「本当に `d = "https://github.com/damus-io/damus"` と生で入れる（前置なし・正規化なし）」が意図なら、この節の N1–N6 と前置の決定を差し替える必要がある。**どちらかの確認がいる。** なお M1.6.2a の決定（canonical を採る／GitHub へ寄せない）は、前置の有無とは独立に成立する。
+#### M1.6.4a 決定: `nosmaps:` 前置を残す（旧 M6-3 の決着） — D6
+
+**決定（kojira の判断）: `d` には `nosmaps:` の前置を残す。形は `nosmaps:<正規化済み canonical URI>`。生 URI をそのまま入れる案（前置なし・正規化なし）は採らない。正規化規則 N1–N6 はそのまま維持する。**
+
+旧版はここを未解決（M6-3）として残していた。D5 の「canonical URI を*そのまま*使う」を、`d` の文字列全体まで生 URI にする意味に読むこともできたためである。**その解釈は採らない。** D5 が定めたのは「**どの URI を指すか**」（ミラーではなく canonical を指す）であって、「`d` の文字列に名前空間マーカーを付けるか」は別の階層の話であり、この 2 つは独立に決まる。
+
+前置を残す理由:
+
+1. **名前空間の分離は我々の責任。** kind 30078 は NIP-78 の application-specific data であり、`d` の衝突回避はアプリ側が負う。前置を外すと `d` が「ただの URI」になり、同じ URI を `d` に使う別アプリの kind 30078 と区別できなくなる。
+2. **前置は 4 か所で実際にゲートとして効いている**（実測）: `src/domain/policy.ts:54`（`SOFTWARE_D_PREFIX = 'nosmaps:'`）、`tools/catalogue-events.mjs:13`（`D_PREFIX`。同ファイル :57–59 で前置の有無と「前置だけで中身が無い」を検査）、`tools/sign-catalogue.mjs:69`（前置が無ければ署名を拒否）、`tools/verify-catalogue.mjs:11,66`。前置を外すことは、この 4 か所の識別子ゲートを一斉に外すことを意味する。
+3. **正規化（N1–N6）を捨てない理由。** 正規化を外すと、同じ配布先が末尾スラッシュや `.git` の有無で別の `d` になり、訂正が重ならない。重なりを成立させることが本設計の目的（M1.1）なので、正規化は目的そのものに必要。**実データでも N3 は 1 件に実影響がある**（`https://sr.ht/~gheartsfield/nostr-rs-relay/`、実測）。
+
+**この決定で変わらないもの:** M1.6.2a（canonical を採る／GitHub へ寄せない）、N1–N6 の内容、M1.6.3 の実測プロファイル。**前置の有無は 41 件の一意性に影響しない**（前置は全件共通の定数なので、衝突関係は変わらない）。再実測でも `nosmaps:` 前置込みの `d` は **41 / 41 が一意（重複 0）**。
+
+**この決定の帰結:** `d` の実例は M1.6.4 の 3 例のとおり（`nosmaps:https://github.com/damus-io/damus` など）。既存の `SOFTWARE_D_PREFIX` / `D_PREFIX` の値（`'nosmaps:'`）は**変更不要**で、D3 の再発行で変わるのは前置より後ろの部分だけになる。
 
 #### M1.6.5 ミラー URL の保持先
 
@@ -494,7 +509,7 @@ d = "nosmaps:" + <正規化済み canonical URI（スキームを含む）>
 | T7 | `observed equals the number of records, and complete is false only when coverage says so` | 数の捏造禁止 + invariant I8（unknown ≠ 0） |
 | T8 | `I7 still holds: the listable row set does not change with the trust list` | **最重要の回帰。** 信頼リストを空 / 1 人 / 3 人と変えて、識別子の集合が完全一致すること |
 
-### M5.2 識別子（D2）
+### M5.2 識別子（D2 / D6）
 
 | # | テスト名（案） | 何を守るか |
 |---|---|---|
@@ -504,6 +519,7 @@ d = "nosmaps:" + <正規化済み canonical URI（スキームを含む）>
 | T10b | `a scheme-less d is rejected` | M1.6.4。`nosmaps:github.com/a/b`（`://` 無し）が不正であること。旧形式の名残を止める |
 | T11 | `every one of the 41 catalogue entries produces a d within D_MAX_BYTES` | M1.6.3。canonical 採用後の再実測で最長 **91 バイト**（上限 192、`src/domain/policy.ts:55`）。テストで固定する |
 | T12 | `a d that is not a source URI is rejected by the catalogue tools` | M1.7.3。旧形式（`nosmaps:io.damus`）が新しい検証で落ちること |
+| T12b | `every published d starts with the nosmaps: prefix` | **D6 の番人（M1.6.4a）。** 41 件すべての `d` が `nosmaps:` で始まり、前置を外した生 URI（`https://github.com/damus-io/damus`）が検証で落ちること |
 
 ### M5.3 UI 層
 
@@ -543,9 +559,13 @@ d = "nosmaps:" + <正規化済み canonical URI（スキームを含む）>
 
 **追加で解消した論点:** M6-1（`source_repo` が確定していない 2 件を mirror にするか canonical にするか）→ **kojira の判断で canonical に決定。M1.6.2a に記載。** これに伴い M1.6.3 のプロファイルと M1.6.4 の正規化規則を canonical 前提に書き直した（`htree://` の許容、スキームを落とさない、`.git` を落とす側へ移動）。
 
+**この改訂で解消した論点:** M6-3（`d` に `nosmaps:` 前置を残すか、生 URI にするか）→ **kojira の判断で前置を残すに決定（D6）。M1.6.4a に記載。** 正規化規則 N1–N6 も維持で確定した。
+
+**残っている未解決論点は 7 件**（下の 2, 4, 5, 6, 7, 8, 9。1 と 3 は決定済みとして番号だけ残してある）。
+
 1. ~~`source_repo` が確定していない 2 件をどうするか~~ → **決定済み（M1.6.2a）。canonical をそのまま使う。**
 2. **URI にクエリ文字列・フラグメント・ポートが付いてきた場合の正規化。** 現データには 1 件も無いので実測できていない（**未確認**）。第三者投稿では起こりうる。落とすか残すかを決める必要がある。（`.git` は M1.6.4 N4 で「落とす」に決定済み。ただし現データでの実影響は 0 件。）
-3. **`d` は「`nosmaps:` 前置 + 正規化済み URI」でよいか、それとも生の URI そのままか。** M1.6.4 の注記のとおり、指示の「そのまま使う」の解釈が 2 通りある。前置を外す場合、`SOFTWARE_D_PREFIX` を使っている 4 か所（`policy.ts:54`, `catalogue-events.mjs:13`, `verify-catalogue.mjs`, `sign-catalogue.mjs`）の扱いも決まる。
+3. ~~`d` は「`nosmaps:` 前置 + 正規化済み URI」でよいか、それとも生の URI そのままか~~ → **決定済み（M1.6.4a / D6）。前置を残し、N1–N6 も維持する。** `SOFTWARE_D_PREFIX` / `D_PREFIX` を使う 4 か所（`policy.ts:54`, `catalogue-events.mjs:13`, `sign-catalogue.mjs:69`, `verify-catalogue.mjs:11,66`。実測）は**変更不要**。
 4. **`catalogue-events.jsonl` を複数署名者化するか。** M4-10 では「しない（repo の正本は収集鍵のみ、訂正はリレー上）」を既定案にした。しかしそうすると **`data.js` にしか繋がっていない環境（`?relay=1` 無しの既定表示）では訂正が一切見えない**。実測: `src/ui/explorer/app.ts` はリレー読み取りを `explorerParams.relayRequested`（`?relay=1`）でしか有効化していない。つまり**既定の閲覧体験に重なりは届かない**。これは issue #18 を半分しか解いていないとも言える。
 5. **旧イベントに kind:5 を出すか、放置か。** M1.7.2 は「出す」を既定案にしたが、addressable event に対する削除がリレーでどう扱われるかは**未確認**。効果が保証できないものを出す価値があるかは判断がいる。
 6. **信頼リストの kind。** M2.3 案 B は NIP-51 の kind 30000 Follow set を `d="nosmaps:signers"` で流用する提案。専用 kind の有無は**未確認**。汎用 set を流用してよいか。
