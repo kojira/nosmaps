@@ -462,12 +462,13 @@
   min-width: 0;
 }
 
-.feature-tool-card .tool-identifier {
+/* issue #15: the coordinate that used to sit here is internal bookkeeping and is gone. What takes
+   its place is the one thing a reader needs before opening anything -- whether the record is still
+   active. It is a badge on the same headline row, so the card is still the four fields c15fafd cut
+   it down to, and it shrinks rather than pushing the row past 375px wide. */
+.feature-tool-card .card-headline .record-state {
   flex: 0 1 auto;
-  margin: 0;
-  color: var(--muted);
-  font-size: .68rem;
-  white-space: nowrap;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }

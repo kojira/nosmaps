@@ -4,10 +4,15 @@
    chips, claim summary, liveness, likes, bookmarks, review thumbnails -- and measured a median 552px
    tall at 375x812, so barely one card fitted in a screen's worth of list and the list could not be
    scanned. The card now carries only the fields every one of the 41 collected records actually holds
-   (name, the topics it published, its one-line summary, the id that identifies it) and the detail
+   (name, the state of the record, its one-line description, the topics it published) and the detail
    moved behind the Details & evidence button. These tests pin both halves: the card exposes exactly
    that set and nothing else, the detail is one press away and still carries what left the card, and
    the height/fit numbers show the density actually improved.
+
+   The two rows that changed since: the headline slot that used to print the coordinate now prints
+   the record state (issue #15), and the one-line row is the description recorded for the language
+   being read rather than the collected original (descriptions map, ecbb46b). Both are read out of
+   the catalogue and the live dictionary below, never written down as literals.
 
    #2: a carousel item on the top page was inert. It is now a link to the explorer opened on that
    entry, and these tests pin that it lands on *that* entry rather than merely on the explorer. */
@@ -43,8 +48,15 @@ function readCards(page) {
       const tool = window.NOSMAPS_DATA.tools.find(item => item.id === card.dataset['toolId']);
       if (!tool) throw new Error(`no catalogue record for ${card.dataset['toolId']}`);
       const topics = tool.topics || [];
+      const recorded = tool.descriptions && tool.descriptions[i18n.language];
+      const described = tool.summaryAbsent
+        ? String(i18n.t('explorer.summaryAbsent'))
+        : (typeof recorded === 'string' && recorded ? recorded : tool.summary);
       return {
         id: tool.id,
+        /* Whatever branch produced it, the row is a real sentence: an absence is spelled out in
+           words and nothing ever leaks the string `undefined` or a blank line. */
+        described,
         children: [...card.children].map(element => element.className),
         /* The one record whose summary is absent keeps the `is-unknown` marker: an absent summary
            is stated as absent, it is not quietly filled and it is not quietly dropped. */
@@ -52,8 +64,17 @@ function readCards(page) {
         actual: card.innerText.split('\n').map(line => line.trim()).filter(Boolean),
         expected: [
           tool.name,
-          tool.id,
-          tool.summaryAbsent ? i18n.t('explorer.summaryAbsent') : tool.summary,
+          /* issue #15: the coordinate that used to occupy this slot is internal bookkeeping and was
+             removed; the record state took its place because it is what a reader needs first. Read
+             out of the record and the live dictionary, so a card that printed a state the record
+             does not hold, or a raw key, fails here. */
+          i18n.t(`recordStates.${tool.recordState}`),
+          /* The one-line row is the description recorded for the language being read; a language
+             with no recorded text falls back to the collected original (`summary`), which stays
+             canonical. Derived from the record, so a card showing the other language's text, the
+             original where a translation exists, or an invented sentence fails here. An absent
+             original is still stated as absent in words. */
+          described,
           ...(topics.length ? topics.map(label) : [`${i18n.t('explorer.category')}: ${i18n.t('unknown')}`]),
           i18n.t('explorer.compareAdd'),
           i18n.t('explorer.details')
@@ -66,7 +87,7 @@ function readCards(page) {
 test.describe('375x812 collapsed card', () => {
   test.use({viewport: PHONE});
 
-  test('a collapsed card exposes only name, id, one-line summary and topics, and the detail is one press away', async ({page}) => {
+  test('a collapsed card exposes only name, record state, the one-line description in the language being read, and topics, and the detail is one press away', async ({page}) => {
     const errors = collectErrors(page);
     await page.goto('nip-explorer.html');
     await expect(page.locator('.feature-tool-card').first()).toBeVisible();
@@ -81,17 +102,46 @@ test.describe('375x812 collapsed card', () => {
       for (const row of rows) {
         expect(row.children, `${row.id} card structure`).toEqual(row.expectedChildren);
         expect(row.actual, `${row.id} card text`).toEqual(row.expected);
+        /* Absent stays absent, but it is never blank and never the word `undefined`. */
+        expect(row.described, `${row.id} description is a sentence`).toBeTruthy();
+        expect(row.described, `${row.id} description is not undefined`).not.toBe('undefined');
       }
+    }
+    /* The rows above would also pass if every record fell back to the collected original, so pin
+       that the recorded translations are actually being read: switching language changes the text
+       of every record that has one recorded in both. */
+    /** @type {Record<string, Record<string, string>>} */
+    const perLanguage = {};
+    for (const language of ['en', 'ja']) {
+      await page.locator(`#compact-identity [data-language="${language}"]`).click();
+      perLanguage[language] = Object.fromEntries((await readCards(page)).map(row => [row.id, row.described]));
+    }
+    const translated = await page.evaluate(() => window.NOSMAPS_DATA.tools
+      .filter(tool => {
+        const descriptions = tool.descriptions || {};
+        return !tool.summaryAbsent && descriptions['en'] && descriptions['ja'] && descriptions['en'] !== descriptions['ja'];
+      })
+      .map(tool => tool.id));
+    expect(translated.length, 'catalogue carries per-language descriptions').toBeGreaterThan(0);
+    for (const id of translated) {
+      expect(perLanguage['en']?.[id], `${id} reads differently per language`).not.toBe(perLanguage['ja']?.[id]);
     }
 
     // 2. Nothing that moved behind the detail view is still printed on a card.
     for (const selector of [
       '.tool-facts', '.card-layer', '.fact-layer', '.evaluation-layer', '.resource-links', '.basis-nips',
-      '.claim-summary', '.liveness-block', '.provenance-badge', '.record-state', '.card-review-thumbnails',
-      '[data-like-tool]', '[data-bookmark-tool]', '[data-review-tool]', '[data-resource-tool]', '[data-evidence-tool]'
+      '.claim-summary', '.liveness-block', '.provenance-badge', '.card-review-thumbnails',
+      '[data-like-tool]', '[data-bookmark-tool]', '[data-review-tool]', '[data-resource-tool]', '[data-evidence-tool]',
+      // issue #15: the coordinate is gone from the card entirely, element and all.
+      '.tool-identifier'
     ]) {
       await expect(page.locator(`#tool-results .feature-tool-card ${selector}`), selector).toHaveCount(0);
     }
+    /* `.record-state` left the list above rather than being quietly dropped: issue #15 put it back
+       on the card, in the headline slot the coordinate used to occupy, so it is asserted present on
+       every card here. Its text is pinned against the record and the dictionary in step 1, and
+       tests/coordinate-hidden-and-liveness.spec.js pins the same in both languages. */
+    await expect(page.locator('#tool-results .feature-tool-card .card-headline .record-state')).toHaveCount(total);
 
     // 3. Density. Before this change the median card was 552px and one card filled the screen.
     const density = await page.evaluate(height => {
@@ -121,8 +171,14 @@ test.describe('375x812 collapsed card', () => {
     const dialog = page.locator('#evidence-dialog');
     await expect(dialog).toBeVisible();
     await expect(dialog).toHaveAttribute('aria-label', String(name));
-    for (const label of ['ライセンス', 'OS／環境', '最終観測', 'カテゴリ', '座標', '一次情報', '対応主張', '利用者評価']) {
+    /* issue #15: '座標' left this list because the coordinate is no longer shown to a reader, and
+       '一次情報' became '出典' because collecting from primary sources is a standing premise rather
+       than a per-heading claim. Both are asserted absent below rather than merely dropped. */
+    for (const label of ['ライセンス', 'OS／環境', '最終観測', 'カテゴリ', '出典', '対応主張', '利用者評価']) {
       await expect(dialog, label).toContainText(label);
+    }
+    for (const gone of ['座標', '30078:']) {
+      await expect(dialog, gone).not.toContainText(gone);
     }
     await expect(dialog.locator('.resource-links [data-resource-tool]').first()).toBeVisible();
     await expect(dialog.locator('[data-like-tool]')).toHaveCount(1);

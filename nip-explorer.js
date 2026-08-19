@@ -465,11 +465,29 @@
   /* §21.4 R4: 記録の状態 (`state`) と プロジェクトの生存 (liveness) は別の軸。liveness は
      30370 の観測で、ビューアの G に居る署名者の分だけ数える。グラフが無いこのビルドでは
      どの観測も数えないので、導出値は常に unknown。観測そのものは消さずに併記する。 */
-  function livenessValue() { return 'unknown'; }
+  /* issue #15-2: このビルドにグラフが無いので 30370 の観測は一件も数えられない。だが「数えられる観測が無い」
+     ことと「何も観測されていない」ことは別。収集時にホームページへの応答が実際に記録されているエントリは、
+     その記録を根拠に reachable と言える。根拠は記録された `sources` の行そのものであって、ここで新しく
+     観測を作ることはしない。記録が無いエントリは unknown のままで、到達不能という意味ではない。 */
+  const sameAddress = (a, b) => Boolean(a) && Boolean(b) && String(a).replace(/\/+$/, '') === String(b).replace(/\/+$/, '');
+  function reachableSource(tool) {
+    const sources = (tool && tool.sources) || [];
+    for (const source of sources) {
+      if (!source || !source.url) continue;
+      // 「HTTP 200 を見た」と収集時に書かれている行だけ。文脈を推測して広げない。
+      if (!/\bHTTP 200\b/.test(String(source.what || ''))) continue;
+      // その応答がこのエントリのホームページに対するものだと、記録自体が言っているときだけ。
+      if ((source.fields || []).includes('homepage') || sameAddress(source.url, tool.homepage)) return source;
+    }
+    return null;
+  }
+  function livenessValue(tool) { return reachableSource(tool) ? 'reachable' : 'unknown'; }
   function livenessMarkup(tool) {
     const observations = tool.liveness || [];
     const rows = observations.map(item => `<li><span class="liveness-result ${esc(item.result)}">${esc(t(`liveness.${item.result}`))}</span> <code>${esc(item.subject)}</code> <small>${esc(item.detail)}</small>${item.target ? ` <small>→ ${esc(item.target)}</small>` : ''} <small>${esc(item.observedAt)}</small></li>`).join('');
-    return `<div class="liveness-block"><p class="liveness-derived" data-liveness="${esc(livenessValue())}">${esc(t('explorer.livenessDerived', {value: t(`liveness.${livenessValue()}`)}))} ${unknownMarker()}</p>${observations.length ? `<p class="liveness-why">${esc(t('explorer.livenessUncounted', {count: observations.length}))}</p><ul class="liveness-list">${rows}</ul>` : ''}</div>`;
+    const value = livenessValue(tool);
+    const ground = reachableSource(tool);
+    return `<div class="liveness-block"><p class="liveness-derived" data-liveness="${esc(value)}">${esc(t('explorer.livenessDerived', {value: t(`liveness.${value}`)}))} ${value === 'unknown' ? unknownMarker() : ''}</p>${ground ? `<p class="liveness-ground">${esc(t('explorer.livenessFromSource', {url: ground.url, date: ground.fetched || t('unknown')}))}</p>` : ''}${observations.length ? `<p class="liveness-why">${esc(t('explorer.livenessUncounted', {count: observations.length}))}</p><ul class="liveness-list">${rows}</ul>` : ''}</div>`;
   }
   // §6.4: 推薦数はビューアのフォローグラフから数えた「distinct pubkey 数」。
   // グラフが無いときは unknown で、0 とは別の見た目にし、並び順にも 0 として入れない (I8)。
@@ -501,11 +519,18 @@
   }
   /* issue #6: the collapsed card is a row to scan, not a dossier. It carries only what every one of
      the catalogue's records actually holds -- the name, the topics it published, its one-line
-     summary, and the id that identifies it -- plus the two controls that belong to the list rather
+     summary, and (issue #15) whether the record is still active -- plus the two controls that belong to the list rather
      than to the record: the comparison checkbox (picking candidates is a multi-row act, so it
      cannot live inside a single record's dialog) and the button that opens the record. Everything
      that used to be printed here -- licence, OS, observation date, official links, capability
      chips, claim summary, liveness, likes, bookmarks, review thumbnails -- is in the detail dialog.
+
+     issue #15: the coordinate (`30078:<pubkey>:nosmaps:<d>`) is internal bookkeeping -- a reader
+     never types it, copies it or compares it -- so it is off the card and out of the reader-facing
+     part of the dialog. The only place an identifier is still named is the publish form, where the
+     author has to supply one, and there it is called 識別子 / Identifier. What replaced the
+     coordinate on the headline is the record state, because whether the entry is still active is
+     the first thing a reader needs and it was previously one press away for no reason.
 
      `recommendationMarkup` stays because it is the relay list's own ordering key, and it renders
      nothing at all for a record that did not come from a relay: for all 41 collected entries the
@@ -515,7 +540,7 @@
      not a fifth field -- the card still has exactly the four rows above, and the icon carries no
      text of its own (see NOSMAPS_ICONS.entity). */
   function featureCard(tool) {
-    return `<article class="feature-tool-card" data-tool-id="${esc(tool.id)}" data-record-state="${esc(tool.recordState)}"><div class="card-headline"><div class="card-identity">${icons.entity(tool)}<h2>${esc(tool.name)}</h2></div><code class="tool-identifier">${esc(tool.id)}</code></div><p class="tool-summary${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(toolDescription(tool))}</p><div class="card-topics">${topicTags(tool)}</div>${recommendationMarkup(tool)}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${esc(tool.id)}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${esc(tool.id)}">${esc(t('explorer.details'))}</button></div></article>`;
+    return `<article class="feature-tool-card" data-tool-id="${esc(tool.id)}" data-record-state="${esc(tool.recordState)}"><div class="card-headline"><div class="card-identity">${icons.entity(tool)}<h2>${esc(tool.name)}</h2></div><span class="record-state ${esc(tool.recordState)}">${esc(t(`recordStates.${tool.recordState}`))}</span></div><p class="tool-summary${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(toolDescription(tool))}</p><div class="card-topics">${topicTags(tool)}</div>${recommendationMarkup(tool)}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${esc(tool.id)}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${esc(tool.id)}">${esc(t('explorer.details'))}</button></div></article>`;
   }
 
   function activeConditions() {
@@ -1003,7 +1028,7 @@
     // 選択中の機能に対する対応まとめ。カードから移したが、条件は一覧の状態のままを映す。
     const supports = state.features.map(id => localizedFeature(id)).map(feature => ({feature, support: featureSupport(tool, feature)}));
     els.evidenceDialog.setAttribute('aria-label', tool.name);
-    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.details'), tool.name)}<p class="detail-provenance">${provenanceBadge(tool)}<span class="record-state ${esc(tool.recordState)}">${esc(t(`recordStates.${tool.recordState}`))}</span></p><p class="tool-summary${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(description)}</p><section class="dialog-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><div class="support-line">${supports.length ? supports.map(item => `<span class="feature-support-summary">${esc(item.feature.name)} ${supportBadge(item.support)}</span>`).join('') : `<span class="tag">${esc(t('explorer.noFeatureCondition'))}</span>`}${topicTags(tool)}${platformTags(tool)}</div><dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.recordState'))}</dt><dd>${esc(t(`recordStates.${tool.recordState}`))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool))}</dd></div><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(topicsText(tool))}</dd></div><div><dt>${esc(t('explorer.os'))}</dt><dd>${esc(osText(tool))}</dd></div><div><dt>${esc(t('explorer.license'))}</dt><dd>${esc(displayLicense(tool))}</dd></div><div><dt>${esc(t('explorer.coordinate'))}</dt><dd><code>${esc(tool.coordinate || tool.id)}</code></dd></div></dl>${livenessMarkup(tool)}${tool.topicCorrection ? `<p class="topic-correction">${esc(t('explorer.topicCorrection', {collected: (tool.collectedTopics || []).join(', ') || t('none')}))} ${esc(tool.topicCorrection)}</p>` : ''}<nav class="resource-links" aria-label="${esc(t('explorer.officialLinks', {name: tool.name}))}">${resourceLinks(tool)}</nav><h4>${esc(t('explorer.primarySources'))}</h4>${sourceListMarkup(tool)}</section>${claimBlockMarkup(tool)}<section class="dialog-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${esc(tool.id)}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCountMarkup(tool)}</button><button type="button" data-bookmark-tool="${esc(tool.id)}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${esc(tool.id)}">${esc(t('explorer.reviews', {count: reviews.length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${esc(tool.id)}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}${reviews.length ? '' : `<p class="no-support-record">${esc(t('explorer.noReviewsObserved'))}</p>`}</section>`;
+    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.details'), tool.name)}<p class="detail-provenance">${provenanceBadge(tool)}<span class="record-state ${esc(tool.recordState)}">${esc(t(`recordStates.${tool.recordState}`))}</span></p><p class="tool-summary${tool.summaryAbsent ? ' is-unknown' : ''}">${esc(description)}</p><section class="dialog-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><div class="support-line">${supports.length ? supports.map(item => `<span class="feature-support-summary">${esc(item.feature.name)} ${supportBadge(item.support)}</span>`).join('') : `<span class="tag">${esc(t('explorer.noFeatureCondition'))}</span>`}${topicTags(tool)}${platformTags(tool)}</div><dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.recordState'))}</dt><dd>${esc(t(`recordStates.${tool.recordState}`))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool))}</dd></div><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(topicsText(tool))}</dd></div><div><dt>${esc(t('explorer.os'))}</dt><dd>${esc(osText(tool))}</dd></div><div><dt>${esc(t('explorer.license'))}</dt><dd>${esc(displayLicense(tool))}</dd></div></dl>${livenessMarkup(tool)}${tool.topicCorrection ? `<p class="topic-correction">${esc(t('explorer.topicCorrection', {collected: (tool.collectedTopics || []).join(', ') || t('none')}))} ${esc(tool.topicCorrection)}</p>` : ''}<nav class="resource-links" aria-label="${esc(t('explorer.officialLinks', {name: tool.name}))}">${resourceLinks(tool)}</nav><h4>${esc(t('explorer.primarySources'))}</h4>${sourceListMarkup(tool)}</section>${claimBlockMarkup(tool)}<section class="dialog-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${esc(tool.id)}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCountMarkup(tool)}</button><button type="button" data-bookmark-tool="${esc(tool.id)}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${esc(tool.id)}">${esc(t('explorer.reviews', {count: reviews.length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${esc(tool.id)}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}${reviews.length ? '' : `<p class="no-support-record">${esc(t('explorer.noReviewsObserved'))}</p>`}</section>`;
     if (shouldOpen) openDialog(els.evidenceDialog, context);
   }
 
@@ -1071,7 +1096,7 @@
       comparisonItem('OSS', selected.map(tool => displayLicense(tool)), selected.map(tool => `<div class="comparison-value">${esc(displayLicense(tool))}</div>`)),
       // §21.10 item 4: レコードの状態とプロジェクトの生存は別行。ひとつのバッジに混ぜない。
       comparisonItem(t('explorer.recordState'), selected.map(tool => tool.recordState), selected.map(tool => `<div class="comparison-value">${esc(t(`recordStates.${tool.recordState}`))}</div>`)),
-      comparisonItem(t('explorer.liveness'), selected.map(() => livenessValue()), selected.map(tool => `<div class="comparison-value" data-liveness="${esc(livenessValue())}">${esc(t(`liveness.${livenessValue()}`))} ${unknownMarker()}${(tool.liveness || []).length ? `<small>${esc(t('explorer.livenessUncounted', {count: tool.liveness.length}))}</small>` : ''}</div>`)),
+      comparisonItem(t('explorer.liveness'), selected.map(tool => livenessValue(tool)), selected.map(tool => `<div class="comparison-value" data-liveness="${esc(livenessValue(tool))}">${esc(t(`liveness.${livenessValue(tool)}`))} ${livenessValue(tool) === 'unknown' ? unknownMarker() : ''}${(tool.liveness || []).length ? `<small>${esc(t('explorer.livenessUncounted', {count: tool.liveness.length}))}</small>` : ''}</div>`)),
       comparisonItem(t('explorer.capabilityClaims'), selected.map(tool => String(claimSummary(tool).total)), selected.map(tool => `<div class="comparison-value" data-claim-total="${claimSummary(tool).total}">${claimSummary(tool).total ? esc(Object.entries(claimSummary(tool).byFamily).map(([family, count]) => t('explorer.claimFamilyCount', {family: family.toUpperCase(), count})).join(' · ')) : `${esc(t('explorer.noClaimPublished'))} ${unknownMarker()}`}</div>`)),
       // observed が空のリレー由来エントリでも空欄にせず、observedText の「不明」語彙で出す。
       comparisonItem(t('explorer.observed'), selected.map(tool => observedText(tool)), selected.map(tool => `<div class="comparison-value">${esc(observedText(tool).split(' ')[0])}</div>`))
