@@ -12,7 +12,7 @@
 
 ## 改訂 2 版で変わったこと（kojira の設計判断）
 
-初版から次の 4 点が変わった。以下の本文はすべてこの 4 点に従って書き直してある。
+初版から次の 4 点が変わった。以下の本文はすべてこの 4 点に従って書き直してある。**さらに D2 の細目として D5 を追加した（kojira の判断）。**
 
 | # | 判断 | 影響する節 |
 |---|---|---|
@@ -20,6 +20,7 @@
 | D2 | **識別子（`d` 値）は Java パッケージ風をやめ、ソースコード配布場所の URI をそのまま使う。** 扱うのは基本オープンソースのみという前提 | M1.6（新設）, M0.2, M5, M7 |
 | D3 | **旧 `d`（`nosmaps:<逆ドメイン>`）は捨てて 41 件を全件出し直す**（kojira 承認済み） | M1.7（新設）, M4, M5 |
 | D4 | **投稿数のスケール懸念は皮算用として設計から外す。** 当面は自分たちで整備する前提 | M2.4（縮小）, M4 |
+| D5 | **`d` に使う URI は「ソース配布先の canonical URI をそのまま」。GitHub へ寄せる統一はしない。** ミラーの GitHub URL は捨てず、別フィールドで保持する（kojira の判断。旧 M6-1 の決着） | M1.6.2a（新設）, M1.6.3（再実測）, M1.6.4（N1–N6 に改訂）, M1.6.5（新設）, M5.2, M6 |
 
 初版にあった「既定は収集鍵」案と「常に最新」案は **どちらも採らない**。初版の M6-1（未解決論点「既定表示をどちらにするか」）は D1 によって解消したので、未解決論点から外した。§0（`design-relay-native-data.md`）が捨てた "shipped default curator" への懸念も、**そもそも既定を選ばないので発生しない**（M2.1 参照）。
 
@@ -192,51 +193,117 @@ sourceRepo: facts.source_repo || facts.source_repo_mirror || facts.mirror || nul
 | `nosmaps:to.iris` | `source_repo` 無し。`canonical_repo` が「Main development is on decentralized git: `htree://npub1xdhnr9mrv47kkrn95k6cwecearydeh8e895990n3acntwvmgk2dsdeeycm/iris-client`. GitHub is a mirror.」と述べている | `source_repo_mirror: "https://github.com/irislib/iris-client"` |
 | `nosmaps:io.sourcehut.nostr-rs-relay` | `source_repo` 無し。`canonical_home` が `https://sr.ht/~gheartsfield/nostr-rs-relay/`（mirror の description 由来） | `mirror: "https://github.com/scsibug/nostr-rs-relay"` |
 
-**つまり「URI が取れない件は 0 件、しかし『どの URI が正か』が確定していない件が 2 件ある。」** この 2 件は「mirror の URI を `d` にするのか、canonical の URI を `d` にするのか」を人が決める必要がある。自動では決められない。→ M6-1（未解決）。
+**つまり「URI が取れない件は 0 件、しかし『どの URI が正か』が確定していない件が 2 件ある。」** この 2 件は「mirror の URI を `d` にするのか、canonical の URI を `d` にするのか」を人が決める必要があった。自動では決められない。→ **M1.6.2a で決定済み（kojira の判断）。**
 
-#### M1.6.3 41 件の URI の実測プロファイル
+#### M1.6.2a 決定: canonical URI をそのまま `d` に使う（旧 M6-1 の決着）
 
-`data.js` の `sourceRepo` 41 件を実測した:
+**決定（kojira の判断）: 識別子（`d` 値）には、そのソース配布先の canonical URI をそのまま使う。GitHub へ寄せる統一はしない。**
 
-| 観測 | 値 |
-|---|---|
-| ホスト | **`github.com` が 41 / 41**（他ホストは 0） |
-| スキーム | **`https://` が 41 / 41**（`http://` や他スキームは 0） |
-| 末尾スラッシュあり | **0 件** |
-| 大文字を含む URI | **9 件**（`PrimalHQ/primal-web-app`, `SnowCait/nostter`, `YakiHonne/web-app`, `greenart7c3/Amber`, `getAlby/lightning-browser-extension`, `KoalaSat/pokey`, `ZeusLN/zeus`, `getAlby/hub`, `MutinyWallet/mutiny-web`） |
-| 一意性（生の文字列） | **41 / 41 が一意**（重複 0） |
-| 一意性（スキーム除去・末尾スラッシュ除去・全小文字化後） | **41 / 41 が一意**（重複 0） |
-| バイト長（生） | 最小 28 / 最大 54 |
-| バイト長（`https://` 除去後） | 最小 20 / 最大 46 |
-| printable ASCII（`D_ASCII_RE = /^[\x21-\x7e]+$/`）に収まるか | **41 / 41 が収まる** |
+理由（kojira の判断としてそのまま記す）: 識別子は「そのソフトウェアの配布の正本がどこにあるか」を指すべきであり、我々が扱いやすいホスト（GitHub）へ寄せる操作は、M1.6.1 で否定した「我々が発明した名前」への逆戻りになる。ミラーを識別子に据えると、canonical を知っている第三者が独立に同じ `d` へ到達できない。
 
-**サイズの結論（実測）:** `nosmaps:` 前置（8 バイト）を残して生の URI をそのまま入れても、最長で **62 バイト**。`D_MAX_BYTES = 192` に対して十分な余裕がある。**バイト長は制約にならない。**
+したがって 2 件は次で確定する:
+
+| 旧 `d` | 新 `d` に使う canonical URI（verbatim） | 出所（`real-catalog-draft.json` のキー） |
+|---|---|---|
+| `nosmaps:to.iris` | `htree://npub1xdhnr9mrv47kkrn95k6cwecearydeh8e895990n3acntwvmgk2dsdeeycm/iris-client` | `entries[].facts_with_no_home_in_v1_profile.canonical_repo` の文中に埋め込まれた URI。フィールドの値は verbatim で `README states 'Main development is on decentralized git: htree://npub1xdhnr9mrv47kkrn95k6cwecearydeh8e895990n3acntwvmgk2dsdeeycm/iris-client'. GitHub is a mirror.`（**URI は散文の中にあり、単独フィールドとしては存在しない**） |
+| `nosmaps:io.sourcehut.nostr-rs-relay` | `https://sr.ht/~gheartsfield/nostr-rs-relay/` | `entries[].facts_with_no_home_in_v1_profile.canonical_home`。フィールドの値は verbatim で `https://sr.ht/~gheartsfield/nostr-rs-relay/ (per the mirror's description)`（**URI の後ろに註釈が付いた文字列であり、URI 単独ではない**） |
+
+**この 2 件について、URI は機械可読なフィールドとして入っていない（散文・註釈付き文字列の中にある）。** したがって実装フェーズでは**この 2 件だけ人手で `d` を書く**。散文からの自動抽出はしない（正規表現で URI を掘るのは、記録が主張していない構造を勝手に仮定することになる）。
+
+**GitHub の URL は捨てない。ミラーとして保持する。** 保持先は M1.6.5 で決める。
+
+#### M1.6.3 41 件の URI の実測プロファイル（canonical 採用後の再実測）
+
+**この節は M1.6.2a の決定を受けて実測し直した。** 旧版は `data.js` の `sourceRepo` 41 件（GitHub ミラーへフォールバック済みの値）を見ていたため「ホストは全件 `github.com`、スキームは全件 `https`」というプロファイルになっていた。**canonical を採るとこの前提は成立しない。**
+
+実測した集合（41 件）の作り方: 39 件は `real-catalog-draft.json` の `entries[].facts_with_no_home_in_v1_profile.source_repo`、残る 2 件は M1.6.2a で確定した canonical URI。
+
+| 観測 | 旧（ミラー寄せ・`data.js` の `sourceRepo`） | 新（canonical 採用後・実測） |
+|---|---|---|
+| スキーム | `https` 41 / 41 | **`https` 40 / 41、`htree` 1 / 41** |
+| ホスト | `github.com` 41 / 41 | **`github.com` 39 / 41、`sr.ht` 1、`npub1xdhnr9mrv47kkrn95k6cwecearydeh8e895990n3acntwvmgk2dsdeeycm` 1** |
+| 末尾スラッシュあり | 0 件 | **1 件**（`https://sr.ht/~gheartsfield/nostr-rs-relay/`） |
+| 末尾 `.git` | 0 件 | **0 件** |
+| 大文字を含む URI（正規化後） | 9 件 | **9 件**（いずれも GitHub のパス部。`PrimalHQ/primal-web-app`, `SnowCait/nostter`, `YakiHonne/web-app`, `greenart7c3/Amber`, `getAlby/lightning-browser-extension`, `KoalaSat/pokey`, `ZeusLN/zeus`, `getAlby/hub`, `MutinyWallet/mutiny-web`） |
+| 一意性（生の文字列） | 41 / 41 一意 | **41 / 41 が一意**（重複 0） |
+| **一意性（N1–N6 正規化後）** | 41 / 41 一意 | **41 / 41 が一意（重複 0）— 再実測済み。canonical 採用で衝突は発生しない** |
+| バイト長（正規化済み URI 単体） | 最小 20 / 最大 46（`https://` 除去後） | **最小 28 / 最大 83** |
+| バイト長（`nosmaps:` 前置込みの `d`） | 最長 62 | **最小 36 / 最大 91**（最長は iris の `htree://npub1…/iris-client`） |
+| printable ASCII（`D_ASCII_RE = /^[\x21-\x7e]+$/`）に収まるか | 41 / 41 | **41 / 41 が収まる** |
+
+**サイズの結論（再実測）:** 最長の `d` は **91 バイト**（`nosmaps:` 前置込み）。`D_MAX_BYTES = 192`（実測: `src/domain/policy.ts:55`）に対してまだ余裕がある。**バイト長は制約にならない。** ただし旧版の「最長 62 バイト」は**もう正しくない**（M5.2 の T11 の記述も差し替えた）。
+
+**このプロファイルが正規化規則に課す要求:**
+
+1. **`http`/`https` 以外のスキームが実在する**（`htree://` 1 件）。スキームを落とす・https へ寄せる正規化は、この 1 件を壊す。
+2. **オーソリティ部（`://` の直後）が DNS ホスト名とは限らない**（iris の canonical はそこに npub が来る）。実測ではこの npub は全文字が小文字なので小文字化しても値は変わらないが、**「オーソリティは大文字小文字を区別しないから小文字化してよい」という根拠は `htree://` には無い**（htree の仕様書を今回取得していない → 未確認）。
+3. **末尾スラッシュが実在する**（sr.ht の 1 件）。予防ではなく実データの処理として必要になった。
 
 #### M1.6.4 `d` の具体形式（設計としての決定）
 
 **決定した形式:**
 
 ```
-d = "nosmaps:" + <正規化済みソース URI>
-例: d = "nosmaps:github.com/damus-io/damus"
+d = "nosmaps:" + <正規化済み canonical URI（スキームを含む）>
+例: d = "nosmaps:https://github.com/damus-io/damus"
+例: d = "nosmaps:htree://npub1xdhnr9mrv47kkrn95k6cwecearydeh8e895990n3acntwvmgk2dsdeeycm/iris-client"
+例: d = "nosmaps:https://sr.ht/~gheartsfield/nostr-rs-relay"
 ```
 
-**正規化規則（何を落とすか）:**
+**旧版からの変更点（M1.6.2a の canonical 採用に伴う）:** 旧版はスキームを**落とす**設計（N1）だった。canonical 採用で `htree://` が実データに入るため、**スキームを落とす設計は破棄する。** スキームは `d` の一部として保持する。
 
-| # | 落とすもの | 理由 | 実データでの影響（実測） |
+**許容するスキーム:**
+
+**スキームのホワイトリストは作らない。`http`/`https` 以外も許容する。** 理由は、canonical な配布先が何のプロトコルで公開されるかを我々が事前に列挙できないから（`htree://` は既に 1 件実在し、これは 2026 年以前の設計では想定されていなかった）。ホワイトリストを置くと、新しい配布プロトコルが出るたびに「識別子を発行できない」が起き、それは M1.6.1 で否定した「識別子が我々の私物」に戻る。
+
+代わりに**構文の要求だけを置く**:
+
+- `d` の前置以降は `<scheme>://<rest>` の形であること（`scheme` は ASCII 英字で始まり、英数字 / `+` / `-` / `.` からなる。`rest` は空でない）。
+- 全体が `D_ASCII_RE = /^[\x21-\x7e]+$/`（実測: `src/domain/policy.ts:70`）に収まり、`D_MAX_BYTES = 192`（同 `:55`）以内であること。
+- **スキームレス（`github.com/a/b` のように `://` が無い）は受け付けない。** 旧版はスキームを落としていたのでこれが正の形だったが、今回の設計では**不正**とする。
+
+**正規化規則（canonical URI 前提で書き直し）:**
+
+| # | 規則 | 理由 | 実データでの影響（実測） |
 |---|---|---|---|
-| N1 | **スキーム**（`https://` / `http://`） | `https` と `http` は同じリソースを指す。スキームを残すと「同じ repo なのに `d` が 2 種類」が起こりうる | 41 件すべてが `https://` なので、今の 41 件では衝突は生じない。将来の第三者投稿への予防 |
-| N2 | **末尾スラッシュ**（1 個以上をすべて除去） | `…/damus` と `…/damus/` は同じ | 現データに末尾スラッシュは **0 件**。予防のみ |
-| N3 | **ホスト部の大文字小文字**（ホスト部のみ小文字化） | ホスト名は大文字小文字を区別しないという扱いが一般的 | 41 件すべてホスト部は既に `github.com`（小文字）。影響 0 |
-| N4 | **パス部の大文字小文字は落とさない（保持する）** | ホストによってはパスが大文字小文字を区別する。一律小文字化すると、区別するホストで別リソースを同一視してしまう | 大文字を含む 9 件はパス部の大文字がそのまま `d` に入る |
+| N1 | **スキームは落とさない。他のスキームへ寄せない。** `http` を `https` に書き換えることもしない | canonical が `htree://` である配布先が実在する（1 件）。スキームを落とすと `htree://npub…/iris-client` と `https://npub…/iris-client` が同一視され、実在しない後者を作り出す。`http`→`https` の寄せも、そのホストが https を提供している確証が無い以上、観測していない事実の捏造にあたる | `https` 40 件・`htree` 1 件がそれぞれそのまま `d` に入る |
+| N2 | **スキーム名のみ小文字化**（`HTTPS://` → `https://`）。`://` より後ろのスキーム名以外には触れない | スキーム名が大文字小文字を区別しないのは URI 構文の一般的な扱い。ただし**RFC 3986 の原文を今回取得していないため、一次情報の裏は取れていない（未確認）** | 41 件すべて既に小文字。影響 0 |
+| N3 | **末尾スラッシュ（1 個以上）をすべて除去** | `…/nostr-rs-relay` と `…/nostr-rs-relay/` は同じ配布先を指す | **1 件に実影響**: `https://sr.ht/~gheartsfield/nostr-rs-relay/` → `https://sr.ht/~gheartsfield/nostr-rs-relay`。旧版は「現データ 0 件・予防のみ」と書いていたが、canonical 採用でこれは実データの処理になった |
+| N4 | **末尾の `.git` を除去**（`…/foo.git` → `…/foo`） | `https://github.com/a/b.git` と `https://github.com/a/b` は同じ repo の別表記。第三者は clone URL をそのまま貼りうる | **現データでの影響は 0 件**（末尾 `.git` は 41 件中 0 件、実測）。予防のみ。旧版は `.git` を「落とさないもの」に分類していたが、**canonical URI を人が手で貼る前提では clone URL 形式の混入が主要な分岐要因になるため、落とす側へ変更した** |
+| N5 | **オーソリティ部（`://` 直後、最初の `/` まで）の大文字小文字は落とさない（保持する）** | 旧版 N3 は「ホスト名は大文字小文字を区別しない」を根拠にオーソリティを小文字化していた。**canonical 採用でここには npub が来ることがあり、`htree://` のオーソリティが DNS ホスト名と同じ規則に従うという根拠は無い（htree の仕様を今回取得していない → 未確認）。** 確認できない一般化に基づいて値を書き換えるより、保持する方が安全 | **影響 0**: 41 件のオーソリティ部はすべて既に小文字（`github.com` 39 / `sr.ht` 1 / npub 1、bech32 は小文字のみ） |
+| N6 | **パス部の大文字小文字は落とさない（保持する）** | ホストによってはパスが大文字小文字を区別する。一律小文字化すると、区別するホストで別リソースを同一視してしまう | 大文字を含む 9 件はパス部の大文字がそのまま `d` に入る |
 
-**落とさないもの（明示）:** パスの大文字小文字（N4）、`www.` の有無、ポート番号、末尾の `.git`、クエリ文字列とフラグメント（そもそも入っていない。**入ってきた場合の扱いは未確認 → M6-2**）。
+**落とさないもの（明示）:** スキーム（N1）、オーソリティ部の大文字小文字（N5）、パスの大文字小文字（N6）、`www.` の有無、ポート番号、クエリ文字列とフラグメント（現データには 1 件も無い。**入ってきた場合の扱いは未確認 → M6-2**）。
 
-**N3 と N4 が食い違う点についての判断:** GitHub は実際にはパスの大文字小文字を区別しない（`/DAMUS-IO/DAMUS` でも到達する）ので、N4 を守ると「同じ repo に大文字違いの `d` が 2 つ」が理論上ありうる。それでも N4 を採る理由は、**「GitHub がそう振る舞う」を全ホストに一般化する根拠が無い**から。ホスト個別の特例（github.com だけ小文字化）は入れない。**同一 repo に大文字違いの `d` が並んだら、それは 2 つの別の重なりとして表示される。これは意図した挙動であり、バグではない。** 現データではこの状況は 1 件も発生しない（正規化後も 41/41 一意、実測）。
+**大文字小文字を一切正規化しないことの帰結:** GitHub は実際にはパスの大文字小文字を区別しない（`/DAMUS-IO/DAMUS` でも到達すると思われる。**実際に叩いて確認はしていない → 未確認**）ので、「同じ repo に大文字違いの `d` が 2 つ」は理論上ありうる。それでも N5/N6 を採る理由は、**「GitHub がそう振る舞う」を全ホストに一般化する根拠が無い**から。ホスト個別の特例（github.com だけ小文字化）は入れない。**同一 repo に大文字違いの `d` が並んだら、それは 2 つの別の重なりとして表示される。これは意図した挙動であり、バグではない。**
+
+**正規化後の一意性（再実測）:** canonical 採用後の 41 件に N1–N6 を適用した結果、**41 / 41 が一意（重複 0）**。canonical を採ったことによる `d` の衝突は発生しない。
+
+**ミラー URL を `d` の正規化で吸収しない。** `https://github.com/irislib/iris-client` は iris の canonical（`htree://…`）とは**別の文字列であり、正規化しても一致しない**。これは意図した設計で、ミラーは識別子ではなく M1.6.5 のフィールドに置く。
 
 **なぜ `nosmaps:` 前置を残すか:** 前置は `d` の名前空間マーカーであり、URI 形式への移行とは独立した話。実測で `SOFTWARE_D_PREFIX` / `D_PREFIX` は `src/domain/policy.ts:54`、`tools/catalogue-events.mjs:13`、`tools/verify-catalogue.mjs`、`tools/sign-catalogue.mjs` の 4 か所でゲートとして効いている。前置を外すと `d` が「ただの URI」になり、他アプリの kind 30078 と混ざる可能性が出る（kind 30078 は NIP-78 の汎用 application-specific data であり、名前空間の分離は我々の責任）。**したがって前置は残す。**
 
-> **未解決（M6-3）:** kojira の指示は「ソースコード配布場所の URI を*そのまま*使う」だった。上の決定は「`nosmaps:` 前置 + 正規化済み URI」なので、厳密には「そのまま」ではない。「本当に `d = "https://github.com/damus-io/damus"` と生で入れる（前置なし・正規化なし）」が意図なら、この節の N1–N4 と前置の決定を差し替える必要がある。**どちらかの確認がいる。**
+> **未解決（M6-3）:** kojira の指示は「ソース配布先の canonical URI を*そのまま*使う」だった。上の決定は「`nosmaps:` 前置 + 正規化済み URI」なので、厳密には「そのまま」ではない。「本当に `d = "https://github.com/damus-io/damus"` と生で入れる（前置なし・正規化なし）」が意図なら、この節の N1–N6 と前置の決定を差し替える必要がある。**どちらかの確認がいる。** なお M1.6.2a の決定（canonical を採る／GitHub へ寄せない）は、前置の有無とは独立に成立する。
+
+#### M1.6.5 ミラー URL の保持先
+
+**識別子には canonical だけを使う（M1.6.2a）。GitHub のミラー URL は捨てず、別フィールドで保持する。**
+
+現状の実測:
+
+- 署名済みイベントの `content` に入っているキーは `schema` / `version` / `state` / `name` / `summary` / `homepage` の 6 つだけ（41 件を実測。`homepage` は 27 件にのみ存在）。**ソース URI もミラー URL もイベント本体には一切入っていない**（`grep -c 'github.com' catalogue-events.jsonl` = 0、実測）。
+- タグは `d` 41 / `state` 41 / `v` 41 / `t` 88 のみ（実測）。
+- ミラーの値が今どこにあるか: `real-catalog-draft.json` の `entries[].facts_with_no_home_in_v1_profile` の `source_repo_mirror`（1 件）と `mirror`（1 件）。この 2 キーは**この 2 件にしか存在しない**（実測。他 39 件は `source_repo` のみ）。
+- `tools/build-data.mjs:398` が `source_repo || source_repo_mirror || mirror` の順でフォールバックして `data.js` の `tools[].sourceRepo` を 1 本の文字列に潰している（実測）。**canonical を `d` に据える以上、このフォールバックは「canonical とミラーを 1 つの欄に混ぜる」ことになるので、実装フェーズで見直しが要る。**
+
+**設計としての決定:**
+
+1. **`d` は canonical のみ。ミラーは `d` に一切影響しない**（正規化でも吸収しない。M1.6.4 末尾）。
+2. **ミラーはイベント `content` の新キーとして持つ。キー名は `mirrors`、値は URI の配列。** 単数キーにしない理由は、ミラーは原理的に複数ありうるため（実データでは各 1 件だが、1 件しか持てない形にすると後から増やせない）。
+3. **ミラーを持たない記録では `mirrors` キーを出さない。** 空配列を書かない — `homepage` が 27 件にしか無いのと同じ扱い（存在しないものを空値で埋めない）。
+4. **`content` の `schema` は `org.nosmaps.software` のまま、`version` を上げるかは未決。** 現在 41 件すべて `version: 1`（実測）。キーを足すのが version 増を要求するかは、`version` の意味を定義した文書を今回確認できていない → **未確認（M6-10）**。
+
+> **未解決（M6-10）:** `mirrors` を `content` に足すことが `version: 1` → `2` を要求するか。また、`src/domain/entry.ts` の `SourceField`（実測: `'name' | 'summary' | 'homepage'`）に `mirrors` を加えるかどうか。**どちらも今回確認していない。**
 
 ### M1.7 旧 `d` の廃棄と 41 件の再発行 — D3
 
@@ -272,7 +339,7 @@ d = "nosmaps:" + <正規化済みソース URI>
 
 | ファイル | 何をするか | 実測した根拠 |
 |---|---|---|
-| `real-catalog-draft.json` | 41 件の `event_skeleton.tags` の `d` と `coordinate_template` を新形式に。2 件（M1.6.2）は `source_repo` が無いので人が決める | `entries` = 41、`event_skeleton.tags[0]` が `["d", …]` であることを実測 |
+| `real-catalog-draft.json` | 41 件の `event_skeleton.tags` の `d` と `coordinate_template` を新形式に。うち 2 件（M1.6.2）は `source_repo` が無いので、M1.6.2a の canonical URI を**人手で**書く（散文からの自動抽出はしない）。ミラー 2 件は `content.mirrors` へ（M1.6.5） | `entries` = 41、`event_skeleton.tags[0]` が `["d", …]` であることを実測 |
 | `catalogue-events.jsonl` | `sign-catalogue.mjs --force` で全件再生成（41 行すべて `id` / `sig` / `d` が変わる） | 現在 41 行 / 署名者 1 / kind 30078 を実測 |
 | `data.js` | `build-data.mjs` で再生成。`tools[].id` と `tools[].coordinate` が全件変わる | `id` は裸の `d`（G4）であることを実測 |
 | `tools/catalogue-events.mjs` | `D_PREFIX` のチェック（`:58-59`）に加えて、**`d` の前置以降が URI 形式であること**の検証を足す。現在は「前置があり、前置だけではない」しか見ていない | `:58-59` を実測 |
@@ -371,7 +438,7 @@ d = "nosmaps:" + <正規化済みソース URI>
 **足すもの（UI のみ、プロトコルは不変）:**
 
 1. **「この識別子について記録を出す」導線。** 詳細ダイアログから publish フォームを開き、`d` を**その識別子で pre-fill**する。`d` は read-only にしない（別のものを書きたい人を止めない）が、変更したら 3 の警告に切り替える。
-2. **D2 に伴う入力の変更。** `d` のローカル部分がソース URI になるので、フォームは「ソースコードの配布場所（URL）」を尋ねる形にし、入力を M1.6.4 の N1–N4 で**正規化してから** `d` を組み立てる。**正規化後の `d` を必ずユーザーに見せる**（「あなたが入力した URL はこの識別子になります」）。黙って書き換えると、別の記録と重ならなかったときに理由が分からない。
+2. **D2 に伴う入力の変更。** `d` のローカル部分が canonical なソース URI になるので、フォームは「ソースコードの配布の正本の場所（URI。ミラーではなく）」を尋ねる形にし、入力を M1.6.4 の N1–N6 で**正規化してから** `d` を組み立てる。**`https://` を自動で補わない**（スキームを含む入力を求める。M1.6.4 の「スキームレスは不正」）。ミラーは別入力欄にして `content.mirrors` へ入れる（M1.6.5）。**正規化後の `d` を必ずユーザーに見せる**（「あなたが入力した URL はこの識別子になります」）。黙って書き換えると、別の記録と重ならなかったときに理由が分からない。
 3. **署名者が自分であることの明示。** 「あなたは `npub1…` として、識別子 `<d>` に**あなた自身の記録**を出します。既存の記録は書き換わりません。両方が重なって表示されます。」— これは `design-relay-native-write-path.md` §W6.4 の「protocol 上、他人の座標には絶対に書けない」を、ユーザーに見える言葉にしたもの。
 4. **既に自分の記録がある場合。** それは更新（同じ座標の新しい `created_at`）であり、§W6.2 の Update そのもの。「新しい記録を作る」ではなく「あなたの記録を更新する」と言い分ける。
 5. **`t` タグ。** 訂正にも `t=nosmaps` を必ず付ける（付けないと discovery に載らず、誰にも届かない）。これは既に `buildSoftwareDraft` の挙動である想定だが、**未確認**（`src/data/publish.ts` の tag 構築を今回は読み切っていない。実装前に確認すること）。
@@ -431,9 +498,11 @@ d = "nosmaps:" + <正規化済みソース URI>
 
 | # | テスト名（案） | 何を守るか |
 |---|---|---|
-| T9 | `d normalization drops the scheme, trailing slashes, and host case` | M1.6.4 N1–N3。`https://GitHub.com/a/b/` と `http://github.com/a/b` が同じ `d` になること |
-| T10 | `d normalization preserves path case` | M1.6.4 N4。`github.com/A/b` と `github.com/a/b` が**別の** `d` のままであること。**一律小文字化を入れたらここで落ちる** |
-| T11 | `every one of the 41 catalogue entries produces a d within D_MAX_BYTES` | M1.6.3。実測では最長 62 バイト（上限 192）だが、テストで固定する |
+| T9 | `d normalization keeps the scheme and never rewrites http to https` | M1.6.4 N1。`https://github.com/a/b` と `http://github.com/a/b` が**別の** `d` のままであること、`htree://npub…/x` がそのまま通ること。**スキームを落とす実装を入れたらここで落ちる** |
+| T9b | `d normalization drops trailing slashes and a trailing .git` | M1.6.4 N3/N4。`https://sr.ht/~g/r/` と `https://sr.ht/~g/r` と `https://sr.ht/~g/r.git` が同じ `d` になること |
+| T10 | `d normalization preserves authority and path case` | M1.6.4 N5/N6。`https://github.com/A/b` と `https://github.com/a/b` が**別の** `d` のままであること。**一律小文字化を入れたらここで落ちる** |
+| T10b | `a scheme-less d is rejected` | M1.6.4。`nosmaps:github.com/a/b`（`://` 無し）が不正であること。旧形式の名残を止める |
+| T11 | `every one of the 41 catalogue entries produces a d within D_MAX_BYTES` | M1.6.3。canonical 採用後の再実測で最長 **91 バイト**（上限 192、`src/domain/policy.ts:55`）。テストで固定する |
 | T12 | `a d that is not a source URI is rejected by the catalogue tools` | M1.7.3。旧形式（`nosmaps:io.damus`）が新しい検証で落ちること |
 
 ### M5.3 UI 層
@@ -472,8 +541,10 @@ d = "nosmaps:" + <正規化済みソース URI>
 
 初版の 7 点のうち、D1〜D4 で解消したものは落とした。**解消した論点:** 初版 M6-1（既定表示を収集鍵にするか最新にするか → D1 でどちらも採らない）、初版 M6-5（「訂正」という語を UI に出すか → M2.2-7 で出さないに確定）。
 
-1. **`source_repo` が確定していない 2 件をどうするか。** `nosmaps:to.iris` は canonical が `htree://npub1xdhnr9…/iris-client`（GitHub は mirror と明記）、`nosmaps:io.sourcehut.nostr-rs-relay` は canonical が `https://sr.ht/~gheartsfield/nostr-rs-relay/`（GitHub は mirror）。**mirror の URI を `d` にするか、canonical の URI を `d` にするか。** canonical を採ると、`htree://` スキームの正規化規則（M1.6.4 は `https`/`http` しか想定していない）を決める必要が出る。
-2. **URI にクエリ文字列・フラグメント・ポート・`.git` が付いてきた場合の正規化。** 現データには 1 件も無いので実測できていない（**未確認**）。第三者投稿では起こりうる。落とすか残すかを決める必要がある。
+**追加で解消した論点:** M6-1（`source_repo` が確定していない 2 件を mirror にするか canonical にするか）→ **kojira の判断で canonical に決定。M1.6.2a に記載。** これに伴い M1.6.3 のプロファイルと M1.6.4 の正規化規則を canonical 前提に書き直した（`htree://` の許容、スキームを落とさない、`.git` を落とす側へ移動）。
+
+1. ~~`source_repo` が確定していない 2 件をどうするか~~ → **決定済み（M1.6.2a）。canonical をそのまま使う。**
+2. **URI にクエリ文字列・フラグメント・ポートが付いてきた場合の正規化。** 現データには 1 件も無いので実測できていない（**未確認**）。第三者投稿では起こりうる。落とすか残すかを決める必要がある。（`.git` は M1.6.4 N4 で「落とす」に決定済み。ただし現データでの実影響は 0 件。）
 3. **`d` は「`nosmaps:` 前置 + 正規化済み URI」でよいか、それとも生の URI そのままか。** M1.6.4 の注記のとおり、指示の「そのまま使う」の解釈が 2 通りある。前置を外す場合、`SOFTWARE_D_PREFIX` を使っている 4 か所（`policy.ts:54`, `catalogue-events.mjs:13`, `verify-catalogue.mjs`, `sign-catalogue.mjs`）の扱いも決まる。
 4. **`catalogue-events.jsonl` を複数署名者化するか。** M4-10 では「しない（repo の正本は収集鍵のみ、訂正はリレー上）」を既定案にした。しかしそうすると **`data.js` にしか繋がっていない環境（`?relay=1` 無しの既定表示）では訂正が一切見えない**。実測: `src/ui/explorer/app.ts` はリレー読み取りを `explorerParams.relayRequested`（`?relay=1`）でしか有効化していない。つまり**既定の閲覧体験に重なりは届かない**。これは issue #18 を半分しか解いていないとも言える。
 5. **旧イベントに kind:5 を出すか、放置か。** M1.7.2 は「出す」を既定案にしたが、addressable event に対する削除がリレーでどう扱われるかは**未確認**。効果が保証できないものを出す価値があるかは判断がいる。
@@ -489,7 +560,7 @@ d = "nosmaps:" + <正規化済みソース URI>
 | ファイル | 変更の種類 | 備考 |
 |---|---|---|
 | `src/domain/` に新規 1 ファイル | 新規 | `d` による重ねと、ソート条件に従う順序付けの純関数。DOM/network/window を持たない（layering チェックに通す） |
-| `src/domain/` に新規 1 ファイル（または既存に追加） | 新規 | URI 正規化（M1.6.4 の N1–N4）。書き込み側と検証側の**両方から同じ関数**を呼ぶ |
+| `src/domain/` に新規 1 ファイル（または既存に追加） | 新規 | URI 正規化（M1.6.4 の N1–N6）。書き込み側と検証側の**両方から同じ関数**を呼ぶ |
 | `src/ui/explorer/app.ts` | 追加 | カードの 3 次元的な重ね、枚数ラベル、めくり操作、ダイアログの署名者セクション、publish 導線 |
 | explorer の CSS（`nip-explorer.css`） | 追加 | 重なりの見た目（最大 3 枚） |
 | `src/ui/i18n.ts` | 追加 | ja/en の文言 |
@@ -537,8 +608,10 @@ d = "nosmaps:" + <正規化済みソース URI>
 
 | 主張 | なぜ未確認か |
 |---|---|
-| ホスト名が大文字小文字を区別しないこと（M1.6.4 N3 の根拠） | RFC 3986 の原文を今回取得していない。一般的な扱いとして書いたが、一次情報で裏を取っていない |
-| クエリ文字列・フラグメント・ポート・`.git` 付き URI の正規化 | 現データに 1 件も無いので実測できていない（M6-2） |
+| スキーム名が大文字小文字を区別しないこと（M1.6.4 N2 の根拠） | RFC 3986 の原文を今回取得していない。一般的な扱いとして書いたが、一次情報で裏を取っていない |
+| `htree://` の URI 構文（オーソリティ部の大文字小文字の扱い、末尾スラッシュの意味） | htree の仕様書を今回取得していない。M1.6.4 N5 は「根拠が無いので保持する」という保守側の判断であって、htree の規則を確認した結果ではない |
+| クエリ文字列・フラグメント・ポート付き URI の正規化 | 現データに 1 件も無いので実測できていない（M6-2）。`.git` は M1.6.4 N4 で「落とす」に決めたが、これも現データでの実影響は 0 件（実測）で、予防的な決定 |
+| iris と nostr-rs-relay の canonical URI が今も有効か | `real-catalog-draft.json` の記録（`canonical_repo` / `canonical_home`）をそのまま採用しただけで、URI を実際に解決していない。`htree://` は今回のツールでは解決手段が無い |
 | addressable event に対する kind:5 削除をリレーがどう扱うか | NIP-09 の原文を取得していない。M1.7.2 の「削除要求を出す」は設計意図であって、効果の保証ではない |
 | `tools/build-data.mjs` の旧 `d` リテラル 91 か所の内訳 | 件数は測ったが、1 件ずつ用途を分類していない。実際の作業量は不明 |
 | GitHub がパスの大文字小文字を区別しないこと | 実際に大文字違いの URL を叩いて確認していない。M1.6.4 の注記はその想定に触れているが、確認していない |
