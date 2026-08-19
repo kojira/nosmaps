@@ -199,6 +199,61 @@
   font-size: .76rem;
 }
 
+/* issue #1: the sort control. Wraps rather than scrolls sideways so it stays
+   inside 375px, and the select itself is allowed to shrink (min-width: 0) —
+   without it a long localized option name pushes the row past the viewport. */
+.sort-bar {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+  padding: .4rem 0 0;
+}
+
+.sort-bar .sort-field {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .35rem;
+  margin: 0;
+  font-size: .74rem;
+}
+
+.sort-bar select {
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 8rem;
+}
+
+/* issue #1 / invariant I8: the rows whose like count was never observed are not
+   ranked and are not silently sunk to the bottom of the ranking. They are said
+   out loud, under their own heading, so "not observed" cannot be read as "0". */
+.sort-unranked {
+  min-width: 0;
+  margin: .8rem 0 .55rem;
+  padding: .55rem .7rem;
+  border: 1px dashed var(--line);
+  border-radius: .65rem;
+  background: #f6f6fb;
+}
+
+.sort-unranked h3 {
+  margin: 0;
+  font-size: .78rem;
+}
+
+.sort-unranked p {
+  min-width: 0;
+  margin: .25rem 0 0;
+  color: var(--muted);
+  font-size: .72rem;
+  overflow-wrap: anywhere;
+}
+
 .selected-summary strong {
   color: var(--ink);
 }

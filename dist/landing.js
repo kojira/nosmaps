@@ -173,6 +173,19 @@ var dictionaries = {
       conditionNip: "NIP\u300C{value}\u300D",
       conditionTool: "\u30A8\u30F3\u30C8\u30EA\u300C{value}\u300D",
       conditionRemove: "{label}\u3092\u5916\u3059",
+      /* issue #1: 並び順。実在する値だけを鍵にする。「新着順／古い順」は無い —— レコードは
+         自分の公開日を述べておらず、イベントの created_at は収集した時刻だからで、
+         それで並べると収集順を新しさと言い張ることになる。 */
+      sort: {
+        label: "\u4E26\u3073\u9806",
+        "default": "\u65E2\u5B9A\u306E\u9806",
+        "name-asc": "\u540D\u524D\uFF08\u6607\u9806\uFF09",
+        "name-desc": "\u540D\u524D\uFF08\u964D\u9806\uFF09",
+        "likes-desc": "\u3044\u3044\u306D\u304C\u591A\u3044\u9806",
+        "likes-asc": "\u3044\u3044\u306D\u304C\u5C11\u306A\u3044\u9806",
+        unrankedNotice: "\u3044\u3044\u306D\u6570\u3092\u89B3\u6E2C\u3057\u3066\u3044\u306A\u3044\u30A8\u30F3\u30C8\u30EA\u304C{count}\u4EF6\u3042\u308A\u3001\u3053\u306E\u4E26\u3073\u9806\u306B\u306F\u5165\u308C\u3066\u3044\u307E\u305B\u3093\uFF080\u4EF6\u3068\u3044\u3046\u610F\u5473\u3067\u306F\u3042\u308A\u307E\u305B\u3093\uFF09\u3002",
+        unrankedHeading: "\u3044\u3044\u306D\u6570\uFF1A\u672A\u89B3\u6E2C"
+      },
       /* §21 の新語彙。unknown は「値が無い」ことを名指す語で、0 でも否定でもない。 */
       summaryAbsent: "\u6982\u8981\u306F\u516C\u958B\u3055\u308C\u3066\u3044\u307E\u305B\u3093",
       freeTopic: "\u30EC\u30B3\u30FC\u30C9\u304C\u516C\u958B\u3057\u305F\u30C8\u30D4\u30C3\u30AF\u3002\u3053\u306E\u7AEF\u672B\u306B\u5BFE\u5FDC\u3059\u308B\u30E9\u30D9\u30EB\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
@@ -827,6 +840,19 @@ var dictionaries = {
       coverage: { eose: "Complete (EOSE)", timeout: "Timeout", error: "Error", "auth-required": "Auth required", rejected: "Rejected", disconnected: "Disconnected", skipped: "Not issued" },
       features: { posts: ["Posts & replies", "Read, write, and reply on a timeline", "timeline post reply"], dm: ["DM", "Send encrypted direct messages", "encrypted DM direct message"], search: ["Search", "Find posts, people, and identifiers", "search person identifier"], media: ["Images & video", "View and publish images or video", "media image video"], notifications: ["Notifications", "Notice replies, reactions, and zaps", "notification reaction"], accounts: ["Multiple accounts", "Switch between keys and profiles", "multi account"], signing: ["External signing", "Keep private keys separate from the app", "remote signing"], wallet: ["Wallet & Zap", "Use zaps and wallet connections", "payment tip"], longform: ["Long-form", "Write articles and longer content", "article long form"], community: ["Channels", "Talk and organize in communities", "channel community"] },
       reviewsSeed: { aBody: "Readable across devices, and notification settings were easy to find.", bBody: "The path from search results back to a profile was clear.", cBody: "It was easy to follow the conversation alongside images.", aBio: "Reviews client navigation and accessibility across several operating systems.", bBio: "Records first-use and comparison findings.", aSpread: "28 months \xB7 11 categories \xB7 Web/Desktop/Mobile", bSpread: "9 months \xB7 6 categories \xB7 mostly Web", aPosts: "2\u20139 per month: short posts, images, and notes.", bPosts: "1\u20134 per month: comparisons and replies.", localName: "You", localBio: "Reviews added on this screen.", screenTimeline: "Timeline", screenSettings: "Settings", screenMedia: "Media view" },
+      /* issue #1: sort orders. Only keys that name something the records state.
+         There is no "newest / oldest" — the records publish no date of their own
+         and the events' created_at is when the collector signed them. */
+      sort: {
+        label: "Sort by",
+        "default": "Default order",
+        "name-asc": "Name (A\u2192Z)",
+        "name-desc": "Name (Z\u2192A)",
+        "likes-desc": "Most liked",
+        "likes-asc": "Fewest liked",
+        unrankedNotice: "{count} entries have no observed like count and are left out of this order (that is not the same as zero).",
+        unrankedHeading: "Likes: not observed"
+      },
       summaryAbsent: "No summary published",
       freeTopic: "A topic the record published; this client ships no label for it.",
       recordState: "Record state",

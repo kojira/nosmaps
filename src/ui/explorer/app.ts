@@ -25,6 +25,7 @@ import {
   type DisplayResult, type FeatureDefinition, type UiState
 } from '../../domain/explorer.ts';
 import {isValidCoordinate} from '../../domain/event.ts';
+import {isSortKey, sortRows, SORT_KEYS, type SortKey} from '../../domain/sorting.ts';
 import {decodeNpub, encodeNpub} from '../../domain/npub.ts';
 import {POLICY, SOFTWARE_D_PREFIX} from '../../domain/policy.ts';
 import {validateSoftwareEvent} from '../../domain/records.ts';
@@ -145,6 +146,9 @@ interface ExplorerState {
   tool: string;
   savedOnly: boolean;
   nipQuery: string;
+  /** issue #1: how the candidate list is presented. Not a filter — it removes
+      nothing — so it is deliberately not one of the removable condition pills. */
+  sort: SortKey;
   compare: string[];
   reactions: Record<string, ReactionView | undefined>;
   bookmarks: Record<string, Bookmark | null | undefined>;
@@ -228,7 +232,7 @@ export function mountExplorer(data: Data): ExplorerHandles {
   const state: ExplorerState = {
     features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: DEFAULT_SUPPORT, oss: 'all',
     tool: initialTool,
-    savedOnly: false, nipQuery: '', compare: [], reactions: {}, bookmarks: {}, reviews: {}, reviewVotes: {}, reviewDrafts: {},
+    savedOnly: false, nipQuery: '', sort: 'default', compare: [], reactions: {}, bookmarks: {}, reviews: {}, reviewVotes: {}, reviewDrafts: {},
     uiState: isUiState(requestedState) ? requestedState : 'normal'
   };
 
@@ -326,6 +330,7 @@ export function mountExplorer(data: Data): ExplorerHandles {
     results: need('#tool-results', HTMLElement), resultCount: need('#result-count', HTMLElement),
     selected: need('#selected-feature-summary', HTMLElement),
     condition: need('#condition-summary', HTMLElement), activeFilterCount: need('#active-filter-count', HTMLElement),
+    sortBar: need('#sort-bar', HTMLElement),
     uiState: need('#ui-state-view', HTMLElement), offline: need('#offline-banner', HTMLElement),
     compareActions: need('#compare-actions', HTMLElement), compareSummary: need('#compare-summary', HTMLElement),
     openCompare: need('#open-compare', HTMLButtonElement), filterDetails: need('#filter-details', HTMLDetailsElement),
@@ -688,6 +693,36 @@ export function mountExplorer(data: Data): ExplorerHandles {
   }
 
   function supportBadge(status: string): string { return `<span class="support-badge ${status}">${esc(statusLabel(status))}</span>`; }
+
+  /* ---- issue #1: 並び順 ----------------------------------------------------
+     鍵は「レコードが実際に述べている値」だけ。名前は全行が持っている。いいね数は
+     観測できた行だけが持っていて、観測していない行は null —— これは 0 ではない（I8）。
+     なので lists は「並べられた行」と「その鍵を持たない行」に割れて返り、後者は
+     0 件の行に混ぜず、未観測だと分かる見出しの下に出す。黙って末尾に沈めるのは
+     「0 件と同じ」と読ませることであって、I8 が禁じているのはまさにそれ。
+
+     「新着順／古い順」は無い。41件のレコードは自分の公開日を述べておらず、署名
+     イベントの created_at は収集した時刻だから、それで並べると収集順を新しさと
+     偽ることになる（domain/sorting.ts 冒頭に同じ理由を書いてある）。 */
+  interface SortableRow {
+    readonly id: string;
+    readonly name: string;
+    readonly likes: number | null;
+    readonly row: Row;
+  }
+  function sortedList(list: readonly Row[]): {ranked: readonly Row[]; unranked: readonly Row[]} {
+    const sortable: SortableRow[] = list.map(row => ({id: row.id, name: row.name, likes: likeCount(row), row}));
+    const result = sortRows(sortable, state.sort);
+    return {ranked: result.ranked.map(item => item.row), unranked: result.unranked.map(item => item.row)};
+  }
+  function sortLabel(key: SortKey): string { return t(`explorer.sort.${key}`); }
+  function renderSortBar(): void {
+    els.sortBar.innerHTML = `<label class="field sort-field" for="sort-order">${esc(t('explorer.sort.label'))}<select id="sort-order">${SORT_KEYS.map(key => option(key, sortLabel(key), state.sort)).join('')}</select></label>`;
+  }
+  function unrankedMarkup(rows: readonly Row[]): string {
+    if (!rows.length) return '';
+    return `<div class="sort-unranked" data-unranked-sort="${rows.length}"><h3>${esc(t('explorer.sort.unrankedHeading'))}</h3><p>${esc(t('explorer.sort.unrankedNotice', {count: rows.length}))}</p></div>${rows.map(featureCard).join('')}`;
+  }
   /* 一次情報が持っていないリンク種別のボタンは出さない。存在しない URL を生成するのは捏造で、
      ボタンだけ出して「不明」を見せるのは、あるはずの物が壊れているように読める。 */
   function resourceTypes(tool: Row): string[] {
@@ -1100,7 +1135,7 @@ export function mountExplorer(data: Data): ExplorerHandles {
     }
   }
   function renderResults(): void {
-    renderConditions(); renderNips(); renderCompareActions();
+    renderConditions(); renderNips(); renderCompareActions(); renderSortBar();
     els.offline.hidden = state.uiState !== 'offline';
     const relayActive = Boolean(relayState && relayState.active);
     // グラフの状態バナーと発見スコープの但し書きは、結果が空でも必ず出す。
@@ -1114,7 +1149,10 @@ export function mountExplorer(data: Data): ExplorerHandles {
     let list: readonly Row[] = relayActive && relayState ? relayState.entries : filteredTools();
     if (!relayActive && state.uiState === 'partial') list = list.slice(0, 7);
     els.resultCount.textContent = t('explorer.count', {count: list.length});
-    if (list.length) { els.results.innerHTML = list.map(featureCard).join(''); return; }
+    /* 並び替えは行を落とさない。数え上げは並び替える前の list のままで、
+       ranked + unranked は必ず list と同じ集合になる（issue #1）。 */
+    const sorted = sortedList(list);
+    if (list.length) { els.results.innerHTML = sorted.ranked.map(featureCard).join('') + unrankedMarkup(sorted.unranked); return; }
     if (relayActive) { els.results.innerHTML = `<div class="empty zero-results"><h2>${esc(t('explorer.relayEmptyTitle'))}</h2><p>${esc(t('explorer.relayEmpty'))}</p></div>`; return; }
     const relaxations = activeConditions().map(item => ({...item, count: filteredTools(item.overrides).length})).sort((a, b) => b.count - a.count);
     const suggestion = relaxations[0];
@@ -1806,6 +1844,9 @@ export function mountExplorer(data: Data): ExplorerHandles {
     if (!target) return;
     const field = SELECT_FILTERS[target.id];
     if (field && target instanceof HTMLSelectElement) { state[field] = target.value; state.uiState = 'normal'; renderAll(); return; }
+    /* issue #1: 並び順は絞り込みではないので uiState には触らない。知らない値は
+       黙って既定に落とさず、単に無視する（勝手な並び順を作らない）。 */
+    if (target.id === 'sort-order' && target instanceof HTMLSelectElement) { if (isSortKey(target.value)) { state.sort = target.value; renderResults(); } return; }
     if (target.id === 'saved-only' && target instanceof HTMLInputElement) { state.savedOnly = target.checked; renderAll(); return; }
     if (target.matches('[data-compare-tool]') && target instanceof HTMLInputElement) { toggleCompare(attr(target, 'compareTool'), target.checked); return; }
     if (target.matches('[data-public-bookmark]') && target instanceof HTMLInputElement) { const bookmark = state.bookmarks[attr(target, 'publicBookmark')]; if (bookmark) bookmark.public = target.checked; renderResults(); rerenderOpenDialogs(); toast(t('explorer.toastPublic')); return; }

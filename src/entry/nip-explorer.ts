@@ -23,6 +23,7 @@ import {
 } from '../domain/json.ts';
 import {decodeNpub, encodeNpub} from '../domain/npub.ts';
 import {POLICY, SOFTWARE_D_PREFIX, SOFTWARE_SCHEMA} from '../domain/policy.ts';
+import {isSortKey, sortRows, SORT_KEYS} from '../domain/sorting.ts';
 import {
   validateCurationSetEvent, validateDeletionEvent,
   validateFollowListEvent, validateSoftwareEvent
@@ -56,6 +57,11 @@ const catalog = {
   deriveGraph,
   curationMembership,
   orderEntries,
+  /* issue #1: the presentation order. Exposed for the same reason orderEntries is
+     — the specs drive the pure ordering rule directly, without a render. */
+  SORT_KEYS,
+  isSortKey,
+  sortRows,
   /* buildCatalog is re-typed at the boundary only so a caller in a plain .js test
      hands it a value this signature accepts; the function itself is untouched. */
   buildCatalog: (input?: CatalogInput): CatalogResult => buildCatalog(input),
