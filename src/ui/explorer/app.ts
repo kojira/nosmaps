@@ -25,7 +25,7 @@ import {
   type DisplayResult, type FeatureDefinition, type UiState
 } from '../../domain/explorer.ts';
 import {isValidCoordinate} from '../../domain/event.ts';
-import {isSortKey, sortRows, SORT_KEYS, type SortKey} from '../../domain/sorting.ts';
+import {isSortKey, sortDimension, sortRows, SORT_KEYS, type SortKey} from '../../domain/sorting.ts';
 import {decodeNpub, encodeNpub} from '../../domain/npub.ts';
 import {POLICY, SOFTWARE_D_PREFIX} from '../../domain/policy.ts';
 import {validateSoftwareEvent} from '../../domain/records.ts';
@@ -701,17 +701,24 @@ export function mountExplorer(data: Data): ExplorerHandles {
      0 件の行に混ぜず、未観測だと分かる見出しの下に出す。黙って末尾に沈めるのは
      「0 件と同じ」と読ませることであって、I8 が禁じているのはまさにそれ。
 
-     「新着順／古い順」は無い。41件のレコードは自分の公開日を述べておらず、署名
-     イベントの created_at は収集した時刻だから、それで並べると収集順を新しさと
-     偽ることになる（domain/sorting.ts 冒頭に同じ理由を書いてある）。 */
+     issue #21 で「収集日が新しい順／古い順」を足した。鍵はレコード自身の
+     created_at ——「収集した時刻」であって公開日ではない。だからラベルもそう書く。
+     41件は一括署名なので今は全部同値で、その並び順は既定の順のまま出る。それが
+     同値データの正しい出力で、鍵を伏せる理由にはならない。 */
   interface SortableRow {
     readonly id: string;
     readonly name: string;
     readonly likes: number | null;
+    readonly collectedAt: number | null;
     readonly row: Row;
   }
+  /** レコードが述べている収集の秒。収集済みの行は必ず持ち、relay 行は持たないこと
+      がある（その場合は null = 未観測で、0 ではない）。 */
+  function collectedAt(row: Row): number | null { return row.collectedAt; }
   function sortedList(list: readonly Row[]): {ranked: readonly Row[]; unranked: readonly Row[]} {
-    const sortable: SortableRow[] = list.map(row => ({id: row.id, name: row.name, likes: likeCount(row), row}));
+    const sortable: SortableRow[] = list.map(row => ({
+      id: row.id, name: row.name, likes: likeCount(row), collectedAt: collectedAt(row), row
+    }));
     const result = sortRows(sortable, state.sort);
     return {ranked: result.ranked.map(item => item.row), unranked: result.unranked.map(item => item.row)};
   }
@@ -719,9 +726,15 @@ export function mountExplorer(data: Data): ExplorerHandles {
   function renderSortBar(): void {
     els.sortBar.innerHTML = `<label class="field sort-field" for="sort-order">${esc(t('explorer.sort.label'))}<select id="sort-order">${SORT_KEYS.map(key => option(key, sortLabel(key), state.sort)).join('')}</select></label>`;
   }
+  /* 除外の見出しは鍵の次元ごとに別の文。「いいね数：未観測」を収集日順の下に出すと、
+     観測していない値について嘘を書くことになる（issue #21）。 */
   function unrankedMarkup(rows: readonly Row[]): string {
     if (!rows.length) return '';
-    return `<div class="sort-unranked" data-unranked-sort="${rows.length}"><h3>${esc(t('explorer.sort.unrankedHeading'))}</h3><p>${esc(t('explorer.sort.unrankedNotice', {count: rows.length}))}</p></div>${rows.map(featureCard).join('')}`;
+    const dimension = sortDimension(state.sort);
+    if (dimension === null) return rows.map(featureCard).join('');
+    const heading = t(`explorer.sort.unranked.${dimension}.heading`);
+    const notice = t(`explorer.sort.unranked.${dimension}.notice`, {count: rows.length});
+    return `<div class="sort-unranked" data-unranked-sort="${rows.length}" data-unranked-dimension="${esc(dimension)}"><h3>${esc(heading)}</h3><p>${esc(notice)}</p></div>${rows.map(featureCard).join('')}`;
   }
   /* 一次情報が持っていないリンク種別のボタンは出さない。存在しない URL を生成するのは捏造で、
      ボタンだけ出して「不明」を見せるのは、あるはずの物が壊れているように読める。 */

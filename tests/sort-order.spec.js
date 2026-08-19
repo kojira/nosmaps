@@ -11,9 +11,20 @@ const {test, expect} = require('@playwright/test');
         —— 0 の並ぶ位置に混ざらず、未観測だと読める見出しの下に出る（不変条件 I8）
      4. ja / en どちらでも並び順のラベルが出て、undefined を描かない
 
-   「新着順／古い順」はここに無い。実装にも無い。41件のレコードは自分の公開日を
-   述べておらず、署名イベントの created_at は収集した時刻なので、それで並べると
-   収集順を新しさと偽ることになる。テストできる事実が無いものはテストしない。
+   issue #21 で「収集日が新しい順／古い順」を足したので、その分がさらに三つ:
+
+     5. 収集日順の両方向が ja / en 両方でラベルを持ち、undefined を含まない
+     6. created_at が互いに異なる fixture で、実際に降順／昇順に並ぶ
+     7. 収集日を持たない行は、収集日 0 の行と同じ場所に置かれない（unknown ≠ 0）
+
+   「リリースが新しい順」はここにも無いし実装にも無い。レコードは自分の公開日を
+   述べていないからである。持っているのは署名イベントの created_at ＝ 収集した時刻
+   だけなので、鍵もラベルもそれをそのまま「収集日」と呼ぶ。表示と値が同じ事実を
+   指しているので、これは捏造ではない。
+
+   同値だけのデータで通るテストは書かない。カタログ41件は一括署名で created_at が
+   distinct 1（1787011200）なので、それだけでは「並び替えた」ことを何も検証できない。
+   順序そのものを見る 6 は、created_at が実際に違うリレー fixture の側で検証する。
 
    モックリレーの流儀は tests/reactions.spec.js のものをそのまま使う。いいね数を
    DOM に出す唯一の経路が「詳細を開いた行の座標を kind 7 で数え直す」ことなので、
@@ -330,8 +341,8 @@ test('4. every sort option is labelled in ja and en, and none of them renders "u
   await openExplorer(page);
 
   const expected = {
-    ja: ['既定の順', '名前（昇順）', '名前（降順）', 'いいねが多い順', 'いいねが少ない順'],
-    en: ['Default order', 'Name (A→Z)', 'Name (Z→A)', 'Most liked', 'Fewest liked']
+    ja: ['既定の順', '名前（昇順）', '名前（降順）', 'いいねが多い順', 'いいねが少ない順', '収集日が新しい順', '収集日が古い順'],
+    en: ['Default order', 'Name (A→Z)', 'Name (Z→A)', 'Most liked', 'Fewest liked', 'Newest collected', 'Oldest collected']
   };
 
   for (const [code, button] of [['ja', '日本語'], ['en', 'English']]) {
@@ -339,7 +350,7 @@ test('4. every sort option is labelled in ja and en, and none of them renders "u
     await expect(page.locator('html')).toHaveAttribute('lang', code);
 
     const options = await page.locator('#sort-order option').evaluateAll(nodes => nodes.map(node => ({value: node.value, label: node.textContent})));
-    expect(options.map(o => o.value)).toEqual(['default', 'name-asc', 'name-desc', 'likes-desc', 'likes-asc']);
+    expect(options.map(o => o.value)).toEqual(['default', 'name-asc', 'name-desc', 'likes-desc', 'likes-asc', 'collected-desc', 'collected-asc']);
     expect(options.map(o => o.label)).toEqual(expected[code]);
     for (const item of options) {
       expect(item.label, `${code}: option ${item.value}`).not.toContain('undefined');
@@ -351,11 +362,171 @@ test('4. every sort option is labelled in ja and en, and none of them renders "u
     expect(label).not.toContain('undefined');
     expect(label).toContain(code === 'ja' ? '並び順' : 'Sort by');
 
-    // 並び順を実際に動かしても、i18n が欠落を報告しない。
-    await chooseSort(page, 'likes-desc');
-    expect(await page.evaluate(() => window.NOSMAPS_I18N.missing.map(entry => `${entry.detail}: ${entry.path}`))).toEqual([]);
+    /* 並び順から外された行の見出しは次元ごとに別の文で、どちらの言語でも存在する。
+       今のデータでは収集日を持たない行が出ないので画面には現れず、鍵の打ち間違いが
+       黙って出荷されうる。だから i18n を直接引いて、鍵のパスがそのまま返ってきて
+       いないこと（＝欠落していないこと）まで見る。 */
+    const setAside = await page.evaluate(() => {
+      const i18n = window.NOSMAPS_I18N;
+      const out = {};
+      for (const dimension of ['likes', 'collected']) {
+        out[dimension] = {
+          heading: i18n.t(`explorer.sort.unranked.${dimension}.heading`),
+          notice: i18n.t(`explorer.sort.unranked.${dimension}.notice`, {count: 3})
+        };
+      }
+      out.missing = i18n.missing.map(entry => entry.path);
+      return out;
+    });
+    for (const dimension of ['likes', 'collected']) {
+      for (const [part, text] of Object.entries(setAside[dimension])) {
+        expect(text, `${code}: ${dimension}.${part}`).not.toContain('undefined');
+        expect(text, `${code}: ${dimension}.${part}`).not.toContain('explorer.sort');
+        expect(text.trim().length, `${code}: ${dimension}.${part} is empty`).toBeGreaterThan(0);
+      }
+      // 件数は必ず入る。プレースホルダのまま出たら文が壊れている。
+      expect(setAside[dimension].notice, `${code}: ${dimension}.notice count`).toContain('3');
+      expect(setAside[dimension].notice, `${code}: ${dimension}.notice count`).not.toContain('{count}');
+    }
+    // いいねの文と収集日の文は別物である。使い回すと観測していない値について嘘を書く。
+    expect(setAside.collected.heading).not.toBe(setAside.likes.heading);
+    expect(setAside.collected.notice).not.toBe(setAside.likes.notice);
+    expect(setAside.missing, `${code}: i18n missing`).toEqual([]);
+
+    // 並び順を実際に動かしても、i18n が欠落を報告しない。収集日順も選べることを
+    // 「選んだうえで欠落ゼロ」まで見る（ラベルが出るだけでは動かした証拠にならない）。
+    for (const value of ['likes-desc', 'collected-desc', 'collected-asc']) {
+      await chooseSort(page, value);
+      await expect(page.locator('#sort-order')).toHaveValue(value);
+      expect(await page.evaluate(() => window.NOSMAPS_I18N.missing.map(entry => `${entry.detail}: ${entry.path}`)), `${code}: after ${value}`).toEqual([]);
+    }
     await chooseSort(page, 'default');
   }
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
+/* ---- issue #21: 収集日順 ---------------------------------------------------- */
+
+/** 一覧の行数が確定するまで待つ。「読み込みが始まった」ではなく「この件数のカードが
+    DOM に出た」を完了の合図にする（#1 で踏んだ flaky の再発防止）。 */
+async function expectCardCount(page, count) {
+  await expect(page.locator('#tool-results article.feature-tool-card:visible')).toHaveCount(count);
+}
+
+test('5. the collection-date orders keep every row, and equal dates come out in the default order', async ({page}) => {
+  const errors = collectErrors(page);
+  await openExplorer(page);
+  await expectCardCount(page, 41);
+
+  // 収集した41件が実際に何秒を持っているかを、ページから読む。
+  const seconds = await page.evaluate(() => window.NOSMAPS_DATA.tools.map(tool => tool.collectedAt));
+  expect(seconds).toHaveLength(41);
+  for (const value of seconds) expect(Number.isFinite(value), 'every collected row states its second').toBe(true);
+  const distinct = [...new Set(seconds)];
+
+  const defaultNames = cardNames(await readList(page));
+  expect(defaultNames).toHaveLength(41);
+
+  for (const key of ['collected-desc', 'collected-asc']) {
+    await chooseSort(page, key);
+    const names = cardNames(await readList(page));
+    // 行は落ちない。集合は既定と同じ。
+    expect(names.slice().sort(codePointCompare), key).toEqual(defaultNames.slice().sort(codePointCompare));
+    // 収集日を持たない行は無いので、外された行の見出しも出ない。
+    expect(await page.locator('.sort-unranked').count(), key).toBe(0);
+    if (distinct.length === 1) {
+      /* 41件は一括署名なので秒が全部同じ。同値の並びは既定の順のまま出るのが正しく、
+         ここで名前順に化けたら「収集日で並べた」と偽ったことになる。 */
+      expect(names, `${key}: equal seconds stay in the incoming order`).toEqual(defaultNames);
+    }
+  }
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
+test('6. with records signed at different seconds, the collection order really is that of created_at', async ({page}) => {
+  const errors = collectErrors(page);
+  await openExplorer(page, {relay: true});
+  const fixtures = await buildFixtures(page);
+  await loadRelayCatalog(page, fixtures);
+  await expectCardCount(page, 3);
+
+  /* 期待値は実装の並びからではなく、リレーが返した created_at から仕様側で組み立てる。
+     ここが同値のままだとテストが何も守らないので、まず「本当に互いに違う」ことを見る。 */
+  const rows = await page.evaluate(() => window.__NOSMAPS_RELAY_RESULT__.entries.map(entry => ({
+    name: entry.fields.name, createdAt: entry.createdAt
+  })));
+  expect(rows).toHaveLength(3);
+  expect([...new Set(rows.map(row => row.createdAt))], 'the fixture must not be three equal seconds').toHaveLength(3);
+
+  const newestFirst = rows.slice().sort((a, b) => b.createdAt - a.createdAt).map(row => row.name);
+  const oldestFirst = newestFirst.slice().reverse();
+
+  /* 一度名前順に崩してから収集日順を選ぶ。そうしないと「並べ替えた」のか「元のまま
+     だった」のかが区別できない。 */
+  await chooseSort(page, 'name-asc');
+  const byName = cardNames(await readList(page));
+
+  await chooseSort(page, 'collected-desc');
+  expect(cardNames(await readList(page))).toEqual(newestFirst);
+
+  await chooseSort(page, 'collected-asc');
+  expect(cardNames(await readList(page))).toEqual(oldestFirst);
+
+  // 収集日順は名前順の言い換えではない。どちらの向きも名前の並びとは違う。
+  expect(newestFirst).not.toEqual(byName);
+  expect(oldestFirst).not.toEqual(byName);
+  expect(newestFirst).not.toEqual(oldestFirst);
+  // 三件とも秒を持っているので、外された行は無い。
+  expect(await page.locator('.sort-unranked').count()).toBe(0);
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
+test('7. a row with no collection date is not ranked where a row collected at 0 is ranked', async ({page}) => {
+  const errors = collectErrors(page);
+  await openExplorer(page);
+
+  /* 収集日を持たない行は、今のデータでは画面に出ない —— 収集済みの41件は全部秒を持ち、
+     リレー行の秒は署名イベントから来るので必ず有限。だから unknown ≠ 0 を確かめられる
+     のは並び替えの規則そのものの側で、そこは NOSMAPS_CATALOG.sortRows として出ている。 */
+  const measured = await page.evaluate(() => ({
+    collectedRowsWithoutSecond: window.NOSMAPS_DATA.tools.filter(tool => !Number.isFinite(tool.collectedAt)).length
+  }));
+  expect(measured.collectedRowsWithoutSecond, 'today no collected row lacks a second').toBe(0);
+
+  const result = await page.evaluate(() => {
+    const rows = [
+      {id: 'u', name: 'Unknown date', likes: null, collectedAt: null},
+      {id: 'z', name: 'Collected at zero', likes: null, collectedAt: 0},
+      {id: 'l', name: 'Collected later', likes: null, collectedAt: 100}
+    ];
+    const asc = window.NOSMAPS_CATALOG.sortRows(rows, 'collected-asc');
+    const desc = window.NOSMAPS_CATALOG.sortRows(rows, 'collected-desc');
+    /* 同値の安定性。名前は逆順に置いてあるので、名前で割り込んだら並びが入れ替わる。 */
+    const tied = window.NOSMAPS_CATALOG.sortRows([
+      {id: 'b', name: 'Zulu', likes: null, collectedAt: 7},
+      {id: 'a', name: 'Alpha', likes: null, collectedAt: 7},
+      {id: 'c', name: 'Mike', likes: null, collectedAt: 7}
+    ], 'collected-desc');
+    return {
+      ascRanked: asc.ranked.map(row => row.id), ascUnranked: asc.unranked.map(row => row.id),
+      descRanked: desc.ranked.map(row => row.id), descUnranked: desc.unranked.map(row => row.id),
+      tiedRanked: tied.ranked.map(row => row.id), tiedUnranked: tied.unranked.map(row => row.id)
+    };
+  });
+
+  // 0 は観測された秒なので順位を持ち、古い順の先頭に立つ。
+  expect(result.ascRanked).toEqual(['z', 'l']);
+  // 収集日を持たない行はその先頭を奪わないし、最下位という順位も与えられない。
+  expect(result.ascUnranked).toEqual(['u']);
+  expect(result.ascRanked).not.toContain('u');
+  expect(result.descRanked).toEqual(['l', 'z']);
+  expect(result.descUnranked).toEqual(['u']);
+  // 0 の居場所と unknown の居場所は、どちらの向きでも同じにならない。
+  expect(result.ascRanked.indexOf('u')).toBe(-1);
+  expect(result.descRanked.indexOf('u')).toBe(-1);
+  // 同値は入ってきた順のまま。名前でこっそり並べ替えない。
+  expect(result.tiedRanked).toEqual(['b', 'a', 'c']);
+  expect(result.tiedUnranked).toEqual([]);
   expect(errors, 'console/page errors').toEqual([]);
 });
 
@@ -368,7 +539,7 @@ test.describe('375x812', () => {
 
     for (const button of ['日本語', 'English']) {
       await page.getByRole('button', {name: button}).first().click();
-      for (const value of ['default', 'name-asc', 'name-desc', 'likes-desc', 'likes-asc']) {
+      for (const value of ['default', 'name-asc', 'name-desc', 'likes-desc', 'likes-asc', 'collected-desc', 'collected-asc']) {
         await chooseSort(page, value);
         const overflow = await page.evaluate(() => {
           const doc = document.documentElement;

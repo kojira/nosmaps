@@ -170,6 +170,11 @@ export interface Tool {
   /** Why `topics` differs from `collectedTopics`. Null for 33 of 41. */
   readonly topicCorrection: string | null;
   readonly provenance: 'collected';
+  /** issue #21: the `created_at` of the signed record, in seconds — when it was
+      collected into the catalogue, not when the project was released (no record
+      states that). All 41 were signed in one batch, so all 41 carry the same
+      second today. */
+  readonly collectedAt: number;
   readonly observed: string;
   readonly sources: readonly ProvenanceSource[];
   readonly license: string;

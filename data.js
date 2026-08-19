@@ -740,6 +740,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -975,6 +976,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -2461,6 +2463,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -2533,6 +2536,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -2841,6 +2845,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -3644,6 +3649,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -3724,6 +3730,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -3782,6 +3789,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -3904,6 +3912,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -3975,6 +3984,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -4033,6 +4043,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -4104,6 +4115,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -4348,6 +4360,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -4420,6 +4433,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -4493,6 +4507,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -4574,6 +4589,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -4655,6 +4671,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": "§21.6 — free topic; filed as `clients` it \"asserts something false\"",
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -5148,6 +5165,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -5248,6 +5266,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -5337,6 +5356,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -5420,6 +5440,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": "§21.6 — publisher: \"The Bitcoin Lightning Browser Extension\"; it signs and it pays, so it carries both",
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -5480,6 +5501,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": "§21.6 — free topic; notification bridge, a singleton",
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -5545,6 +5567,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -5789,6 +5812,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -6150,6 +6174,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -6226,6 +6251,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -6674,6 +6700,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -7121,6 +7148,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -7187,6 +7215,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -7383,6 +7412,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": "§21.6 — free topic; a specification repository, for which `state`/`homepage`/NIP support are category errors",
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -7454,6 +7484,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -7527,6 +7558,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -7614,6 +7646,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": "§21.6 — publisher: \"A mobile Bitcoin wallet fit for the gods.\"",
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -7686,6 +7719,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": "§21.6 — publisher: \"Your own Bitcoin Lightning node\"",
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -7767,6 +7801,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": "§21.6 — publisher: \"a self-custodial lightning wallet that runs in the browser\"",
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -7849,6 +7884,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -7928,6 +7964,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -8348,6 +8385,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -8426,6 +8464,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -8496,6 +8535,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": null,
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {
@@ -8577,6 +8617,7 @@ window.NOSMAPS_DATA={
    ],
    "topicCorrection": "§21.6 — free topic; app distribution, a singleton in a 41-entry sample",
    "provenance": "collected",
+   "collectedAt": 1787011200,
    "observed": "2026-08-18",
    "sources": [
     {

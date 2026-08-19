@@ -33,6 +33,9 @@ export interface RelayRow {
   readonly observed: string;
   readonly nips: readonly string[];
   readonly provenance: 'relay';
+  /** issue #21: the winning event's `created_at`, in seconds. Null when the
+      entry carries no usable second — unknown, never the epoch. */
+  readonly collectedAt: number | null;
   readonly coordinate: string;
   readonly summary: string;
   readonly homepage: string | null;
@@ -77,6 +80,10 @@ export function relayEntryToRow(
     platform: '', os: [], license: '',
     observed: formatObserved(asOf),
     nips: [], provenance: 'relay',
+    /* The record's own second, read straight off the winning event. A value that
+       is not a finite number is unknown and stays unknown; coercing it to 0 would
+       file the row under 1970. */
+    collectedAt: Number.isFinite(entry.createdAt) ? entry.createdAt : null,
     coordinate: entry.coordinate,
     summary: entry.fields.summary,
     homepage: entry.fields.homepage,

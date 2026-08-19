@@ -384,6 +384,12 @@ function buildTool(signedRecord) {
     collectedTopics: collected,
     topicCorrection: correction ? correction.why : null,
     provenance: 'collected',
+    /* issue #21 — the second this record was signed into the catalogue, straight off its own
+       event. It is NOT `observed` (the date the primary source was fetched) and it is NOT a
+       publication date, which no record states. All 41 lines were signed in one batch so this
+       value is the same for every row today; it is written per row anyway because it is a
+       property of the record, and a record signed by anyone else will carry its own. */
+    collectedAt: event.created_at,
     observed: (entry.provenance[0] || {}).fetched || null,
     sources: entry.provenance.map(item => ({fields: item.field, url: item.url, what: item.what, fetched: item.fetched})),
     license: facts.license || null,
