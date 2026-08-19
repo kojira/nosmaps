@@ -432,4 +432,93 @@ test.describe('NIP-07 sign-in (issue #9)', () => {
     expect(r.tooLong).toBeNull();
     expect(errors).toEqual([]);
   });
+
+  /* M / N / O は「サインインが一箇所しかない」ことを押さえる。
+     以前は経路が二本あった: ヘッダの [data-viewer-signin] と、グラフバナーの
+     [data-graph-connect] が呼ぶ loadCatalog({useNip07:true})。後者は自分で
+     window.nostr.getPublicKey() を呼び直していたので、ヘッダが「サインイン済み」でも
+     カタログ側は viewerPubkey:null / viewerSource:'none' のまま、という食い違いが起きた。
+     ここで見るのは表示ではなくカタログに実際に渡った鍵で、画面の文言だけでは通らない。 */
+  const catalogIdentity = page => page.evaluate(async () => {
+    const result = await window.__NOSMAPS_RELAY_LOAD__({});
+    return {
+      viewerPubkey: (result && result.graph && result.graph.viewerPubkey) || null,
+      viewerSource: (result && result.viewerSource) || null
+    };
+  });
+
+  test('M. the signed-in key is the key the catalogue loads with', async ({page}) => {
+    const errors = collectErrors(page);
+    await installSigner(page, {mode: 'resolve', value: VECTORS.b.hex});
+    await page.goto(EXPLORER);
+
+    // 未サインインでは鍵を渡さない。拡張が在っても、聞かれていない同意は使わない。
+    const before = await catalogIdentity(page);
+    expect(before.viewerPubkey).toBeNull();
+    expect(before.viewerSource).toBe('none');
+    // カタログを読んだだけでプロンプトは出ない。
+    expect(await page.evaluate(() => window.__SIGNER_CALLS__)).toBe(0);
+
+    await signInButton(page).click();
+    await expect(viewer(page)).toHaveAttribute('data-viewer-status', 'signedIn');
+
+    const after = await catalogIdentity(page);
+    // 画面が出している npub と、カタログが使った鍵が同じ一つの身元であること。
+    expect(after.viewerPubkey).toBe(VECTORS.b.hex);
+    expect(after.viewerSource).toBe('pasted');
+    // 一度サインインしたら、読み直しのたびに拡張へ聞き直さない。
+    expect(await page.evaluate(() => window.__SIGNER_CALLS__)).toBe(1);
+
+    // サインアウトしたら鍵も一緒に外れる。画面だけ未サインインになるのでは足りない。
+    await page.locator('[data-viewer-signout]').click();
+    await expectNoIdentityShown(page);
+    const signedOut = await catalogIdentity(page);
+    expect(signedOut.viewerPubkey).toBeNull();
+    expect(signedOut.viewerSource).toBe('none');
+    expect(errors).toEqual([]);
+  });
+
+  test('N. the graph banner connect button signs in through the one sign-in path', async ({page}) => {
+    const errors = collectErrors(page);
+    await installSigner(page, {mode: 'resolve', value: VECTORS.a.hex});
+    await page.goto(EXPLORER);
+
+    // バナーはグラフが無いときだけ出る。まずカタログを一度読んでバナーを出す。
+    await catalogIdentity(page);
+    const connect = page.locator('.graph-banner[data-graph-state="none"] [data-graph-connect]');
+    await expect(connect).toBeVisible();
+
+    await connect.click();
+    // バナー経由でもヘッダの状態が動く。二つの独立した「ログイン済み」は存在しない。
+    await expect(viewer(page)).toHaveAttribute('data-viewer-status', 'signedIn');
+    await expect(viewer(page).locator('[data-viewer-npub]')).toHaveText(VECTORS.a.npub);
+    expect(await page.evaluate(() => window.__SIGNER_CALLS__)).toBe(1);
+
+    const identity = await catalogIdentity(page);
+    expect(identity.viewerPubkey).toBe(VECTORS.a.hex);
+    expect(errors).toEqual([]);
+  });
+
+  test('O. a declined graph-banner connect leaves no identity anywhere', async ({page}) => {
+    const errors = collectErrors(page);
+    await installSigner(page, {mode: 'reject', message: 'User rejected the request'});
+    await page.goto(EXPLORER);
+
+    await catalogIdentity(page);
+    const connect = page.locator('.graph-banner[data-graph-state="none"] [data-graph-connect]');
+    await expect(connect).toBeVisible();
+
+    await connect.click();
+    // 断られた理由はヘッダの一箇所に出る。バナー側に二つ目の文言を作らない。
+    await expect(reasonNode(page)).toHaveAttribute('data-viewer-reason', 'rejected');
+    await expectNoIdentityShown(page);
+
+    const identity = await catalogIdentity(page);
+    expect(identity.viewerPubkey).toBeNull();
+    expect(identity.viewerSource).toBe('none');
+    // 断られた後も、バナーは同じ二つの手段を出したまま。
+    await expect(connect).toBeVisible();
+    expect(await page.content()).not.toContain(MOCK_NPUB);
+    expect(errors).toEqual([]);
+  });
 });

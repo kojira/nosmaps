@@ -721,11 +721,15 @@
   }
   // §6.5.4 の二つの手段（NIP-07 接続 / npub 貼り付け）はここで保持する。既定は空で、
   // アプリが既定のキュレーターを持つことはない (§6.5.5)。
-  const relayViewer = {viewerPubkey: (params.get('viewer') || '').trim(), useNip07: false};
+  const relayViewer = {viewerPubkey: (params.get('viewer') || '').trim()};
+  /* issue #9: サインインは一箇所しかない。以前はここが window.nostr.getPublicKey() を
+     独自に呼び直していて、ヘッダは「サインイン済み」なのにカタログ側は viewerSource:'none'
+     のまま、という食い違った二重経路になっていた。拡張に触るのは signIn() だけにして、
+     ここは既にサインイン済みの鍵を読むだけにする。貼り付けた鍵 (§6.5.4) が在ればそちらが優先。 */
+  function signedInPubkey() { return viewer.status === 'signedIn' ? (viewer.pubkey || '') : ''; }
   async function loadRelayCatalog(override) {
     const next = override && typeof override === 'object' && !(override instanceof Event) ? override : {};
     if ('viewerPubkey' in next) relayViewer.viewerPubkey = String(next.viewerPubkey || '').trim();
-    if ('useNip07' in next) relayViewer.useNip07 = Boolean(next.useNip07);
     try {
       const catalog = window.NOSMAPS_CATALOG;
       if (!catalog || typeof catalog.loadCatalog !== 'function') return null;
@@ -738,8 +742,10 @@
       const options = {relays};
       if (manualOverride) options.manualCounted = manualOverride.split(',').map(value => value.trim()).filter(Boolean);
       if (topicOverride) options.topics = topicOverride.split(',').map(value => value.trim()).filter(Boolean);
-      if (relayViewer.viewerPubkey) options.viewerPubkey = relayViewer.viewerPubkey;
-      if (relayViewer.useNip07) options.useNip07 = true;
+      // 貼り付けた鍵が最優先。無ければサインイン済みの鍵。どちらも無ければ鍵は渡さない
+      // (未サインインで勝手にプロンプトを出さないし、鍵をでっち上げもしない)。
+      const identity = relayViewer.viewerPubkey || signedInPubkey();
+      if (identity) options.viewerPubkey = identity;
       state.uiState = 'loading'; renderResults();
       const result = await catalog.loadCatalog(options);
       window.__NOSMAPS_RELAY_RESULT__ = result;
@@ -1259,7 +1265,12 @@
     if (event.target.closest('[data-show-feature-basis]')) { renderFeatureBasis(); return; }
     const relayAction = event.target.closest('[data-relay-action]'); if (relayAction) { if (relayAction.dataset.relayAction === 'reload') loadRelayCatalog(); return; }
     // §6.5.4 の二つの手段。どちらも並び順と推薦数にしか効かず、行の集合は動かない (I7)。
-    if (event.target.closest('[data-graph-connect]')) { loadRelayCatalog({useNip07: true}); return; }
+    // 「Nostr鍵を接続」もヘッダのサインインと同じ一本の経路を通る。成功したときだけ読み直す。
+    // 失敗したらヘッダの未サインイン理由がそのまま出るので、ここで別の文言を作らない。
+    if (event.target.closest('[data-graph-connect]')) {
+      signIn().then(() => { if (viewer.status === 'signedIn') loadRelayCatalog({viewerPubkey: ''}); });
+      return;
+    }
     if (event.target.closest('[data-graph-apply]')) { loadRelayCatalog({viewerPubkey: $('#graph-npub')?.value || '', useNip07: false}); return; }
     const setState = event.target.closest('[data-set-state]'); if (setState) { state.uiState = setState.dataset.setState; renderAll(); }
   });
