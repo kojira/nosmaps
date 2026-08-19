@@ -24,6 +24,7 @@ import {
 import {decodeNpub, encodeNpub} from '../domain/npub.ts';
 import {POLICY, SOFTWARE_D_PREFIX, SOFTWARE_SCHEMA} from '../domain/policy.ts';
 import {isSortKey, sortRows, SORT_KEYS} from '../domain/sorting.ts';
+import {drawnRecords, stackRecords, STACK_DRAWN_LIMIT} from '../domain/stacks.ts';
 import {
   validateCurationSetEvent, validateDeletionEvent,
   validateFollowListEvent, validateSoftwareEvent
@@ -39,6 +40,7 @@ import {i18n} from '../ui/i18n.ts';
 import {icons} from '../ui/icons.ts';
 import {mountSiteFooter} from '../ui/site-footer.ts';
 import {mountExplorer, type RelayLoadOverride} from '../ui/explorer/app.ts';
+import type {RelayRow} from '../ui/explorer/relay-row.ts';
 
 /* The catalogue surface, assembled from the modules rather than re-implemented.
    Same names, same functions — `nostr-catalog.js` was a bundle of these exact
@@ -62,6 +64,11 @@ const catalog = {
   SORT_KEYS,
   isSortKey,
   sortRows,
+  /* issue #18: 同じ識別子を共有するレコードの束ね方。既定を選ぶ関数ではないので、
+     spec からも純関数のまま直接叩けるように出しておく。 */
+  stackRecords,
+  drawnRecords,
+  STACK_DRAWN_LIMIT,
   /* buildCatalog is re-typed at the boundary only so a caller in a plain .js test
      hands it a value this signature accepts; the function itself is untouched. */
   buildCatalog: (input?: CatalogInput): CatalogResult => buildCatalog(input),
@@ -100,6 +107,8 @@ declare global {
     __NOSMAPS_RELAY_RESULT__: LoadedCatalog | null;
     __NOSMAPS_RELAY_LOAD__: (override?: RelayLoadOverride | Event) => Promise<LoadedCatalog | null>;
     __NOSMAPS_SET_STATE__: (next: string) => void;
+    /** issue #18: the relay rows the list is holding, each carrying its `d`. */
+    __NOSMAPS_RELAY_ROWS__: () => readonly RelayRow[];
   }
 }
 
@@ -113,5 +122,6 @@ const explorer = mountExplorer(readCatalogueData());
 explorer.onRelayResult(result => { window.__NOSMAPS_RELAY_RESULT__ = result; });
 window.__NOSMAPS_RELAY_LOAD__ = explorer.loadRelayCatalog;
 window.__NOSMAPS_SET_STATE__ = explorer.setState;
+window.__NOSMAPS_RELAY_ROWS__ = explorer.relayRows;
 
 mountSiteFooter();
