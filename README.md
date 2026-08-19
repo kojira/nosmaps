@@ -2,7 +2,7 @@
 
 Nostr周辺ツールを機能から探し、最大3件を比較できる純粋な静的サイトです。
 
-- `index.html`: トップページ。見出し、`data.js` のサンプル項目を自動送りするカルーセル、機能探索への導線
+- `index.html`: トップページ。見出し、`data.js` の収集済み記録を自動送りするカルーセル、機能探索への導線
 - `nip-explorer.html`: 機能探索。複数機能のAND条件とNIPの根拠から探し、比較する
 
 ビルドなしで静的配信できます。
@@ -51,17 +51,19 @@ E2Eからは `window.__NOSMAPS_SET_STATE__(state)` も利用できます。
 
 ## リレー実データ（Phase 1、既定で無効）
 
-`nip-explorer.html?relay=1` のときだけ、署名済みNostrイベントを一次情報として実データを取得します。付けなければネットワークアクセスは一切発生せず、従来どおり `data.js` のサンプルだけを表示します。
+`nip-explorer.html?relay=1` のときだけ、リレーから署名済みNostrイベントを取得します（`nip-explorer.js` の `params.get('relay') === '1'`）。付けなければネットワークアクセスは一切発生せず、リポジトリ内の `data.js`（収集済み記録の派生ビルド）だけを表示します。
+
+カタログのイベントは既定リレーへ投入済みです。2026-08-19 にこのリポジトリから `wss://x.kojira.io` と `wss://nos.lol` へそれぞれ `kinds:[30078] / authors:[収集者pubkey] / #t:[nosmaps]` でREQを投げ、両リレーとも41件をEOSEまで返しました（`catalogue-events.jsonl` の行数と一致）。既定を `relay=1` 側へ入れ替えるかどうかは未変更で、現在も既定は無効です。
 
 - 既定リレーは `wss://x.kojira.io` と `wss://nos.lol`。`?relays=` と `?curators=` で上書きできます
-- kind `30078`（NIP-78 application-specific data）のカタログポインタを `#d` 完全一致で取得し、NIP-01のaddressable勝者選択（`created_at` 最大、同値ならイベントid最小）を適用します
-- ポインタが指すカタログ本体はBlossomの匿名 `GET /<sha256>` で取得し、**バイト数・SHA-256・RFC 8785正規形・スキーマ・件数のすべてが一致した場合にのみ**採用します。1つでも失敗したバイト列は決して表示に使いません。ミラー再試行は上限つきです
-- 検証済みカタログはIndexedDB（`nosmaps-catalog`）に派生キャッシュとして保存します。これは再構築可能な高速化用で、真実の源ではありません。全消去してもリレーとBlossomから再構築できます
+- kind `30078`（NIP-78 application-specific data）の**レコード本体そのもの**が正本です。ポインタも別置きのカタログ本体もありません（`nostr-catalog.js` 冒頭 D2: 「no pointer, no manifest, no blob, no mirror, ... and no HTTP anywhere in this file」）。取得は `#d` 完全一致または `#t=nosmaps`、採用はNIP-01のaddressable勝者選択（`created_at` 最大、同値ならイベントid最小）です
+- 署名・`d` 名前空間・content の v1 プロファイル（`schema` = `org.nosmaps.software`）の検証を通らないイベントは表示に使わず、理由付きで隔離します
+- 検証済みカタログはIndexedDB（`nosmaps-catalog`）に派生キャッシュとして保存します。これは再構築可能な高速化用で、真実の源ではありません。全消去してもリレーから再構築できます
 - 実データが無い・検証できない・リレー到達が不完全な場合は `stale` / `incomplete` / `unavailable` を明示します。**データが無いことを成功として表示しません**
-- 各カードには出所バッジ（サンプル / リレー検証済み）を表示し、実データとサンプルを混同しません
-- リレー診断（リレー別カバレッジ、キュレーター、ポインタid、generation、blobハッシュ、as-of、REQ数）は `#relay-diagnostics` で確認できます
+- 一覧カードの見出しにはレコード状態バッジ（公開中 / 取り下げ済み）を出します（issue #15）。出所バッジ（一次情報から収集 / リレー検証済み）は詳細ダイアログ側にあります。座標は読者向けの画面には出しません
+- リレー診断（リレー別カバレッジ、ソーシャルグラフ、キュレーター、ラウンド、as-of、REQ数、隔離、推薦されたが観測できなかった座標）は `#relay-diagnostics` で確認できます
 
-kind `30078` は NIP-78 の application-specific data で、すべてのアプリが共用します。一意性は整数kindではなく `d` タグの名前空間（`nosmaps:` 前置）で確保します。2026-08-17 時点の実測では、実リレー上の `30078` に `ditto/metadata` / `AmethystSettings` / `seen_notifications_at` など無関係なアプリのレコードが多数同居しています（サンプル300件あたり distinct `d` は 22〜227）。したがって取得は `#d` 完全一致、discovery は `t` タグ（`nosmaps`）で行い、`d` が `nosmaps:` 前置でないもの、および `L`/`l` スキーマタグ・正規形JSON・ハッシュ検証を通らないイベントはすべて破棄します。
+kind `30078` は NIP-78 の application-specific data で、すべてのアプリが共用します。一意性は整数kindではなく `d` タグの名前空間（`nosmaps:` 前置）で確保します。2026-08-17 時点の実測では、実リレー上の `30078` に `ditto/metadata` / `AmethystSettings` / `seen_notifications_at` など無関係なアプリのレコードが多数同居しています（サンプル300件あたり distinct `d` は 22〜227）。したがって取得は `#d` 完全一致、discovery は `t` タグ（`nosmaps`）で行い、`d` が `nosmaps:` 前置でないもの、および content が `schema` = `org.nosmaps.software` の v1 プロファイル（`nostr-catalog.js` の `SOFTWARE_SCHEMA`）として通らないイベントはすべて破棄します。
 
 当初は未割当の独自kind（`30367`–`30372`）を使う設計でしたが、`30367` には無関係の第三者アプリが実際に稼働しており、「registry未割当＝空き番号」が成立しないことを実測で確認したため、番号の奪い合いが原理的に発生しない `30078` + `d` 名前空間へ移行しました。
 
@@ -78,7 +80,7 @@ Playwright設定はChromiumとWebKitを対象にし、デスクトップと375×
 
 リポジトリ内カタログの正本は `catalogue-events.jsonl` です。1行が1件の**署名済み生Nostrイベント**（kind `30078`、`d` は `nosmaps:` 前置、`t=nosmaps`）で、リレーから流れてくる形とまったく同じです。誰が収集したかは `pubkey` が示すので、収集者名のフィールドは持ちません（署名で分かることを二重に書かない）。
 
-現在の41件を署名した収集者の公開鍵は次のとおりです。
+現在の収集分を署名した収集者の公開鍵は次のとおりです（件数は `node tools/verify-catalogue.mjs` が表示します。2026-08-19 の実行では 41 行 / 41 件）。
 
 ```
 pubkey 3ce2f3e7dc1dfc7cab278e57d75384c7fcf6ad768ed189acba3b80fe4aa782b6
@@ -98,7 +100,7 @@ node tools/verify-catalogue.mjs                                           # 全�
 
 ## データと構成
 
-`data.js` の36件をトップページのサンプル表示と機能探索で共有します。NIPの番号・英語見出し・一次資料URLは `nostr-protocol/nips` の固定commitを参照し、ツール名と観測記録は画面設計用のデータです。
+`data.js` をトップページのカルーセルと機能探索で共有します。中身は架空のサンプルではなく、一次情報から収集した記録です（`meta.collected` = 2026-08-18、`meta.collector` = `primary sources only; see real-catalog-draft-report.md`、全件 `provenance` = `collected`。`node -e` で `window.NOSMAPS_DATA` を読んで実測）。NIPの番号・英語見出し・一次資料URLは `nips-registry-656cecc.json`（`nostr-protocol/nips` の固定commitのスナップショット）を参照します。一次情報が何も述べていない欄は埋めず、不在のまま表示します。
 
 このリポジトリは静的ファイルだけで構成し、バックエンド、専用API、サーバ側DB、中央インデクサは追加しません。真実の源は署名済みNostrイベントであり、IndexedDBは再構築可能な派生キャッシュにすぎません。
 
@@ -106,4 +108,4 @@ node tools/verify-catalogue.mjs                                           # 全�
 
 供給網攻撃対策として `pnpm-workspace.yaml` に `minimumReleaseAge: 10080`（7日）を明示設定しています。pnpm 10系の既定は 0 なので、この設定が無いと保護されません。除外リスト（`minimumReleaseAgeExclude`）は使いません。
 
-リレー通信は読み取り専用（REQ）のみで、署名、イベント送信、外部画像アップロードは実装しません。
+閲覧はリレー読み取り（REQ）のみです。投稿はNIP-07拡張でのサインインが前提で（issue #9）、署名は拡張が行い、ページは秘密鍵に触れません。投稿結果を「公開できた」と表示するのはリレーから読み戻せたときだけです（`nostr-catalog.js` の `publishSoftwareRecord`）。外部画像アップロードは実装しません。
