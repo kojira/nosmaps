@@ -552,19 +552,19 @@ function __awaiter(thisArg, _arguments, P, generator) {
       resolve(value);
     });
   }
-  return new (P || (P = Promise))(function(resolve, reject) {
+  return new (P || (P = Promise))(function(resolve, reject2) {
     function fulfilled(value) {
       try {
         step(generator.next(value));
       } catch (e) {
-        reject(e);
+        reject2(e);
       }
     }
     function rejected(value) {
       try {
         step(generator["throw"](value));
       } catch (e) {
-        reject(e);
+        reject2(e);
       }
     }
     function step(result) {
@@ -721,12 +721,12 @@ function __asyncGenerator(thisArg, _arguments, generator) {
     }
   }
   function step(r) {
-    r.value instanceof __await ? Promise.resolve(r.value.v).then(fulfill, reject) : settle(q[0][2], r);
+    r.value instanceof __await ? Promise.resolve(r.value.v).then(fulfill, reject2) : settle(q[0][2], r);
   }
   function fulfill(value) {
     resume("next", value);
   }
-  function reject(value) {
+  function reject2(value) {
     resume("throw", value);
   }
   function settle(f, v) {
@@ -743,15 +743,15 @@ function __asyncValues(o) {
   }, i);
   function verb(n) {
     i[n] = o[n] && function(v) {
-      return new Promise(function(resolve, reject) {
-        v = o[n](v), settle(resolve, reject, v.done, v.value);
+      return new Promise(function(resolve, reject2) {
+        v = o[n](v), settle(resolve, reject2, v.done, v.value);
       });
     };
   }
-  function settle(resolve, reject, d, v) {
+  function settle(resolve, reject2, d, v) {
     Promise.resolve(v).then(function(v2) {
       resolve({ value: v2, done: d });
-    }, reject);
+    }, reject2);
   }
 }
 function isFunction(value) {
@@ -1237,18 +1237,18 @@ function of() {
 }
 function firstValueFrom(source, config2) {
   var hasConfig = typeof config2 === "object";
-  return new Promise(function(resolve, reject) {
+  return new Promise(function(resolve, reject2) {
     var subscriber = new SafeSubscriber({
       next: function(value) {
         resolve(value);
         subscriber.unsubscribe();
       },
-      error: reject,
+      error: reject2,
       complete: function() {
         if (hasConfig) {
           resolve(config2.defaultValue);
         } else {
-          reject(new EmptyError());
+          reject2(new EmptyError());
         }
       }
     });
@@ -2799,17 +2799,17 @@ var init_rx_nostr = __esm({
       Observable2.prototype.forEach = function(next, promiseCtor) {
         var _this = this;
         promiseCtor = getPromiseCtor(promiseCtor);
-        return new promiseCtor(function(resolve, reject) {
+        return new promiseCtor(function(resolve, reject2) {
           var subscriber = new SafeSubscriber({
             next: function(value) {
               try {
                 next(value);
               } catch (err) {
-                reject(err);
+                reject2(err);
                 subscriber.unsubscribe();
               }
             },
-            error: reject,
+            error: reject2,
             complete: resolve
           });
           _this.subscribe(subscriber);
@@ -2832,12 +2832,12 @@ var init_rx_nostr = __esm({
       Observable2.prototype.toPromise = function(promiseCtor) {
         var _this = this;
         promiseCtor = getPromiseCtor(promiseCtor);
-        return new promiseCtor(function(resolve, reject) {
+        return new promiseCtor(function(resolve, reject2) {
           var value;
           _this.subscribe(function(x) {
             return value = x;
           }, function(err) {
-            return reject(err);
+            return reject2(err);
           }, function() {
             return resolve(value);
           });
@@ -7035,11 +7035,11 @@ var init_rx_nostr_crypto = __esm({
       const fallbackVerifier = fallback ?? verifier;
       const workerVerifier = (event) => {
         const reqId = nextReqId++;
-        const r = new Promise((resolve, reject) => {
+        const r = new Promise((resolve, reject2) => {
           resolvers.set(reqId, resolve);
           batch2.set(() => {
             if (resolvers.get(reqId)) {
-              reject(new Error("Verification request was timed out."));
+              reject2(new Error("Verification request was timed out."));
               resolvers.delete(reqId);
             }
           });
@@ -8529,6 +8529,78 @@ function stackRecords(rows, keyOf, complete) {
 var STACK_DRAWN_LIMIT = 3;
 function drawnRecords(stack) {
   return stack.records.slice(0, STACK_DRAWN_LIMIT);
+}
+
+// src/domain/corrections.ts
+var DISCOVERY_TOPIC2 = "nosmaps";
+var SOFTWARE_KIND = 30078;
+var SCHEME_RE = /^([A-Za-z][A-Za-z0-9+.-]*):\/\/(.+)$/;
+function reject(problem) {
+  return { uri: "", d: "", problem };
+}
+function normaliseSourceUri(input) {
+  if (typeof input !== "string") return reject("not a string");
+  const trimmed = input.trim();
+  if (trimmed === "") return reject("empty");
+  const match = SCHEME_RE.exec(trimmed);
+  if (!match) return reject("not <scheme>://<rest>; a schemeless URI is refused, not completed");
+  const scheme = (match[1] ?? "").toLowerCase();
+  let rest = match[2] ?? "";
+  while (rest.endsWith("/")) rest = rest.slice(0, -1);
+  if (rest.endsWith(".git")) rest = rest.slice(0, -4);
+  if (rest === "") return reject("nothing left after the scheme");
+  const uri = `${scheme}://${rest}`;
+  const d = `${SOFTWARE_D_PREFIX}${uri}`;
+  if (!D_ASCII_RE.test(d)) return reject("d holds characters outside printable ASCII");
+  if (utf8ByteLength(d) > D_MAX_BYTES) return reject(`d is ${utf8ByteLength(d)} bytes, over the ${D_MAX_BYTES} limit`);
+  return { uri, d, problem: null };
+}
+function buildCorrectionDraft(d, content, createdAt, extraTopics = []) {
+  if (typeof d !== "string" || d.indexOf(SOFTWARE_D_PREFIX) !== 0) {
+    return { event: null, problem: `d is not inside the ${SOFTWARE_D_PREFIX} namespace` };
+  }
+  if (d.length === SOFTWARE_D_PREFIX.length) return { event: null, problem: "d is the bare prefix and names nothing" };
+  if (!D_ASCII_RE.test(d)) return { event: null, problem: "d holds characters outside printable ASCII" };
+  if (utf8ByteLength(d) > D_MAX_BYTES) {
+    return { event: null, problem: `d is ${utf8ByteLength(d)} bytes, over the ${D_MAX_BYTES} limit` };
+  }
+  if (!Number.isSafeInteger(createdAt) || createdAt <= 0) return { event: null, problem: "created_at is not a positive integer" };
+  if (typeof content.name !== "string" || content.name === "") return { event: null, problem: "name is empty" };
+  if (typeof content.summary !== "string") return { event: null, problem: "summary is not a string" };
+  if (typeof content.homepage !== "string" || content.homepage === "") return { event: null, problem: "homepage is empty" };
+  const state = content.state === void 0 ? "active" : content.state;
+  if (typeof state !== "string" || state === "") return { event: null, problem: "state is empty" };
+  const topics = [DISCOVERY_TOPIC2];
+  for (const topic of extraTopics) {
+    if (typeof topic === "string" && topic !== "" && !topics.includes(topic)) topics.push(topic);
+  }
+  const tags = [["d", d], ...topics.map((topic) => ["t", topic]), ["state", state], ["v", "1"]];
+  const body = {
+    schema: SOFTWARE_SCHEMA,
+    version: 1,
+    state,
+    name: content.name,
+    summary: content.summary,
+    homepage: content.homepage
+  };
+  return {
+    event: { kind: SOFTWARE_KIND, created_at: createdAt, tags, content: JSON.stringify(body) },
+    problem: null
+  };
+}
+var DELETION_KIND = 5;
+var HEX64 = /^[0-9a-f]{64}$/;
+function buildDeletionDraft(ids, createdAt, reason = "") {
+  if (!Array.isArray(ids) || ids.length === 0) return { event: null, problem: "no ids to retract" };
+  for (const id of ids) {
+    if (typeof id !== "string" || !HEX64.test(id)) return { event: null, problem: `not a 64-hex id: ${String(id)}` };
+  }
+  if (!Number.isSafeInteger(createdAt) || createdAt <= 0) return { event: null, problem: "created_at is not a positive integer" };
+  const tags = [...ids.map((id) => ["e", id]), ["k", String(SOFTWARE_KIND)]];
+  return {
+    event: { kind: DELETION_KIND, created_at: createdAt, tags, content: typeof reason === "string" ? reason : "" },
+    problem: null
+  };
 }
 
 // src/data/cache.ts
@@ -12822,6 +12894,12 @@ var catalog = {
   stackRecords,
   drawnRecords,
   STACK_DRAWN_LIMIT,
+  /* issue #18 phase 2: 訂正を出す側。d の正規化（D2/D6, N1-N6）と、その d を
+     バイトのまま載せる下書きの組み立て。署名も送信もしない純関数なので、
+     spec から直接叩ける形で出しておく。 */
+  normaliseSourceUri,
+  buildCorrectionDraft,
+  buildDeletionDraft,
   /* buildCatalog is re-typed at the boundary only so a caller in a plain .js test
      hands it a value this signature accepts; the function itself is untouched. */
   buildCatalog: (input) => buildCatalog(input),
