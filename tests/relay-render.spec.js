@@ -255,9 +255,16 @@ test('relay-observed 30078 winners render as tool cards, ordered by recommendati
   await expect(page.locator('#result-count')).toHaveText('4');
   await expect(cards.first().locator('h2')).toHaveText('Mock Client');
   await expect(page.locator('.state-message.unavailable')).toHaveCount(0);
-  // data.js contract: `observed` is "YYYY-MM-DD HH:MM UTC", so the card shows the date part.
-  const observed = await cards.first().locator('.tool-facts div').last().locator('dd').textContent();
-  expect(observed).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  /* issue #15 collapsed the card down to name / summary / topics / actions, so the
+     observation moved behind "Details & evidence" rather than disappearing. It is
+     read where it now lives; the contract asserted is unchanged. data.js contract:
+     `observed` is "YYYY-MM-DD HH:MM UTC", so the row shows the date part. */
+  await cards.first().locator('[data-feature-detail]').click();
+  const observedRow = page.locator('#evidence-dialog .nip-evidence-grid div').filter({hasText: 'Last observed'}).locator('dd');
+  await expect(observedRow).toHaveCount(1);
+  const observed = await observedRow.textContent();
+  expect(observed).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC$/);
+  await page.locator('#evidence-dialog [data-close-dialog]').click();
   // The numeric asOf is the input the string `observed` contract has to absorb.
   expect(typeof result.asOf).toBe('number');
   expect(errors).toEqual([]);
@@ -421,10 +428,27 @@ test('the cold catalog costs 3 logical REQ per relay and 0 HTTP, with no per-cur
   const allFilters = reqs.flatMap(req => req.filters);
   expect(allFilters).toHaveLength(6);
 
-  // §9.2: zero HTTP in the catalog data path. The only non-origin HTTP request is
-  // rx-nostr's NIP-11 document fetch on connect, which cannot affect listability.
-  const foreign = httpRequests.filter(url => !url.startsWith('http://127.0.0.1:') && !url.startsWith('https://mock.relay.test/'));
+  /* §9.2: zero HTTP in the catalog data path. Two kinds of off-origin request are
+     not in that path and never were:
+       - rx-nostr's NIP-11 document fetch on connect, which cannot affect listability;
+       - the <img> for each collected entry's recorded `icon.url`. That URL is a
+         value data.js already holds, fetched to paint a logo; no catalog data is
+         read from the response. Commit fddce11 added those icons and this
+         assertion started counting them.
+     So the allowance is derived from the catalogue itself rather than a pattern:
+     exactly the recorded icon URLs are permitted, and any other host -- including
+     a favicon guessed from a homepage, which is precisely what fddce11 refuses to
+     do -- still fails here. */
+  const iconUrls = await page.evaluate(() => window.NOSMAPS_DATA.tools
+    .map(tool => tool.icon && tool.icon.url)
+    .filter(url => typeof url === 'string' && url !== ''));
+  expect(iconUrls.length).toBeGreaterThan(0);
+  const foreign = httpRequests.filter(url =>
+    !url.startsWith('http://127.0.0.1:') && !url.startsWith('https://mock.relay.test/') && !iconUrls.includes(url));
   expect(foreign).toEqual([]);
+  // Whatever those icon requests are, they are images and not a data fetch: the
+  // catalog's own request budget still reads zero HTTP attempts.
+  expect(result.stats.httpAttempts).toBe(0);
   expect(httpRequests.filter(url => /blossom|\.json$/.test(url))).toEqual([]);
   expect(errors).toEqual([]);
 });
@@ -436,44 +460,96 @@ test('relay-derived cards invent no like count, category, OS, or URL', async ({p
   const {cards} = await loadRelayCatalog(page, {load: {viewerPubkey: viewer}});
   await expect(cards).toHaveCount(4);
 
+  /* issue #15 collapsed the card: the like button, the fact grid, the resource
+     links and the NIP chips all moved behind "Details & evidence". Each assertion
+     below therefore opens the detail view of the row it is about instead of
+     reading the card — same values, the place they are now printed. The category
+     assertion is what the topic on the card states, which is still on the card. */
+  const openDetail = async name => {
+    await cards.filter({has: page.locator('h2', {hasText: name})}).locator('[data-feature-detail]').click();
+    return page.locator('#evidence-dialog');
+  };
+  const closeDialog = () => page.locator('#evidence-dialog [data-close-dialog]').click();
+  const factOf = (dialog, label) => dialog.locator('.nip-evidence-grid div').filter({hasText: label}).locator('dd');
+
   // A relay entry carries no like count: no number is derived from the id shape.
-  const likeButtons = cards.locator('[data-like-tool]');
-  for (const label of await likeButtons.allTextContents()) expect(label).not.toMatch(/\d/);
-  await expect(likeButtons.first()).toHaveText('♥ —');
-  await expect(likeButtons.first().locator('.no-support-record')).toHaveAttribute('aria-label', 'Unknown');
-  await likeButtons.first().click();
-  await expect(cards.locator('[data-like-tool]').first()).toHaveText('♥ —');
-  await expect(cards.locator('[data-like-tool]').first()).toHaveAttribute('aria-pressed', 'true');
+  let dialog = await openDetail('Mock Client');
+  const likeButton = dialog.locator('[data-like-tool]');
+  await expect(likeButton).toHaveText('♥ —');
+  expect(await likeButton.textContent()).not.toMatch(/\d/);
+  await expect(likeButton.locator('.no-support-record')).toHaveAttribute('aria-label', 'Unknown');
+  await likeButton.click();
+  await expect(dialog.locator('[data-like-tool]')).toHaveText('♥ —');
+  await expect(dialog.locator('[data-like-tool]')).toHaveAttribute('aria-pressed', 'true');
 
-  // 30078 v1 content has no category field. Only a `t` topic that matches a known
-  // category is observed data; "Mock Relay" has one, "Mock Client" does not.
-  const categoryOf = name => cards.filter({has: page.locator('h2', {hasText: name})}).locator('.tool-facts div').first().locator('dd');
-  await expect(categoryOf('Mock Client')).toHaveText('Unknown');
-  await expect(categoryOf('Mock Relay')).toHaveText('Relay operations');
+  // No OS / delivery is observed, so it says so instead of claiming "Web".
+  await expect(dialog.locator('.support-line')).toContainText('OS / platform: Unknown');
+  await expect(dialog.locator('.support-line')).not.toContainText('Web app');
+  await expect(factOf(dialog, 'OS / platform')).toHaveText('Unknown');
 
-  // No OS / delivery is observed, so the card says so instead of claiming "Web".
-  await expect(cards.first().locator('.support-line')).toContainText('OS / platform: Unknown');
-  await expect(cards.first().locator('.support-line')).not.toContainText('Web app');
-
-  // Reviews and NIP records are not observed either.
-  await expect(cards.first().locator('[data-review-tool]')).toHaveText('Reviews 0');
-  await expect(cards.first().locator('.basis-nips')).toHaveCount(0);
+  // Reviews are not observed either, and no NIP chip is rendered for a record
+  // that claims none: the claim block says so in words instead.
+  await expect(dialog.locator('[data-review-tool]')).toHaveText('Reviews 0');
+  await expect(dialog.locator('.basis-nips .nip-tag-button')).toHaveCount(0);
+  await expect(dialog.locator('.basis-nips')).toContainText('No capability claim published');
 
   // The only URL a 30078 record observes is content.homepage, and only for "site".
-  await cards.first().locator('[data-resource-type="docs"]').click();
-  await expect(page.locator('#evidence-dialog .nip-evidence-grid dd').first()).toHaveText('Unknown');
-  await page.locator('#evidence-dialog [data-close-dialog]').click();
-  await cards.first().locator('[data-resource-type="site"]').click();
+  // "docs" is not among the resource types a relay row offers at all.
+  await expect(dialog.locator('[data-resource-type]')).toHaveText(['Official site']);
+  await dialog.locator('[data-resource-type="site"]').click();
   await expect(page.locator('#evidence-dialog .nip-evidence-grid dd').first()).toHaveText('https://example.com/com.example.client');
+  await closeDialog();
+
+  /* 30078 v1 content has no category field. Only a `t` topic that matches a seed
+     category is observed data; "Mock Relay" publishes `t: relay` and "Mock Client"
+     publishes only the discovery topic, which names no category. The expected
+     label is read from the shipped vocabulary rather than spelled out here, so a
+     renamed category cannot silently drift away from what the page prints. */
+  const relayCategoryLabel = await page.evaluate(() => window.NOSMAPS_I18N.t('categories.relay.name'));
+  expect(relayCategoryLabel).toBeTruthy();
+  const categoryOf = name => cards.filter({has: page.locator('h2', {hasText: name})}).locator('.card-topics');
+  await expect(categoryOf('Mock Client')).toHaveText('Category: Unknown');
+  await expect(categoryOf('Mock Relay')).toHaveText(relayCategoryLabel);
+  dialog = await openDetail('Mock Relay');
+  await expect(factOf(dialog, 'Category')).toHaveText(relayCategoryLabel);
+  await closeDialog();
+
   expect(errors).toEqual([]);
 });
 
-// data.js sample cards keep the count they have always shown.
+/* A catalogue entry's like count is whatever its provenance entitles it to, and
+   nothing else. The number only ever existed for the `sample` seed; the shipped
+   catalogue is 41 collected records, so what this now pins is that a collected
+   entry shows the Unknown marker rather than inheriting the seed's arithmetic.
+   The expectation is derived from the record's own provenance at runtime, so
+   this reads the same whichever kind of entry the catalogue leads with -- and
+   would fail loudly if a collected card started printing a fabricated number.
+   The second assertion is unchanged: a recommendation count is relay-only, and
+   a non-relay card must not grow one. */
 test('sample cards keep their like count', async ({page}) => {
   const errors = collectErrors(page);
   await page.goto(EXPLORER);
-  await expect(page.locator('#tool-results article.feature-tool-card').first().locator('[data-like-tool]')).toHaveText(/^♥ \d+$/);
-  await expect(page.locator('#tool-results article.feature-tool-card').first().locator('.recommendation-count')).toHaveCount(0);
+  const first = page.locator('#tool-results article.feature-tool-card').first();
+  await expect(first).toBeVisible();
+  const provenance = await page.evaluate(id => {
+    const tool = window.NOSMAPS_DATA.tools.find(item => item.id === id);
+    if (!tool) throw new Error(`no catalogue record for the first card (${id})`);
+    return tool.provenance;
+  }, await first.getAttribute('data-tool-id'));
+  expect(['sample', 'collected']).toContain(provenance);
+
+  // The like button moved behind "Details & evidence" with the rest of the card's detail (issue #15).
+  await first.locator('[data-feature-detail]').click();
+  const likeButton = page.locator('#evidence-dialog [data-like-tool]');
+  if (provenance === 'sample') {
+    await expect(likeButton).toHaveText(/^♥ \d+$/);
+  } else {
+    await expect(likeButton).toHaveText('♥ —');
+    await expect(likeButton.locator('.no-support-record')).toHaveAttribute('aria-label', 'Unknown');
+  }
+  await page.locator('#evidence-dialog [data-close-dialog]').click();
+
+  await expect(first.locator('.recommendation-count')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -503,9 +579,17 @@ test('compare selection on relay cards survives a re-render and opens the compar
   const dialog = page.locator('#compare-dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.comparison-candidate strong')).toHaveText(['Mock Client', 'Untagged Recall']);
-  // Nothing unobserved is filled in: no NIP record renders the "—" marker, and the
-  // observed row keeps the "YYYY-MM-DD" card contract instead of going blank.
-  await expect(dialog.locator('.comparison-group').filter({hasText: 'Features'}).locator('.no-support-record').first()).toBeVisible();
+  /* Nothing unobserved is filled in. The marker for "no claim" is no longer a bare
+     em dash: commit dff9cba replaced it with the Unknown badge, because a blank or
+     a dash reads as a stated "no". A relay row claims nothing about any feature, so
+     every feature cell of both candidates must carry that badge -- checked as an
+     exact count over the whole group, not just the first cell. */
+  const featureGroup = dialog.locator('.comparison-group').filter({hasText: 'Features'});
+  const featureCells = featureGroup.locator('.comparison-value');
+  const cellCount = await featureCells.count();
+  expect(cellCount).toBeGreaterThan(0);
+  await expect(featureCells.filter({has: page.locator('.support-badge.unknown')})).toHaveCount(cellCount);
+  await expect(featureGroup.locator('.comparison-value [data-evidence-nip]')).toHaveCount(0);
   const observedValues = await dialog.locator('.comparison-item').filter({hasText: 'Last observed'}).locator('.comparison-value').allTextContents();
   expect(observedValues).toHaveLength(2);
   for (const value of observedValues) expect(value).toMatch(/^\d{4}-\d{2}-\d{2}$/);

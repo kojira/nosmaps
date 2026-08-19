@@ -10629,7 +10629,8 @@ function rowCapabilities(row) {
   return row.provenance === "relay" ? [] : row.capabilities;
 }
 function rowTopics(row) {
-  return row.provenance === "relay" ? [] : row.topics;
+  if (row.provenance !== "relay") return row.topics;
+  return row.categoryObserved ? [row.category] : [];
 }
 function rowLiveness(row) {
   return row.provenance === "relay" ? [] : row.liveness;

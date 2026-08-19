@@ -55,8 +55,17 @@ function rowCapabilities(row: Row): readonly CapabilityClaim[] {
   return row.provenance === 'relay' ? [] : row.capabilities;
 }
 
+/* A relay row's topics are the `t` tags of the 30078 record. Most of them are
+   bookkeeping — every record carries the discovery topic — so the one that is
+   shown is the one `relayEntryToRow` already resolved against the seed
+   vocabulary, and only when it actually resolved. `category` alone is a display
+   fallback ('clients') and states nothing, which is why `categoryObserved` is
+   the gate: an unresolved record reads Unknown rather than being filed under a
+   category nobody published. Returning [] unconditionally here made both fields
+   dead code and printed "Category: Unknown" on a record that named one. */
 function rowTopics(row: Row): readonly string[] {
-  return row.provenance === 'relay' ? [] : row.topics;
+  if (row.provenance !== 'relay') return row.topics;
+  return row.categoryObserved ? [row.category] : [];
 }
 
 function rowLiveness(row: Row): readonly LivenessObservation[] {
