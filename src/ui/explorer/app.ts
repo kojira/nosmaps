@@ -24,6 +24,7 @@ import {
   metadataValues, ossState, isOss, normaliseNipQuery,
   type DisplayResult, type FeatureDefinition, type UiState
 } from '../../domain/explorer.ts';
+import {isValidCoordinate} from '../../domain/event.ts';
 import {decodeNpub, encodeNpub} from '../../domain/npub.ts';
 import {POLICY, SOFTWARE_D_PREFIX} from '../../domain/policy.ts';
 import {validateSoftwareEvent} from '../../domain/records.ts';
@@ -33,6 +34,10 @@ import {
   buildSoftwareDraft, publishSoftwareRecord,
   type Nip07Signer, type PublishResult, type RelayReport
 } from '../../data/publish.ts';
+import {
+  observeReactions, publishReaction, retractReaction,
+  type ReactionObservation, type ReactionResult
+} from '../../data/reactions.ts';
 import {i18n, type I18nNode, type I18nVariables, type Language} from '../i18n.ts';
 import {icons} from '../icons.ts';
 import {$, esc, focusableElements} from './dom.ts';
@@ -118,6 +123,17 @@ interface Bookmark {
   public: boolean;
 }
 
+/** What is known about the reactions on one row.
+
+    `count: null` is "nobody has looked", which is a different fact from a look
+    that found none (invariant I8) — the first prints Unknown, the second prints 0.
+    `mine` is the id of the viewer's own live reaction, and it is what a retraction
+    (kind 5) has to name, so it is carried rather than recomputed. */
+interface ReactionView {
+  readonly count: number | null;
+  readonly mine: string | null;
+}
+
 interface ExplorerState {
   features: string[];
   query: string;
@@ -130,7 +146,7 @@ interface ExplorerState {
   savedOnly: boolean;
   nipQuery: string;
   compare: string[];
-  likes: Record<string, boolean | undefined>;
+  reactions: Record<string, ReactionView | undefined>;
   bookmarks: Record<string, Bookmark | null | undefined>;
   reviews: Record<string, Review[] | undefined>;
   reviewVotes: Record<string, ReviewVote | null | undefined>;
@@ -212,7 +228,7 @@ export function mountExplorer(data: Data): ExplorerHandles {
   const state: ExplorerState = {
     features: [], query: '', platform: 'all', category: 'all', toolStatus: 'all', support: DEFAULT_SUPPORT, oss: 'all',
     tool: initialTool,
-    savedOnly: false, nipQuery: '', compare: [], likes: {}, bookmarks: {}, reviews: {}, reviewVotes: {}, reviewDrafts: {},
+    savedOnly: false, nipQuery: '', compare: [], reactions: {}, bookmarks: {}, reviews: {}, reviewVotes: {}, reviewDrafts: {},
     uiState: isUiState(requestedState) ? requestedState : 'normal'
   };
 
@@ -759,8 +775,29 @@ export function mountExplorer(data: Data): ExplorerHandles {
     return `<div class="card-review-thumbnails" aria-label="${esc(t('explorer.openGallery'))}">${shown.map(review => { const label = t('explorer.imageAlt', {author: review.author, date: review.date}); return `<button type="button" class="card-review-thumbnail" data-open-image="${tool.id}" data-image-review="${review.id}" aria-label="${esc(label)}" title="${esc(label)}">${screenshotMarkup(review.image, true, '')}</button>`; }).join('')}${remaining ? `<button type="button" class="card-review-more" data-gallery-tool="${tool.id}" aria-label="${esc(t('explorer.remainingGallery', {count: remaining}))}" title="${esc(t('explorer.openGallery'))}">+${remaining}</button>` : ''}</div>`;
   }
 
-  // いいね数はサンプル用の連番由来の値。一次情報から収集した実エントリでは観測がないので null を返し、数を作らない。
-  function likeCount(tool: Row): number | null { if (provenanceOf(tool) !== 'sample') return null; const serial = Number(String(tool.id).replace('tool-', '')); return 12 + (Number.isFinite(serial) ? serial * 3 : 0) + (state.likes[tool.id] ? 1 : 0); }
+  /* issue #20: いいね数は「観測できた kind 7 の件数」そのもの。id の形や連番から作らないし、
+     ボタンを押したこと自体でも動かない。動くのはリレーがその kind 7 を返してきたときだけ。
+     null = まだ見ていない（unknown）。0 = 見て0件だった。この二つを混ぜないのが不変式 I8。 */
+  function likeCount(tool: Row): number | null { return state.reactions[tool.id]?.count ?? null; }
+  function myReactionId(tool: Row): string | null { return state.reactions[tool.id]?.mine ?? null; }
+  /* 反応の宛先は座標 (30078:<pubkey>:<d>)。NIP-25 は置換可能イベントを `a` タグで指すし、
+     いいねは「たまたま画面に出ていた版」ではなくエントリに属する。座標を名乗らない行は押せない。 */
+  function reactionTarget(tool: Row): string | null { return isValidCoordinate(tool.coordinate) ? tool.coordinate : null; }
+  /* 未サインインで「押せるのに何も起きない」を作らない。理由は Publish パネルと同じ語彙で名乗る。 */
+  function likeBlocker(tool: Row): string | null {
+    if (!reactionTarget(tool)) return t('explorer.likeNoTarget');
+    if (!signerCanSign()) return t('explorer.likeNeedsSigner');
+    if (viewer.status !== 'signedIn') return t('explorer.likeNeedsSignIn');
+    return null;
+  }
+  function likeButtonMarkup(tool: Row): string {
+    const blocked = likeBlocker(tool);
+    const busy = reactionBusy.has(tool.id);
+    const mine = myReactionId(tool) !== null;
+    const label = busy ? t('explorer.likeSending') : blocked ?? t(mine ? 'explorer.likeRetract' : 'explorer.likeAdd');
+    const disabled = blocked !== null || busy;
+    return `<button type="button" class="like-button" data-like-tool="${esc(tool.id)}" aria-pressed="${mine}" aria-label="${esc(label)}" title="${esc(label)}"${disabled ? ` disabled data-like-blocked="${esc(busy ? 'busy' : 'blocked')}"` : ''}>\u2665 ${likeCountMarkup(tool)}</button>`;
+  }
   // 観測値がないときは比較ダイアログと同じ「—（不明）」マーカーで出す。数字を捏造しない。
   function likeCountMarkup(tool: Row): string { const count = likeCount(tool); return count === null ? `<span class="no-support-record" aria-label="${esc(t('unknown'))}" title="${esc(t('unknown'))}">—</span>` : String(count); }
   // 由来は3つある: リレーで検証したレコード、一次情報から収集したエントリ、サンプル。取り違えると出所を偽ることになるので分けて出す。
@@ -1254,6 +1291,98 @@ export function mountExplorer(data: Data): ExplorerHandles {
     else if (result.state === 'published-partial') await loadRelayCatalog();
   }
 
+  /* issue #20: いいね = 対象エントリの座標への kind 7、取り消し = その kind 7 への kind 5。
+     どちらも Publish と同じ経路（NIP-07 で署名 → data/publish.ts の sendEvent でリレーへ）を通る。
+     押している間は二重発行しないように行ごとに閉じる。表示は下の applyObservation でしか動かない
+     ので、「押したから増えた」という数はどこにも作られない。 */
+  const reactionBusy = new Set<string>();
+
+  /** 観測できたものだけを表に反映する。観測できなかった座標は触らない — 「見ていない」を
+      「0 件だった」に書き換えないため。 */
+  function applyObservation(observation: ReactionObservation | null): void {
+    if (!observation || observation.state !== 'observed') return;
+    const byCoordinate = new Map<string, Row>();
+    for (const row of [...tools, ...relayEntries()]) {
+      const coordinate = reactionTarget(row);
+      if (coordinate) byCoordinate.set(coordinate, row);
+    }
+    for (const coordinate of observation.coordinates) {
+      const row = byCoordinate.get(coordinate);
+      if (!row) continue;
+      const count = observation.counts[coordinate];
+      if (count === undefined) continue;
+      state.reactions[row.id] = {count, mine: observation.mine[coordinate] ?? null};
+    }
+  }
+
+  /* 数を見に行くのは「その行の詳細を開いたとき」だけ。一覧のロードに相乗りさせると §9.2 の
+     ラウンド予算（1ロードあたり論理3ラウンド）を勝手に増やすことになる。座標ごとに一度だけ。
+     リレーを見ていない静的ページでは一切ソケットを開かない ＝ 数は unknown のままで、
+     「見ていない」を 0 と書かない。 */
+  const reactionsRequested = new Set<string>();
+  async function ensureReactionsObserved(tool: Row): Promise<void> {
+    if (!relayState || !relayState.active) return;
+    const coordinate = reactionTarget(tool);
+    if (!coordinate || reactionsRequested.has(coordinate)) return;
+    reactionsRequested.add(coordinate);
+    const observation = await observeReactions([coordinate], {
+      relays: explorerParams.relays.length ? [...explorerParams.relays] : [...POLICY.DEFAULT_RELAYS],
+      viewerPubkey: signedInPubkey()
+    });
+    /* 観測できなかったら記録を残さない。次に開いたときにもう一度見に行けるよう、要求済みの印も外す。 */
+    if (observation.state !== 'observed') { reactionsRequested.delete(coordinate); return; }
+    applyObservation(observation);
+    renderResults(); rerenderOpenDialogs();
+  }
+
+  function reactionToast(result: ReactionResult): void {
+    if (result.state === 'published') { toast(t('explorer.toastLiked')); return; }
+    if (result.state === 'unconfirmed') { toast(t('explorer.toastLikeUnconfirmed')); return; }
+    toast(t('explorer.toastLikeFailed'));
+  }
+
+  async function toggleLike(id: string): Promise<void> {
+    const tool = findTool(id);
+    if (!tool) return;
+    const coordinate = reactionTarget(tool);
+    // 押せない理由があるならボタンは disabled で出ている。ここは念のための二重の鍵。
+    if (!coordinate || likeBlocker(tool) !== null || reactionBusy.has(id)) return;
+    const signer = signingSigner();
+    if (!signer) return;
+    reactionBusy.add(id);
+    renderResults(); rerenderOpenDialogs();
+    /* 一覧に出ている座標をまとめて同じラウンドで数え直す。行ごとに REQ を増やさないための束ね方
+       であって、押した行以外の数を勝手に作るわけではない（返ってきた分だけ反映する）。 */
+    const listed = [...new Set([...tools, ...relayEntries()]
+      .map(row => reactionTarget(row))
+      .filter((value): value is string => value !== null))];
+    const options = {
+      relays: explorerParams.relays.length ? [...explorerParams.relays] : [...POLICY.DEFAULT_RELAYS],
+      signer,
+      expectPubkey: viewer.pubkey ?? '',
+      publishTimeoutMs,
+      observeCoordinates: listed
+    };
+    const mine = myReactionId(tool);
+    let result: ReactionResult;
+    try {
+      result = mine === null
+        ? await publishReaction(coordinate, options)
+        : await retractReaction(coordinate, mine, options);
+    } catch (error) {
+      // 例外を成功に読ませない。分からないなら分からないと出す。
+      console.error('[nosmaps] reaction failed', error);
+      reactionBusy.delete(id);
+      renderResults(); rerenderOpenDialogs();
+      toast(t('explorer.toastLikeFailed'));
+      return;
+    }
+    reactionBusy.delete(id);
+    applyObservation(result.observation);
+    renderResults(); rerenderOpenDialogs();
+    reactionToast(result);
+  }
+
   function renderAll(): void { renderIdentity(); renderFeatures(); renderFilterPanel(); els.query.value = state.query; renderResults(); renderPublish(); rerenderOpenDialogs(); }
   function dialogFocusables(dialog: ParentNode): HTMLElement[] { return focusableElements(dialog).filter(element => element.getClientRects().length); }
   function focusKey(element: Element | null): string | null {
@@ -1330,8 +1459,10 @@ export function mountExplorer(data: Data): ExplorerHandles {
     // 選択中の機能に対する対応まとめ。カードから移したが、条件は一覧の状態のままを映す。
     const supports = state.features.map(id => localizedFeature(id)).map(feature => ({feature, support: featureSupport(tool, feature)}));
     els.evidenceDialog.setAttribute('aria-label', tool.name);
-    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.details'), tool.name)}<p class="detail-provenance">${provenanceBadge(tool)}<span class="record-state ${esc(tool.recordState)}">${esc(t(`recordStates.${tool.recordState}`))}</span></p><p class="tool-summary${tool.provenance !== 'relay' && tool.summaryAbsent ? ' is-unknown' : ''}">${esc(description)}</p><section class="dialog-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><div class="support-line">${supports.length ? supports.map(item => `<span class="feature-support-summary">${esc(item.feature.name)} ${supportBadge(item.support)}</span>`).join('') : `<span class="tag">${esc(t('explorer.noFeatureCondition'))}</span>`}${topicTags(tool)}${platformTags(tool)}</div><dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.recordState'))}</dt><dd>${esc(t(`recordStates.${tool.recordState}`))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool))}</dd></div><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(topicsText(tool))}</dd></div><div><dt>${esc(t('explorer.os'))}</dt><dd>${esc(osText(tool))}</dd></div><div><dt>${esc(t('explorer.license'))}</dt><dd>${esc(displayLicense(tool))}</dd></div></dl>${livenessMarkup(tool)}${tool.provenance !== 'relay' && tool.topicCorrection ? `<p class="topic-correction">${esc(t('explorer.topicCorrection', {collected: tool.collectedTopics.join(', ') || t('none')}))} ${esc(tool.topicCorrection)}</p>` : ''}<nav class="resource-links" aria-label="${esc(t('explorer.officialLinks', {name: tool.name}))}">${resourceLinks(tool)}</nav><h4>${esc(t('explorer.primarySources'))}</h4>${sourceListMarkup(tool)}</section>${claimBlockMarkup(tool)}<section class="dialog-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${esc(tool.id)}" aria-pressed="${Boolean(state.likes[tool.id])}">♥ ${likeCountMarkup(tool)}</button><button type="button" data-bookmark-tool="${esc(tool.id)}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${esc(tool.id)}">${esc(t('explorer.reviews', {count: reviews.length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${esc(tool.id)}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}${reviews.length ? '' : `<p class="no-support-record">${esc(t('explorer.noReviewsObserved'))}</p>`}</section>`;
+    els.evidenceContent.innerHTML = `${dialogHead(t('explorer.details'), tool.name)}<p class="detail-provenance">${provenanceBadge(tool)}<span class="record-state ${esc(tool.recordState)}">${esc(t(`recordStates.${tool.recordState}`))}</span></p><p class="tool-summary${tool.provenance !== 'relay' && tool.summaryAbsent ? ' is-unknown' : ''}">${esc(description)}</p><section class="dialog-layer fact-layer"><h3>${esc(t('explorer.facts'))}</h3><div class="support-line">${supports.length ? supports.map(item => `<span class="feature-support-summary">${esc(item.feature.name)} ${supportBadge(item.support)}</span>`).join('') : `<span class="tag">${esc(t('explorer.noFeatureCondition'))}</span>`}${topicTags(tool)}${platformTags(tool)}</div><dl class="nip-evidence-grid"><div><dt>${esc(t('explorer.recordState'))}</dt><dd>${esc(t(`recordStates.${tool.recordState}`))}</dd></div><div><dt>${esc(t('explorer.observed'))}</dt><dd>${esc(observedText(tool))}</dd></div><div><dt>${esc(t('explorer.category'))}</dt><dd>${esc(topicsText(tool))}</dd></div><div><dt>${esc(t('explorer.os'))}</dt><dd>${esc(osText(tool))}</dd></div><div><dt>${esc(t('explorer.license'))}</dt><dd>${esc(displayLicense(tool))}</dd></div></dl>${livenessMarkup(tool)}${tool.provenance !== 'relay' && tool.topicCorrection ? `<p class="topic-correction">${esc(t('explorer.topicCorrection', {collected: tool.collectedTopics.join(', ') || t('none')}))} ${esc(tool.topicCorrection)}</p>` : ''}<nav class="resource-links" aria-label="${esc(t('explorer.officialLinks', {name: tool.name}))}">${resourceLinks(tool)}</nav><h4>${esc(t('explorer.primarySources'))}</h4>${sourceListMarkup(tool)}</section>${claimBlockMarkup(tool)}<section class="dialog-layer evaluation-layer"><h3>${esc(t('explorer.evaluations'))}</h3>${cardReviewThumbnails(tool)}<div class="evaluation-actions">${likeButtonMarkup(tool)}<button type="button" data-bookmark-tool="${esc(tool.id)}" aria-pressed="${Boolean(bookmark)}">${esc(t(bookmark ? 'explorer.bookmarked' : 'explorer.bookmark'))}</button><button type="button" data-review-tool="${esc(tool.id)}">${esc(t('explorer.reviews', {count: reviews.length}))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${esc(tool.id)}" ${bookmark.public ? 'checked' : ''}> ${esc(t('explorer.publicToggle'))}</label><span class="privacy-state">${esc(t(bookmark.public ? 'explorer.public' : 'explorer.privateDefault'))}</span>` : `<span class="privacy-state">${esc(t('explorer.privateDefault'))}</span>`}${reviews.length ? '' : `<p class="no-support-record">${esc(t('explorer.noReviewsObserved'))}</p>`}</section>`;
     if (shouldOpen) openDialog(els.evidenceDialog, context);
+    // 詳細を開いた行の いいね数 は、開いたその場で観測しに行く（issue #20）。
+    void ensureReactionsObserved(tool);
   }
 
   function resourceUrl(tool: Row, type: string): string {
@@ -1636,7 +1767,7 @@ export function mountExplorer(data: Data): ExplorerHandles {
     const evidence = target.closest<HTMLElement>('[data-evidence-tool]'); if (evidence) { renderEvidence({type: 'evidence', toolId: attr(evidence, 'evidenceTool'), nip: attr(evidence, 'evidenceNip'), featureId: attr(evidence, 'evidenceFeature')}); return; }
     const resource = target.closest<HTMLElement>('[data-resource-tool]'); if (resource) { renderResource({type: 'resource', toolId: attr(resource, 'resourceTool'), resourceType: attr(resource, 'resourceType')}); return; }
     // いいねとブックマークは詳細ダイアログの中にあるので、一覧と一緒に開いているダイアログも描き直す。
-    const like = target.closest<HTMLElement>('[data-like-tool]'); if (like) { state.likes[attr(like, 'likeTool')] = !state.likes[attr(like, 'likeTool')]; renderResults(); rerenderOpenDialogs(); toast(t('explorer.toastLiked')); return; }
+    const like = target.closest<HTMLElement>('[data-like-tool]'); if (like) { void toggleLike(attr(like, 'likeTool')); return; }
     const bookmark = target.closest<HTMLElement>('[data-bookmark-tool]'); if (bookmark) { const id = attr(bookmark, 'bookmarkTool'); state.bookmarks[id] = state.bookmarks[id] ? null : {public: false}; renderResults(); rerenderOpenDialogs(); toast(t('explorer.toastBookmarked')); return; }
     const reviewer = target.closest<HTMLElement>('[data-reviewer]'); if (reviewer) { renderProfile({type: 'profile', profileId: attr(reviewer, 'reviewer')}); return; }
     const vote = target.closest<HTMLElement>('[data-review-vote]'); if (vote) { const cast = attr(vote, 'reviewVote'); if (cast !== 'helpful' && cast !== 'unhelpful') return; const current = state.reviewVotes[attr(vote, 'reviewId')]; state.reviewVotes[attr(vote, 'reviewId')] = current === cast ? null : cast; renderReview({type: 'review', toolId: attr(vote, 'reviewToolId'), reviewId: attr(vote, 'reviewId')}, false); toast(t('explorer.toastVoted')); return; }

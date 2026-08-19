@@ -9789,6 +9789,14 @@ var dictionaries = {
       helpfulVotes: "\u5F79\u306B\u7ACB\u3063\u305F",
       unhelpfulVotes: "\u7ACB\u305F\u306A\u304B\u3063\u305F",
       toastLiked: "\u3044\u3044\u306D\u3092\u66F4\u65B0\u3057\u307E\u3057\u305F",
+      toastLikeUnconfirmed: "\u30EA\u30EC\u30FC\u306F\u53D7\u3051\u53D6\u308A\u307E\u3057\u305F\u304C\u3001\u307E\u3060\u8AAD\u307F\u623B\u305B\u3066\u3044\u307E\u305B\u3093",
+      toastLikeFailed: "\u3044\u3044\u306D\u3092\u9001\u308C\u307E\u305B\u3093\u3067\u3057\u305F",
+      likeAdd: "\u3044\u3044\u306D\u3059\u308B\uFF08kind 7 \u3092\u30EA\u30EC\u30FC\u3078\u767A\u884C\uFF09",
+      likeRetract: "\u3044\u3044\u306D\u3092\u53D6\u308A\u6D88\u3059\uFF08kind 5 \u3092\u30EA\u30EC\u30FC\u3078\u767A\u884C\uFF09",
+      likeSending: "\u9001\u4FE1\u4E2D\u2026",
+      likeNeedsSigner: "\u3044\u3044\u306D\u306B\u306FNIP-07\u62E1\u5F35\u304C\u5FC5\u8981\u3067\u3059",
+      likeNeedsSignIn: "\u3044\u3044\u306D\u3059\u308B\u306B\u306FNIP-07\u3067\u30B5\u30A4\u30F3\u30A4\u30F3\u3057\u3066\u304F\u3060\u3055\u3044",
+      likeNoTarget: "\u3053\u306E\u884C\u306B\u306F\u53CD\u5FDC\u3067\u304D\u308B\u5EA7\u6A19\u304C\u3042\u308A\u307E\u305B\u3093",
       toastBookmarked: "\u30D6\u30C3\u30AF\u30DE\u30FC\u30AF\u3092\u66F4\u65B0\u3057\u307E\u3057\u305F",
       toastVoted: "\u8A55\u4FA1\u3092\u66F4\u65B0\u3057\u307E\u3057\u305F",
       toastPublic: "\u516C\u958B\u7BC4\u56F2\u3092\u66F4\u65B0\u3057\u307E\u3057\u305F",
@@ -10181,6 +10189,14 @@ var dictionaries = {
       helpfulVotes: "Helpful",
       unhelpfulVotes: "Not helpful",
       toastLiked: "Like updated",
+      toastLikeUnconfirmed: "A relay accepted it, but it has not been read back yet",
+      toastLikeFailed: "The like could not be sent",
+      likeAdd: "Like (publishes a kind 7 to the relays)",
+      likeRetract: "Remove like (publishes a kind 5 to the relays)",
+      likeSending: "Sending\u2026",
+      likeNeedsSigner: "Liking needs a NIP-07 extension",
+      likeNeedsSignIn: "Sign in with NIP-07 to like",
+      likeNoTarget: "This row states no coordinate to react to",
       toastBookmarked: "Bookmark updated",
       toastVoted: "Vote updated",
       toastPublic: "Visibility updated",
@@ -10500,6 +10516,270 @@ function normaliseNipQuery(value) {
   return value.trim().toLowerCase().replace(/^(nip|bud|lud)[- ]?/, "");
 }
 
+// src/data/reactions.ts
+var REACTION_KIND = 7;
+var LIKE_CONTENT = "+";
+var DISLIKE_CONTENT = "-";
+function emptyObservation(coordinates, reason) {
+  return {
+    state: "unobserved",
+    reason,
+    coordinates: coordinates.slice(),
+    counts: {},
+    mine: {},
+    asOf: Date.now()
+  };
+}
+function coordinateAuthor(coordinate) {
+  const match = ADDRESS_RE.exec(String(coordinate ?? ""));
+  const author = match?.[2] ?? "";
+  return isLowercaseHex64(author) ? author : null;
+}
+function coordinateKind(coordinate) {
+  const match = ADDRESS_RE.exec(String(coordinate ?? ""));
+  return match?.[1] ?? null;
+}
+function buildReactionDraft(input) {
+  const author = coordinateAuthor(input.coordinate);
+  const kind = coordinateKind(input.coordinate);
+  if (!author || !kind) return null;
+  const tags = [["a", input.coordinate], ["p", author], ["k", kind]];
+  return {
+    kind: REACTION_KIND,
+    pubkey: input.pubkey,
+    created_at: input.createdAt,
+    tags,
+    content: LIKE_CONTENT
+  };
+}
+function buildReactionDeletionDraft(input) {
+  if (!isLowercaseHex64(input.reactionId)) return null;
+  return {
+    kind: POLICY.DELETION_KIND,
+    pubkey: input.pubkey,
+    created_at: input.createdAt,
+    tags: [["e", input.reactionId], ["k", String(REACTION_KIND)]],
+    content: ""
+  };
+}
+function tagValues(event, name) {
+  const out = [];
+  for (const tag of event.tags) {
+    if (Array.isArray(tag) && tag[0] === name && typeof tag[1] === "string") out.push(tag[1]);
+  }
+  return out;
+}
+function anyRelayCompleted(coverage) {
+  return Object.keys(coverage).some((url) => coverage[url]?.status === "eose");
+}
+async function observeWithContext(ctx, coordinates, viewerPubkey) {
+  const wanted = [...new Set(coordinates.map((value) => String(value ?? "").trim()).filter(Boolean))];
+  if (!wanted.length) return emptyObservation(wanted, "no-coordinates");
+  const reactionRound = await fetchRound(
+    ctx,
+    [{ kinds: [REACTION_KIND], "#a": wanted }],
+    "reaction-count"
+  );
+  if (!anyRelayCompleted(reactionRound.coverage)) {
+    return emptyObservation(wanted, reactionRound.reason ?? "no-relay-completed");
+  }
+  const reactions = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const packet of reactionRound.events) {
+    const event = packet.event;
+    if (!event || event.kind !== REACTION_KIND) continue;
+    if (!isLowercaseHex64(event.id)) continue;
+    if (seen.has(event.id)) continue;
+    seen.add(event.id);
+    reactions.push(event);
+  }
+  const retracted = /* @__PURE__ */ new Set();
+  if (reactions.length) {
+    const ids = reactions.map((event) => event.id).filter(isLowercaseHex64);
+    const filters = [{ kinds: [POLICY.DELETION_KIND], "#e": ids }];
+    const deletionRound = await fetchRound(ctx, filters, "reaction-retraction");
+    for (const packet of deletionRound.events) {
+      const event = packet.event;
+      if (!event || event.kind !== POLICY.DELETION_KIND) continue;
+      for (const target of tagValues(event, "e")) {
+        const reaction = reactions.find((item) => item.id === target);
+        if (reaction && reaction.pubkey === event.pubkey) retracted.add(target);
+      }
+    }
+  }
+  const counts = {};
+  const mine = {};
+  for (const coordinate of wanted) counts[coordinate] = 0;
+  for (const event of reactions) {
+    if (typeof event.id !== "string" || retracted.has(event.id)) continue;
+    if (event.content === DISLIKE_CONTENT) continue;
+    for (const coordinate of tagValues(event, "a")) {
+      if (!(coordinate in counts)) continue;
+      counts[coordinate] = (counts[coordinate] ?? 0) + 1;
+      if (viewerPubkey && event.pubkey === viewerPubkey) mine[coordinate] = event.id;
+    }
+  }
+  return {
+    state: "observed",
+    reason: "eose",
+    coordinates: wanted,
+    counts,
+    mine,
+    asOf: Date.now()
+  };
+}
+async function observeReactions(coordinates, opts) {
+  const relays = (Array.isArray(opts?.relays) && opts.relays.length ? opts.relays : POLICY.DEFAULT_RELAYS).slice();
+  const timeoutMs = Number.isFinite(opts?.timeoutMs) ? opts?.timeoutMs : POLICY.REQ_TIMEOUT_MS;
+  const viewerPubkey = typeof opts?.viewerPubkey === "string" ? opts.viewerPubkey : "";
+  let ctx = null;
+  try {
+    ctx = await createRelayContext(relays, timeoutMs);
+    if (!ctx.ok) return emptyObservation(coordinates, "relay-unavailable");
+    return await observeWithContext(ctx, coordinates, viewerPubkey);
+  } catch {
+    return emptyObservation(coordinates, "observe-error");
+  } finally {
+    const rx = ctx?.rxNostr;
+    if (rx && typeof rx.dispose === "function") {
+      try {
+        rx.dispose();
+      } catch {
+      }
+    }
+  }
+}
+async function signSendObserve(draft, invalidReason, opts, confirm) {
+  const relays = (Array.isArray(opts?.relays) && opts.relays.length ? opts.relays : POLICY.DEFAULT_RELAYS).slice();
+  const timeoutMs = Number.isFinite(opts?.timeoutMs) ? opts?.timeoutMs : POLICY.REQ_TIMEOUT_MS;
+  const publishTimeoutMs = Number.isFinite(opts?.publishTimeoutMs) ? opts?.publishTimeoutMs : POLICY.REQ_TIMEOUT_MS;
+  const observeCoordinates = Array.isArray(opts?.observeCoordinates) ? opts.observeCoordinates : [];
+  const failWith = (state, reason) => ({
+    state,
+    reason,
+    eventId: null,
+    relays: relays.map((url) => ({ url, outcome: "not-attempted", notice: "" })),
+    accepted: 0,
+    observation: null
+  });
+  if (!draft) return failWith("invalid", invalidReason);
+  const signer = opts?.signer ?? (typeof window !== "undefined" ? window.nostr : null);
+  if (!signer || typeof signer.signEvent !== "function" || typeof signer.getPublicKey !== "function") {
+    return failWith("blocked", "signer-absent");
+  }
+  let pubkey = null;
+  try {
+    pubkey = decodeNpub(await signer.getPublicKey());
+  } catch {
+    return failWith("blocked", "signer-rejected");
+  }
+  if (!pubkey) return failWith("blocked", "nip07-key-unparsable");
+  if (opts?.expectPubkey && opts.expectPubkey !== pubkey) {
+    return failWith("blocked", "pubkey-mismatch");
+  }
+  const toSign = { ...draft, pubkey };
+  let signed = null;
+  try {
+    signed = await signer.signEvent(toSign);
+  } catch {
+    return failWith("blocked", "signer-rejected");
+  }
+  const problem = checkSignedEvent(toSign, signed, pubkey);
+  if (problem) return failWith("blocked", problem);
+  const signedEvent = signed;
+  const eventId = typeof signedEvent.id === "string" ? signedEvent.id : null;
+  let ctx = null;
+  try {
+    ctx = await createRelayContext(relays, timeoutMs);
+    if (!ctx.ok) {
+      return {
+        state: "failed",
+        reason: "relay-unavailable",
+        eventId,
+        relays: relays.map((url) => ({ url, outcome: "connection-failed", notice: "" })),
+        accepted: 0,
+        observation: null
+      };
+    }
+    const outcomes = await sendEvent(ctx, signedEvent, relays, publishTimeoutMs);
+    const perRelay = relays.map((url) => ({
+      url,
+      outcome: outcomes[url]?.outcome ?? "connection-failed",
+      notice: outcomes[url]?.notice ?? ""
+    }));
+    const accepted = perRelay.filter((entry) => entry.outcome === "accepted").length;
+    const undetermined = perRelay.filter(
+      (entry) => entry.outcome === "timeout" || entry.outcome === "connection-failed"
+    ).length;
+    if (accepted === 0 && undetermined === 0) {
+      return {
+        state: "failed",
+        reason: "all-relays-rejected",
+        eventId,
+        relays: perRelay,
+        accepted: 0,
+        observation: null
+      };
+    }
+    const coordinates = [...new Set(observeCoordinates)];
+    const observation = await observeWithContext(ctx, coordinates, pubkey);
+    const confirmed = eventId !== null && observation.state === "observed" && confirm(observation, eventId);
+    return {
+      state: confirmed ? "published" : "unconfirmed",
+      reason: confirmed ? "observed" : observation.reason,
+      eventId,
+      relays: perRelay,
+      accepted,
+      observation
+    };
+  } catch {
+    return {
+      state: "failed",
+      reason: "reaction-error",
+      eventId,
+      relays: relays.map((url) => ({ url, outcome: "connection-failed", notice: "" })),
+      accepted: 0,
+      observation: null
+    };
+  } finally {
+    const rx = ctx?.rxNostr;
+    if (rx && typeof rx.dispose === "function") {
+      try {
+        rx.dispose();
+      } catch {
+      }
+    }
+  }
+}
+function publishReaction(coordinate, opts) {
+  const nowSec = Number.isSafeInteger(opts?.nowSec) ? opts?.nowSec : Math.floor(Date.now() / 1e3);
+  const draft = buildReactionDraft({ coordinate, pubkey: "", createdAt: nowSec });
+  const options = {
+    ...opts,
+    observeCoordinates: [coordinate, ...opts?.observeCoordinates ?? []]
+  };
+  return signSendObserve(
+    draft,
+    "not-a-coordinate",
+    options,
+    (observation, eventId) => observation.mine[coordinate] === eventId
+  );
+}
+function retractReaction(coordinate, reactionId, opts) {
+  const nowSec = Number.isSafeInteger(opts?.nowSec) ? opts?.nowSec : Math.floor(Date.now() / 1e3);
+  const draft = buildReactionDeletionDraft({ reactionId, pubkey: "", createdAt: nowSec });
+  const options = {
+    ...opts,
+    observeCoordinates: [coordinate, ...opts?.observeCoordinates ?? []]
+  };
+  return signSendObserve(
+    draft,
+    "not-an-event-id",
+    options,
+    (observation) => observation.mine[coordinate] === void 0
+  );
+}
+
 // src/ui/explorer/dom.ts
 function esc3(value) {
   const map2 = { "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" };
@@ -10667,7 +10947,7 @@ function mountExplorer(data) {
     savedOnly: false,
     nipQuery: "",
     compare: [],
-    likes: {},
+    reactions: {},
     bookmarks: {},
     reviews: {},
     reviewVotes: {},
@@ -11122,9 +11402,27 @@ function mountExplorer(data) {
     }).join("")}${remaining ? `<button type="button" class="card-review-more" data-gallery-tool="${tool.id}" aria-label="${esc3(t("explorer.remainingGallery", { count: remaining }))}" title="${esc3(t("explorer.openGallery"))}">+${remaining}</button>` : ""}</div>`;
   }
   function likeCount(tool) {
-    if (provenanceOf(tool) !== "sample") return null;
-    const serial = Number(String(tool.id).replace("tool-", ""));
-    return 12 + (Number.isFinite(serial) ? serial * 3 : 0) + (state.likes[tool.id] ? 1 : 0);
+    return state.reactions[tool.id]?.count ?? null;
+  }
+  function myReactionId(tool) {
+    return state.reactions[tool.id]?.mine ?? null;
+  }
+  function reactionTarget(tool) {
+    return isValidCoordinate(tool.coordinate) ? tool.coordinate : null;
+  }
+  function likeBlocker(tool) {
+    if (!reactionTarget(tool)) return t("explorer.likeNoTarget");
+    if (!signerCanSign()) return t("explorer.likeNeedsSigner");
+    if (viewer.status !== "signedIn") return t("explorer.likeNeedsSignIn");
+    return null;
+  }
+  function likeButtonMarkup(tool) {
+    const blocked = likeBlocker(tool);
+    const busy = reactionBusy.has(tool.id);
+    const mine = myReactionId(tool) !== null;
+    const label = busy ? t("explorer.likeSending") : blocked ?? t(mine ? "explorer.likeRetract" : "explorer.likeAdd");
+    const disabled = blocked !== null || busy;
+    return `<button type="button" class="like-button" data-like-tool="${esc3(tool.id)}" aria-pressed="${mine}" aria-label="${esc3(label)}" title="${esc3(label)}"${disabled ? ` disabled data-like-blocked="${esc3(busy ? "busy" : "blocked")}"` : ""}>\u2665 ${likeCountMarkup(tool)}</button>`;
   }
   function likeCountMarkup(tool) {
     const count = likeCount(tool);
@@ -11528,6 +11826,87 @@ function mountExplorer(data) {
     if (result.state === "published") await loadRelayCatalog();
     else if (result.state === "published-partial") await loadRelayCatalog();
   }
+  const reactionBusy = /* @__PURE__ */ new Set();
+  function applyObservation(observation) {
+    if (!observation || observation.state !== "observed") return;
+    const byCoordinate = /* @__PURE__ */ new Map();
+    for (const row of [...tools, ...relayEntries()]) {
+      const coordinate = reactionTarget(row);
+      if (coordinate) byCoordinate.set(coordinate, row);
+    }
+    for (const coordinate of observation.coordinates) {
+      const row = byCoordinate.get(coordinate);
+      if (!row) continue;
+      const count = observation.counts[coordinate];
+      if (count === void 0) continue;
+      state.reactions[row.id] = { count, mine: observation.mine[coordinate] ?? null };
+    }
+  }
+  const reactionsRequested = /* @__PURE__ */ new Set();
+  async function ensureReactionsObserved(tool) {
+    if (!relayState || !relayState.active) return;
+    const coordinate = reactionTarget(tool);
+    if (!coordinate || reactionsRequested.has(coordinate)) return;
+    reactionsRequested.add(coordinate);
+    const observation = await observeReactions([coordinate], {
+      relays: explorerParams.relays.length ? [...explorerParams.relays] : [...POLICY.DEFAULT_RELAYS],
+      viewerPubkey: signedInPubkey()
+    });
+    if (observation.state !== "observed") {
+      reactionsRequested.delete(coordinate);
+      return;
+    }
+    applyObservation(observation);
+    renderResults();
+    rerenderOpenDialogs();
+  }
+  function reactionToast(result) {
+    if (result.state === "published") {
+      toast(t("explorer.toastLiked"));
+      return;
+    }
+    if (result.state === "unconfirmed") {
+      toast(t("explorer.toastLikeUnconfirmed"));
+      return;
+    }
+    toast(t("explorer.toastLikeFailed"));
+  }
+  async function toggleLike(id) {
+    const tool = findTool(id);
+    if (!tool) return;
+    const coordinate = reactionTarget(tool);
+    if (!coordinate || likeBlocker(tool) !== null || reactionBusy.has(id)) return;
+    const signer = signingSigner();
+    if (!signer) return;
+    reactionBusy.add(id);
+    renderResults();
+    rerenderOpenDialogs();
+    const listed = [...new Set([...tools, ...relayEntries()].map((row) => reactionTarget(row)).filter((value) => value !== null))];
+    const options = {
+      relays: explorerParams.relays.length ? [...explorerParams.relays] : [...POLICY.DEFAULT_RELAYS],
+      signer,
+      expectPubkey: viewer.pubkey ?? "",
+      publishTimeoutMs,
+      observeCoordinates: listed
+    };
+    const mine = myReactionId(tool);
+    let result;
+    try {
+      result = mine === null ? await publishReaction(coordinate, options) : await retractReaction(coordinate, mine, options);
+    } catch (error) {
+      console.error("[nosmaps] reaction failed", error);
+      reactionBusy.delete(id);
+      renderResults();
+      rerenderOpenDialogs();
+      toast(t("explorer.toastLikeFailed"));
+      return;
+    }
+    reactionBusy.delete(id);
+    applyObservation(result.observation);
+    renderResults();
+    rerenderOpenDialogs();
+    reactionToast(result);
+  }
   function renderAll() {
     renderIdentity();
     renderFeatures();
@@ -11594,8 +11973,9 @@ function mountExplorer(data) {
     const bookmark = state.bookmarks[tool.id];
     const supports = state.features.map((id) => localizedFeature(id)).map((feature) => ({ feature, support: featureSupport(tool, feature) }));
     els.evidenceDialog.setAttribute("aria-label", tool.name);
-    els.evidenceContent.innerHTML = `${dialogHead(t("explorer.details"), tool.name)}<p class="detail-provenance">${provenanceBadge(tool)}<span class="record-state ${esc3(tool.recordState)}">${esc3(t(`recordStates.${tool.recordState}`))}</span></p><p class="tool-summary${tool.provenance !== "relay" && tool.summaryAbsent ? " is-unknown" : ""}">${esc3(description)}</p><section class="dialog-layer fact-layer"><h3>${esc3(t("explorer.facts"))}</h3><div class="support-line">${supports.length ? supports.map((item) => `<span class="feature-support-summary">${esc3(item.feature.name)} ${supportBadge(item.support)}</span>`).join("") : `<span class="tag">${esc3(t("explorer.noFeatureCondition"))}</span>`}${topicTags(tool)}${platformTags(tool)}</div><dl class="nip-evidence-grid"><div><dt>${esc3(t("explorer.recordState"))}</dt><dd>${esc3(t(`recordStates.${tool.recordState}`))}</dd></div><div><dt>${esc3(t("explorer.observed"))}</dt><dd>${esc3(observedText(tool))}</dd></div><div><dt>${esc3(t("explorer.category"))}</dt><dd>${esc3(topicsText(tool))}</dd></div><div><dt>${esc3(t("explorer.os"))}</dt><dd>${esc3(osText(tool))}</dd></div><div><dt>${esc3(t("explorer.license"))}</dt><dd>${esc3(displayLicense(tool))}</dd></div></dl>${livenessMarkup(tool)}${tool.provenance !== "relay" && tool.topicCorrection ? `<p class="topic-correction">${esc3(t("explorer.topicCorrection", { collected: tool.collectedTopics.join(", ") || t("none") }))} ${esc3(tool.topicCorrection)}</p>` : ""}<nav class="resource-links" aria-label="${esc3(t("explorer.officialLinks", { name: tool.name }))}">${resourceLinks(tool)}</nav><h4>${esc3(t("explorer.primarySources"))}</h4>${sourceListMarkup(tool)}</section>${claimBlockMarkup(tool)}<section class="dialog-layer evaluation-layer"><h3>${esc3(t("explorer.evaluations"))}</h3>${cardReviewThumbnails(tool)}<div class="evaluation-actions"><button type="button" class="like-button" data-like-tool="${esc3(tool.id)}" aria-pressed="${Boolean(state.likes[tool.id])}">\u2665 ${likeCountMarkup(tool)}</button><button type="button" data-bookmark-tool="${esc3(tool.id)}" aria-pressed="${Boolean(bookmark)}">${esc3(t(bookmark ? "explorer.bookmarked" : "explorer.bookmark"))}</button><button type="button" data-review-tool="${esc3(tool.id)}">${esc3(t("explorer.reviews", { count: reviews.length }))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${esc3(tool.id)}" ${bookmark.public ? "checked" : ""}> ${esc3(t("explorer.publicToggle"))}</label><span class="privacy-state">${esc3(t(bookmark.public ? "explorer.public" : "explorer.privateDefault"))}</span>` : `<span class="privacy-state">${esc3(t("explorer.privateDefault"))}</span>`}${reviews.length ? "" : `<p class="no-support-record">${esc3(t("explorer.noReviewsObserved"))}</p>`}</section>`;
+    els.evidenceContent.innerHTML = `${dialogHead(t("explorer.details"), tool.name)}<p class="detail-provenance">${provenanceBadge(tool)}<span class="record-state ${esc3(tool.recordState)}">${esc3(t(`recordStates.${tool.recordState}`))}</span></p><p class="tool-summary${tool.provenance !== "relay" && tool.summaryAbsent ? " is-unknown" : ""}">${esc3(description)}</p><section class="dialog-layer fact-layer"><h3>${esc3(t("explorer.facts"))}</h3><div class="support-line">${supports.length ? supports.map((item) => `<span class="feature-support-summary">${esc3(item.feature.name)} ${supportBadge(item.support)}</span>`).join("") : `<span class="tag">${esc3(t("explorer.noFeatureCondition"))}</span>`}${topicTags(tool)}${platformTags(tool)}</div><dl class="nip-evidence-grid"><div><dt>${esc3(t("explorer.recordState"))}</dt><dd>${esc3(t(`recordStates.${tool.recordState}`))}</dd></div><div><dt>${esc3(t("explorer.observed"))}</dt><dd>${esc3(observedText(tool))}</dd></div><div><dt>${esc3(t("explorer.category"))}</dt><dd>${esc3(topicsText(tool))}</dd></div><div><dt>${esc3(t("explorer.os"))}</dt><dd>${esc3(osText(tool))}</dd></div><div><dt>${esc3(t("explorer.license"))}</dt><dd>${esc3(displayLicense(tool))}</dd></div></dl>${livenessMarkup(tool)}${tool.provenance !== "relay" && tool.topicCorrection ? `<p class="topic-correction">${esc3(t("explorer.topicCorrection", { collected: tool.collectedTopics.join(", ") || t("none") }))} ${esc3(tool.topicCorrection)}</p>` : ""}<nav class="resource-links" aria-label="${esc3(t("explorer.officialLinks", { name: tool.name }))}">${resourceLinks(tool)}</nav><h4>${esc3(t("explorer.primarySources"))}</h4>${sourceListMarkup(tool)}</section>${claimBlockMarkup(tool)}<section class="dialog-layer evaluation-layer"><h3>${esc3(t("explorer.evaluations"))}</h3>${cardReviewThumbnails(tool)}<div class="evaluation-actions">${likeButtonMarkup(tool)}<button type="button" data-bookmark-tool="${esc3(tool.id)}" aria-pressed="${Boolean(bookmark)}">${esc3(t(bookmark ? "explorer.bookmarked" : "explorer.bookmark"))}</button><button type="button" data-review-tool="${esc3(tool.id)}">${esc3(t("explorer.reviews", { count: reviews.length }))}</button></div>${bookmark ? `<label class="public-toggle"><input type="checkbox" data-public-bookmark="${esc3(tool.id)}" ${bookmark.public ? "checked" : ""}> ${esc3(t("explorer.publicToggle"))}</label><span class="privacy-state">${esc3(t(bookmark.public ? "explorer.public" : "explorer.privateDefault"))}</span>` : `<span class="privacy-state">${esc3(t("explorer.privateDefault"))}</span>`}${reviews.length ? "" : `<p class="no-support-record">${esc3(t("explorer.noReviewsObserved"))}</p>`}</section>`;
     if (shouldOpen) openDialog(els.evidenceDialog, context);
+    void ensureReactionsObserved(tool);
   }
   function resourceUrl(tool, type) {
     if (provenanceOf(tool) === "sample") {
@@ -11922,10 +12302,7 @@ function mountExplorer(data) {
     }
     const like = target.closest("[data-like-tool]");
     if (like) {
-      state.likes[attr(like, "likeTool")] = !state.likes[attr(like, "likeTool")];
-      renderResults();
-      rerenderOpenDialogs();
-      toast(t("explorer.toastLiked"));
+      void toggleLike(attr(like, "likeTool"));
       return;
     }
     const bookmark = target.closest("[data-bookmark-tool]");

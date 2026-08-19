@@ -472,15 +472,28 @@ test('relay-derived cards invent no like count, category, OS, or URL', async ({p
   const closeDialog = () => page.locator('#evidence-dialog [data-close-dialog]').click();
   const factOf = (dialog, label) => dialog.locator('.nip-evidence-grid div').filter({hasText: label}).locator('dd');
 
-  // A relay entry carries no like count: no number is derived from the id shape.
+  /* A relay entry's like count is observed, never derived from the id shape.
+     issue #20 gave this button a real source: opening the detail asks the relays
+     for the kind 7 addressed to this coordinate, and this fixture publishes none,
+     so the honest answer is a measured 0 rather than the old placeholder. The
+     "nothing is invented" contract is unchanged: the 0 is asserted to come from a
+     REQ that actually asked, so an id-derived number still fails here. */
   let dialog = await openDetail('Mock Client');
   const likeButton = dialog.locator('[data-like-tool]');
-  await expect(likeButton).toHaveText('♥ —');
-  expect(await likeButton.textContent()).not.toMatch(/\d/);
-  await expect(likeButton.locator('.no-support-record')).toHaveAttribute('aria-label', 'Unknown');
-  await likeButton.click();
-  await expect(dialog.locator('[data-like-tool]')).toHaveText('♥ —');
-  await expect(dialog.locator('[data-like-tool]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(likeButton).toHaveText('♥ 0');
+  await expect(likeButton.locator('.no-support-record')).toHaveCount(0);
+  const askedForReactions = await page.evaluate(() => window.__MOCK_RELAY__.reqs
+    .some(entry => entry.filters.some(filter => Array.isArray(filter.kinds) && filter.kinds.includes(7))));
+  expect(askedForReactions, 'the 0 was measured, not assumed').toBe(true);
+  /* No NIP-07 extension is installed in this fixture, so there is nothing to sign
+     with and the button says so instead of pretending the press landed. The old
+     optimistic `aria-pressed=true` on click was exactly the invented state issue
+     #20 removed: a like is only ever pressed once a relay serves it back. */
+  await expect(likeButton).toBeDisabled();
+  await expect(likeButton).toHaveAttribute('aria-label', 'Liking needs a NIP-07 extension');
+  await likeButton.dispatchEvent('click');
+  await expect(dialog.locator('[data-like-tool]')).toHaveText('♥ 0');
+  await expect(dialog.locator('[data-like-tool]')).toHaveAttribute('aria-pressed', 'false');
 
   // No OS / delivery is observed, so it says so instead of claiming "Web".
   await expect(dialog.locator('.support-line')).toContainText('OS / platform: Unknown');

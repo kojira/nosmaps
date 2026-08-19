@@ -170,15 +170,19 @@ function normalizeRelayUrl(url: unknown): string {
   return String(url ?? '').trim().toLowerCase().replace(/\/+$/, '');
 }
 
-interface SendOutcome {
+export interface SendOutcome {
   outcome: RelayOutcome;
   notice: string;
 }
 
 /** §W4.1: publication over the read path's own relay context. The per-relay
     outcome model of §W4.2 is what makes partial success expressible; an
-    aggregate that cannot say "1 of 2" can only lie in one direction. */
-function sendEvent(
+    aggregate that cannot say "1 of 2" can only lie in one direction.
+
+    Exported because every write this app makes goes through it: the reaction
+    path (data/reactions.ts) reuses it rather than growing a second, subtly
+    different notion of what "the relay accepted it" means. */
+export function sendEvent(
   ctx: RelayContext,
   signed: NostrEvent,
   relays: readonly string[],
