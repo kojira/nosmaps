@@ -443,3 +443,209 @@ C まで行くと §W6.1 の単一著者 REQ が要り、それは §13.1 の ca
 4. **G3**（手動リトライ）
 5. **G4**（`#t` の表示）
 6. **G5 / G6** — 観測が出るまで、あるいは 3 のついでまで、着手しない。
+
+---
+
+## 7. テスト計画（実装範囲 C — 上書き / 一覧 / 取り下げ）
+
+実装範囲は **C** に確定した。すなわち次の 3 つ:
+
+1. **同じ `d` での上書き**（G2 の `created_at` 決定 + G1 段階 A の `d` 凍結）
+2. **自分が出したレコードの一覧**（G1 段階 B、§W6.1 の単一著者 REQ）
+3. **`withdrawn` による取り下げ**（G1 段階 C、§W6.2 / §W6.5）
+
+この節は「どのテストを書くか」ではなく、**何を性質として押さえるか**と、**そのテストが本当に守っているとどう確かめるか**を決める。
+書いてある件数・秒数は下記の実測値で、推測は「概算」と明記する。
+
+### 7.0 実測ベースライン（この節の全ての数字の出どころ）
+
+| 項目 | 実測値 | 取り方 |
+|---|---|---|
+| 総テスト件数 | **286 件 / 17 ファイル** | `npx playwright test --list` の最終行 `Total: 286 tests in 17 files` |
+| `main` = `3cecf34` でのフル実行 | **269 passed / 17 failed / 0 flaky / 0 skipped** | `npx playwright test --reporter=json` の `.stats` = `{"expected":269,"unexpected":17,"flaky":0,"skipped":0}` |
+| フル実行の所要 | **576830.882 ms（= 9.61 分）** | 同 `.stats.duration` |
+| 1 件あたり | 576830.882 / 286 = **2016.9 ms**（実測平均） | 上の 2 値から |
+| プロジェクト | `chromium` と `webkit` の 2 つ、`workers: 1`、`fullyParallel: false` | `playwright.config.js` |
+
+**`test()` 1 本 = 実行件数 2 件**（chromium と webkit で 1 回ずつ）。以下で「本」と「件」は必ず区別する。
+
+### 7.1 何を性質として検査するか（名簿列挙にしない）
+
+「フィールドが表示された」「行が出た」の類は書かない。それらは**壊れた実装でも通る**。
+3 つの機能それぞれについて、**壊れたときに世界に対して何が起きるか**を 1 つの文にして、それを検査する。
+
+#### 機能 1 — 同じ `d` での上書き
+
+守る性質: **「直したものが、直したとおりに読み手へ届く」**。
+上書きが成立する条件は「同じ座標に、旧イベントより後に並ぶイベントが出て、読み戻したときの winner がそれである」こと。したがって検査するのは以下の 3 点だけ。
+
+| # | 性質 | 何が偽ならアウトか |
+|---|---|---|
+| 1-A | **署名対象の `created_at` は、観測済み winner の `created_at` より必ず大きい。** 壁時計が winner と同値・過去でも成立する（W-T22 / AC-G2-1） | `created_at = now` を素で使うと、同一秒で `selectAddressableWinner`（`winners.ts:126`）の id tie-break に落ちて**新しい方が負けうる** |
+| 1-B | **未来へは逃げない。** winner が `now + MAX_FUTURE_SKEW_SEC`（`policy.ts:24` = 600）を超える `created_at` を持つとき、`clock-conflict` で**署名前に止まる**（AC-G2-2） | 止まらなければ、他人が撒いた未来時刻に合わせて自分も未来イベントを出し、読み取り側の `futureCheck`（`event.ts:128`）に自分で引っかかる |
+| 1-C | **`d` は上書き経路で変わらない。** 既存レコードから開いた編集フォームの `#publish-d` は `readonly` で、いかなる操作でも値が変わらない（AC-G1-1 / W-T37） | `d` が変われば §4.2 の意味で**別レコードが増えるだけ**で、元は消えずに残る。利用者は「直した」と思っている |
+
+1-A は「値そのもの」を見る。UI 文字列ではなく **`window.__SIGN_ARG__.created_at`**（`tests/write-path.spec.js:120-121` に既にある仕掛け）を使う。
+署名器に渡る前のバイトを見ているので、途中の描画が何を言おうと結果は動かない。
+
+#### 機能 2 — 自分が出したレコードの一覧
+
+守る性質: **「一覧に出るものは、自分が自分の名前空間で出したものだけ」**。
+30078 は NIP-78 が「全アプリで共有」と規定した kind なので（`policy.ts:7-12`）、**他アプリのレコードが返ってくるのが正常**。一覧の正しさは「何が出たか」ではなく「**何が出なかったか**」で決まる。
+
+| # | 性質 | 何が偽ならアウトか |
+|---|---|---|
+| 2-A | **他人の pubkey の行が 0。** 著者フィルタ（`authors: [self]`）を通したうえで、返却物にも他 pubkey を混ぜて検査する | REQ の `authors` を落としても、テストの入力が自分のイベントだけなら**気づけない**。だからモックには必ず他人のイベントを入れる |
+| 2-B | **`nosmaps:` 名前空間の外の `d` を持つ行が 0。** かつ除外理由 `foreign-d`（`records.ts:136`）が診断に現れ、それらに対して**編集を提案する UI が DOM に存在しない**（AC-G1-2 / W-T36） | 他アプリのレコードに「編集」ボタンを出すと、押した利用者は他人の座標に自分の署名で上書きを試みる |
+| 2-C | **件数と行数が一致し、除外されたものは件数にも入らない。** §W6.1 `:685-688`（「表示も件数もしない」） | 「64 件見つかりました」と言って 12 行しか出ないのは、利用者にとっては嘘 |
+
+`tests/relay-unit.spec.js:134-199` に**実リレーから取ってきた本物の他アプリ 30078 が 4 件**ある。これを一覧のモックにそのまま流用する。作り物のダミーではなく実データで 2-A / 2-B を押さえられるので、新しい fixture は作らない。
+
+#### 機能 3 — `withdrawn` による取り下げ
+
+守る性質: **「取り下げたと言うのは、読み手にそう見えることを確認できたときだけ」**。
+取り下げは「消す」ではなく「同じ座標に `state: "withdrawn"` の新しいイベントを出す」（§W6.6、kind 5 は使わない）。だから機能 1 の全性質を前提にする。
+
+| # | 性質 | 何が偽ならアウトか |
+|---|---|---|
+| 3-A | **送られたイベントが `content.state === "withdrawn"` で、`name` と `summary` を保持し、`validateSoftwareEvent` が `ok` を返す**（AC-G1-3 / W-T38） | 中身を空にした取り下げは読み取り側で quarantine され、**旧 active が winner のまま残る**＝取り下げになっていない |
+| 3-B | **読み戻しで確認できるまで、画面に「取り下げ済み」と読める文字列が出ない。** 確認前は §W6.5 の「まだ active に見えるクライアントがある」旨が出る（AC-G1-4） | これは `W-I3`（`tests/publish-failure-and-draft.spec.js:137`、`tests/write-path.spec.js:234`）と同じ嘘のかたち。**この形の嘘は既に 2 箇所で守られているので、3 番目も同じ形で守る** |
+| 3-C | **2 台中 1 台だけが受理したとき、見出しに「1/2」が含まれ、もう一方を読むクライアントには依然 active に見える旨が出る**（AC-G1-5 / W-T40） | 部分成功を成功と書くと、利用者は「消えた」と信じたまま片方のリレーに出し続ける |
+| 3-D | **確認後、その座標は一覧から消える。同じ座標に `active` を出し直すと再び現れる**（AC-G1-6 / W-T39） | 片道だけ通る実装（取り下げたら二度と戻せない）を早期に弾く |
+
+3-B と 3-C は**同じ 1 本のテストで両方見る**。片方のリレーだけ `ok: false` にした状態で走らせれば、確認前の文言と「1/2」の見出しは同じ画面に同時に出る。
+
+### 7.2 壊したときに実際に落ちることをどう確認するか（break-restore）
+
+**落ちることを確認していないテストは、何も守っていない。** 新しく足す `test()` は 1 本残らずこの手順を通す。
+通していないテストは「書いた」とみなさない。手順は 5 ステップ:
+
+1. 実装込みで対象 spec だけ green を確認（`npx playwright test --project=chromium <spec>`）
+2. **下表のとおりに 1 箇所だけ壊す**（複数同時に壊さない。どのテストがどの穴を守っているかが分からなくなる）
+3. 同じコマンドを再実行し、**期待したテストが、期待したアサーションで落ちる**ことを確認する。落ちたテスト名とエラーメッセージの 1 行目を控える
+4. `git checkout -- <壊したファイル>` で復元し、green に戻ることを確認
+5. 控えた「壊し方 → 落ちたテスト名 → メッセージ」を PR コメントに貼る
+
+`--project=chromium` だけで回す。break-restore は「テストが実装に依存しているか」を見る作業で、ブラウザ差ではない。webkit まで回すと 1 回あたりの待ちが倍になる。
+
+#### 壊し方の一覧（どの行をどう壊すか）
+
+| 対象 | 壊す場所 | どう壊すか | 落ちるべき性質 |
+|---|---|---|---|
+| 機能 1 | `src/data/publish.ts:371` | 実装後の「winner を見て `created_at` を決める」呼び出しを、現行の `createdAt: nowSec` に**書き戻す**（＝ G2 未実装の状態） | 1-A（`__SIGN_ARG__.created_at` が `T+1` にならず `T` になる） |
+| 機能 1 | G2 実装で入る `clock-conflict` の早期 return | その `return` 行を削除し、そのまま署名へ進ませる | 1-B（`__NOSTR_CALLS__` に `signEvent` が入り、モックリレーの `published.length` が 1 になる） |
+| 機能 1 | `src/domain/winners.ts:126` | `e.id < best.id` を `e.id > best.id` に**反転**する | 1-A の読み戻し側（同一秒のとき winner が入れ替わり、`superseded-during-publish` になる） |
+| 機能 1 | `src/ui/explorer/app.ts:1276` の `#publish-d` | 編集フローで付ける `readonly` 属性を**外す** | 1-C（`toHaveAttribute('readonly')` が落ちる。`fill()` が通ってしまうことも同時に見える） |
+| 機能 2 | 一覧の REQ フィルタ（§W6.1 で新設） | `authors: [self]` を**削る** | 2-A（他人の pubkey の行数が 0 でなくなる） |
+| 機能 2 | `src/domain/records.ts:136` | `if (d.indexOf(SOFTWARE_D_PREFIX) !== 0) return fail('foreign-d');` を**コメントアウト**する | 2-B（`relay-unit.spec.js:134-199` の実物 4 件が一覧に出る）。※ この 1 行は読み取り側でも効いているので、既存テストも同時に落ちる — それは想定どおりで、**落ちた既存テスト名も控える** |
+| 機能 2 | 一覧の件数表示 | 除外前の配列長を件数に使うよう書き換える | 2-C（件数と行数が食い違う） |
+| 機能 3 | `src/data/publish.ts:102` | `const state = input?.state === 'withdrawn' ? 'withdrawn' : 'active';` を `const state = 'active';` に**固定**する | 3-A（送信イベントの `content.state` が `active` のまま） |
+| 機能 3 | `publishResultMarkup()`（`app.ts:1243-1264`）の状態分岐 | 取り下げ用の分岐を `published` と同じ文言に**すり替える** | 3-B（確認前に「取り下げ済み」が出る） |
+| 機能 3 | 取り下げ結果の見出し | `t(...headlines.partial, {accepted, total})` を数無しの固定文言に置換 | 3-C（「1/2」が消える） |
+| 機能 3 | 一覧の `withdrawn` フィルタ（`app.ts:622` の `recordState` 比較） | 比較を無条件 `true` にする | 3-D（取り下げ後も一覧に出続ける） |
+
+**注意**: 「壊す」は必ず**実装コードを壊す**のであって、テスト側の期待値をいじるのではない。
+期待値を書き換えて落とすのは、テストが動いていることの確認にはならない。
+
+### 7.3 粒度と件数の上限方針
+
+フルスイートは **286 件 / 9.61 分**（7.0 の実測）。1 件あたり実測平均 **2016.9 ms**。
+ここに 1 本足すたびに **2 件・約 4 秒**（実測平均からの概算）が全員の待ち時間に乗る。だから**上限を先に決める**。
+
+**上限: 新規 `test()` は 6 本まで（＝ 12 件、286 → 298 件）。**
+
+内訳（1 機能あたり 2 本）:
+
+| 機能 | 本数 | 何をまとめるか |
+|---|---|---|
+| 1（上書き） | 2 本 | (a) 正常系: winner あり → `created_at` が `+1`、読み戻しで winner が自分になる、`d` が `readonly`（1-A / 1-C を 1 本に束ねる） (b) 異常系: 未来 winner → `clock-conflict`、`signEvent` 呼び出し 0 回、EVENT 送信 0 件（1-B） |
+| 2（一覧） | 2 本 | (a) 他人 pubkey + 他アプリ `d` を混ぜたモックで、行数・件数・除外理由（2-A / 2-B / 2-C を 1 本に束ねる） (b) 純粋関数の単体: 一覧のフィルタ関数に上の実物 4 件を通す（`relay-unit.spec.js` に追記、DOM を起こさないので速い） |
+| 3（取り下げ） | 2 本 | (a) 全リレー受理 → `state: "withdrawn"` の中身と、確認後に一覧から消え、`active` 再投稿で戻る（3-A / 3-D） (b) 1 台のみ受理 → 確認前の文言と「1/2」（3-B / 3-C） |
+
+**束ねる根拠**: 1 本の `test()` に複数のアサーションを置くことと、1 つの性質につき 1 本の `test()` を立てることは別。
+前者はコストがほぼゼロ（同じページを起こしたまま続けて見る）、後者は毎回ブラウザ起動と `goto` が乗る。
+**画面を起こし直す必要がない検査は、同じ `test()` の中に置く。** 既存の `tests/write-path.spec.js` が 2 本で書き込み経路全体を見ているのと同じ方針。
+
+**やらないこと（過剰にしない線引き）**:
+- i18n の ja/en 両方でのスナップショット — 既に `tests/i18n-integrity.spec.js` が網羅している。取り下げ用に足す reason スラグは**そこに 1 行足すだけ**にして、新しい `test()` は立てない
+- 375x812 のオーバーフロー検査を新規に立てる — 既存テスト（`write-path.spec.js:220-224`）が同じ画面を見ている。取り下げ UI が同じパネルに乗るなら、そこにアサーションを 1 行足す
+- 「ボタンが表示される」「ラベルが正しい」系 — 7.1 の性質のどれも守っていない
+
+**6 本を超えそうになったら、増やす前に 7.1 の性質表に戻る。** 表に無いものを検査しようとしているなら、それは要らない。
+
+### 7.4 既存ベースラインとの突き合わせ（件数一致ではなく失敗テスト名の集合）
+
+`main` は **17 件が既に赤い**。だから「17 件のままだから壊していない」という確認は**成立しない** —
+既存の赤が 1 件緑になり、自分の変更で別の 1 件が赤くなっても、合計は 17 のままだからだ。
+**突き合わせは必ず「失敗したテスト名の集合」で行う。**
+
+#### `main` の失敗集合（実測、`3cecf34`、`--reporter=json` より）
+
+```
+chromium | e2e.spec.js:214 | explorer search records descriptions and tags in either UI language
+chromium | e2e.spec.js:365 | language rerender preserves selected features, comparison, and open dialog context
+chromium | e2e.spec.js:533 | comparison distinguishes no record from explicit unknown and evidence follows the aggregate record
+chromium | e2e.spec.js:563 | reviewer history gathers reviews from every tool before applying its display limit
+chromium | e2e.spec.js:578 | likes, bookmarks, text/image reviews, profiles, history, gallery, and image return work
+chromium | e2e.spec.js:643 | pages, controls, inputs, and thumbnail occupancy remain compact with no overflow
+chromium | e2e.spec.js:669 | three-way comparison and review/gallery dialogs have no horizontal overflow
+chromium | landing.spec.js:40 | the carousel only shows fields that exist in the dataset and never invents ranking data
+webkit | e2e.spec.js:214 | explorer search records descriptions and tags in either UI language
+webkit | e2e.spec.js:365 | language rerender preserves selected features, comparison, and open dialog context
+webkit | e2e.spec.js:408 | liveness never hides a row, in-page official information, fact/evaluation split, and evidence
+webkit | e2e.spec.js:533 | comparison distinguishes no record from explicit unknown and evidence follows the aggregate record
+webkit | e2e.spec.js:563 | reviewer history gathers reviews from every tool before applying its display limit
+webkit | e2e.spec.js:578 | likes, bookmarks, text/image reviews, profiles, history, gallery, and image return work
+webkit | e2e.spec.js:643 | pages, controls, inputs, and thumbnail occupancy remain compact with no overflow
+webkit | e2e.spec.js:669 | three-way comparison and review/gallery dialogs have no horizontal overflow
+webkit | landing.spec.js:40 | the carousel only shows fields that exist in the dataset and never invents ranking data
+```
+
+**この集合は 17 件で、`e2e.spec.js` と `landing.spec.js` の 2 ファイルにしか無い。**
+`webkit` にだけ `e2e.spec.js:408` があり、`chromium` には無い（左右非対称）。件数だけ見ていると、この非対称は見えない。
+
+#### 突き合わせの手順
+
+```bash
+# 取り方（ベースラインと変更後で同じコマンドを使う）
+npx playwright test --reporter=json > /tmp/pw-<ラベル>.json
+jq -r '[.suites[] | recurse(.suites[]?) | .specs[]? | select(.ok|not)
+        | "\(.tests[0].projectName) | \(.file):\(.line) | \(.title)"] | sort | .[]' \
+  /tmp/pw-<ラベル>.json > /tmp/fail-<ラベル>.txt
+
+# 突き合わせ（差分が空であることが合格条件）
+diff /tmp/fail-main.txt /tmp/fail-head.txt
+```
+
+**合格条件は `diff` が空であること。** 空でなかったら、次の 2 通りに分けて扱う:
+
+- **`fail-head` にだけある行**（新しく赤くなった）— これは自分が壊した。直すまで先に進まない
+- **`fail-main` にだけある行**（緑になった）— 副作用で直った可能性があるので、**なぜ直ったかを説明できるまで喜ばない**。説明できないなら、それは実装が別の何かを黙って変えている
+
+`:line` を鍵に含めているので、**既存テストの行がずれただけでも差分が出る**。それは正しい振る舞い（同じ名前でも別の場所なら別物として一度見る）だが、docs 以外を触らない今回の変更では起きない。
+実装のときに既存 spec の行がずれたら、その差分は「行番号だけの移動である」ことを目視で確かめてから消し込む。
+
+### 7.5 自動テストで押さえられない部分（手動確認）
+
+以下は自動テストの対象外。**モックリレーは自分が書いたとおりにしか振る舞わないので、これらを自動テストで「確認した」と書くのは嘘になる。**
+実装が終わったあと、下記を手で 1 回ずつ通し、**結果を観測値としてこの文書か PR に書く**（通ったかどうかではなく、何が起きたかを書く）。
+
+| # | 何を | どうやって | 何が観測できたら合格 |
+|---|---|---|---|
+| M-1 | 実リレーへの上書きが本当に届くか | 既定リレー（`wss://x.kojira.io`, `wss://nos.lol`、`policy.ts:18`）へ実際に publish → 同じ `d` で内容を変えて再 publish | 2 回目の読み戻しで winner が 2 回目の id。**両方のリレーで**。片方だけなら「1/2」が出る |
+| M-2 | 実リレーでの取り下げが第三者にどう見えるか | M-1 のレコードを取り下げ、**別のブラウザ（別 pubkey、キャッシュ空）**でカタログを開く | 取り下げたレコードが一覧に出ない。`withdrawn` フィルタで出す指定にしたときだけ出る |
+| M-3 | NIP-42 を要求するリレーの実挙動（G5 / U7 の preflight） | 上記 2 台に接続したとき `auth-required` の notice が来るか（§20.3） | **来るか来ないかを観測値として記録する。** 来るなら G5 は後回しをやめて繰り上げる |
+| M-4 | 実 NIP-07 拡張での署名 | nos2x / Amber などの実拡張で M-1 を通す | 署名ダイアログが出て、`SIGNER_TIMEOUT_MS`（`policy.ts:79` = 60000）以内に返る。テストは `seckeySigner` を使うので、拡張特有の遅延・キャンセル挙動は自動では見えない |
+| M-5 | **kind 5 を出していないこと** | M-2 の取り下げ操作の間、DevTools の WS フレームを見る | 送出されたイベントの `kind` に **5 が含まれない**（§W6.6）。`reactions.ts` は「いいね取り消し」で kind 5 を出すので（`policy.ts:17`）、**取り下げ操作で誤ってそちらの経路に入っていないこと**を目で確かめる。これは自動テストでも `published` 配列を見れば書けるが、**実拡張＋実リレーで一度は目視する**（モックは自分が書いたフレームしか記録しない） |
+| M-6 | 他アプリのレコードを壊していないこと | M-1〜M-2 のあと、実リレーの 30078 を `{"kinds":[30078],"limit":80}` で引き直す | `relay-unit.spec.js:134-199` にある他アプリ 4 件が**そのまま残っている**。上書きが他人の座標に漏れていない |
+
+M-3 は**観測が出たら判断が変わる**種類の項目なので、実装より先に済ませてよい（U7）。
+M-5 は自動テスト側にも 1 アサーション（`window.__MOCK_RELAY__.published.every(e => e.kind !== 5)`）を機能 3 のテストに**足すだけ**で済むので、新規 `test()` は立てない。
+
+### 7.6 この計画のまとめ
+
+- 検査するのは **3 機能 × 各 3〜4 個の性質**（7.1）。「表示された」ではなく「壊れたら世界に何が起きるか」で選んでいる
+- **新規 `test()` は 6 本（12 件）まで。** 286 件 / 9.61 分・1 件 2016.9 ms（実測）に上乗せする分を、最初から上限で縛る
+- **全 6 本が break-restore を通っていること**が「書いた」の定義。壊す場所と壊し方は 7.2 の表で行まで決めてある
+- **合否は失敗テスト名の集合の `diff` が空であることで判定する。** 17 件という数字は使わない
+- **実リレー・実拡張・kind 5 の非送出は手動**（7.5）。モックで確認したことにしない
