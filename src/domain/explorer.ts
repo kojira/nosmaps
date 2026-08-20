@@ -91,18 +91,6 @@ export function precedenceOf(result: string, precedence: readonly string[]): num
   return index === -1 ? -1 : precedence.length - index;
 }
 
-export function featureSupportRecord(
-  tool: Tool, feature: FeatureDefinition, family: string, precedence: readonly string[]
-): CapabilityClaim | null {
-  const records = supportRecords(tool, feature, family).filter(record => precedenceOf(record.result, precedence) > 0);
-  const first = records[0];
-  if (!first) return null;
-  return records.reduce<CapabilityClaim>(
-    (best, record) => precedenceOf(record.result, precedence) > precedenceOf(best.result, precedence) ? record : best,
-    first
-  );
-}
-
 /** §21.3 R3 case 2: no claim at all is `unknown`, never "not supported" and never
     an empty checklist that reads as a set of negatives. It is a value, so it
     always has a badge. */
@@ -129,15 +117,6 @@ export function accountSwitchingSupport(
   const observation = accountSwitchingOf(tool);
   if (!observation) return 'unknown';
   return observation.result === 'unknown' ? 'unknown' : observation.result;
-}
-
-export function featureSupport(
-  tool: Tool, feature: FeatureDefinition, family: string, precedence: readonly string[]
-): DisplayResult {
-  if (feature.id === OBSERVED_FEATURE_ID) return accountSwitchingSupport(tool);
-  const record = featureSupportRecord(tool, feature, family, precedence);
-  if (record) return record.result;
-  return outOfFamily(tool, family) ? 'out_of_family' : 'unknown';
 }
 
 export interface ClaimSummary {
