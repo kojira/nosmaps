@@ -116,10 +116,17 @@ test.describe('375x812 collapsed card', () => {
       await page.locator(`#compact-identity [data-language="${language}"]`).click();
       perLanguage[language] = Object.fromEntries((await readCards(page)).map(row => [row.id, row.described]));
     }
+    /* A record reads differently per language when it has a text recorded for one of them that is
+       not the original the other falls back to. Requiring a text in *both* was what this asked, and
+       it was satisfied by `descriptions.en` being a copy of `summary` (#14 D14-6) -- the record read
+       differently because one language had a translation, not because both had one, and the copy
+       was doing nothing. The property is the difference, so that is what is asked for. */
     const translated = await page.evaluate(() => window.NOSMAPS_DATA.tools
       .filter(tool => {
+        if (tool.summaryAbsent) return false;
         const descriptions = tool.descriptions || {};
-        return !tool.summaryAbsent && descriptions['en'] && descriptions['ja'] && descriptions['en'] !== descriptions['ja'];
+        const shown = ['en', 'ja'].map(language => descriptions[language] || tool.summary);
+        return shown[0] !== shown[1];
       })
       .map(tool => tool.id));
     expect(translated.length, 'catalogue carries per-language descriptions').toBeGreaterThan(0);

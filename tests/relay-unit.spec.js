@@ -315,6 +315,68 @@ function registerUnit() {
     expect(errors).toEqual([]);
   });
 
+  /* §4.2 rule 7 (#14). The v1 records collected on 2026-08-18 are not stale and are not rewritten,
+     so the reader has to hold both profiles at once: v1 means "this record carries no per-language
+     text", v2 means "it may". Everything else about a record is identical between them. */
+  test('B. validateSoftwareEvent reads v1 and v2, and refuses a broken language map rather than emptying it', async ({page}) => {
+    const errors = collectErrors(page);
+    await page.goto(EXPLORER);
+    const r = await page.evaluate(() => {
+      const V = window.NOSMAPS_CATALOG.validateSoftwareEvent;
+      const T = window.__T;
+      const mk = T.makeSoftware;
+      const v2 = over => mk({content: Object.assign({version: 2}, over)});
+      const reason = event => V(event, T.OPTS).reason;
+      const full = v2({descriptions: {ja: 'リレークライアント。', fr: 'Un client de relais.'}, summary_lang: 'en'});
+      return {
+        // v1 keeps working, and says so by carrying no language map at all.
+        v1: V(mk({}), T.OPTS),
+        v2: V(full, T.OPTS),
+        // Both new keys are optional: a v2 record that states neither is an ordinary record.
+        v2Bare: V(v2({}), T.OPTS),
+        /* A map that is not a map of non-empty string to non-empty string is a *broken* record, not
+           an empty one. Dropping the bad entries would make it indistinguishable from a record that
+           recorded nothing, so the event is invalid and says which rule it broke. */
+        emptyMap: reason(v2({descriptions: {}})),
+        arrayMap: reason(v2({descriptions: ['リレークライアント。']})),
+        nullMap: reason(v2({descriptions: null})),
+        emptyText: reason(v2({descriptions: {ja: ''}})),
+        nonStringText: reason(v2({descriptions: {ja: 42}})),
+        emptyLanguage: reason(v2({descriptions: {'': 'x'}})),
+        longText: reason(v2({descriptions: {ja: 'x'.repeat(1001)}})),
+        /* The original already lives in `summary` and every unrecorded language falls back to it, so
+           a language-coded copy of the same bytes states nothing new and can drift from what it
+           copies (D14-6). */
+        copyOfSummary: reason(v2({descriptions: {en: 'A relay client.'}})),
+        emptySummaryLang: reason(v2({summary_lang: ''})),
+        nonStringSummaryLang: reason(v2({summary_lang: 2})),
+        // v2 is not an open door: unknown keys are still refused, and translators are named by key.
+        v2UnknownField: reason(v2({translator: 'somebody'}))
+      };
+    });
+
+    expect(r.v1.ok).toBe(true);
+    expect(r.v1.record.descriptions, 'a v1 record records no language, which is not an empty map').toBeNull();
+    expect(r.v1.record.summaryLang).toBeNull();
+
+    expect(r.v2.ok).toBe(true);
+    expect(r.v2.record.descriptions).toEqual({ja: 'リレークライアント。', fr: 'Un client de relais.'});
+    expect(r.v2.record.summaryLang).toBe('en');
+    // The original is the original in either profile: a translation never overwrites it.
+    expect(r.v2.record.summary).toBe('A relay client.');
+
+    expect(r.v2Bare.ok).toBe(true);
+    expect(r.v2Bare.record.descriptions).toBeNull();
+    expect(r.v2Bare.record.summaryLang).toBeNull();
+
+    for (const key of ['emptyMap', 'arrayMap', 'nullMap', 'emptyText', 'nonStringText', 'emptyLanguage',
+      'longText', 'copyOfSummary', 'emptySummaryLang', 'nonStringSummaryLang']) {
+      expect(r[key], key).toBe('bad-schema');
+    }
+    expect(r.v2UnknownField).toBe('unknown-field');
+    expect(errors).toEqual([]);
+  });
+
   test('B. validateSoftwareEvent rejects each malformed variant with the documented reason', async ({page}) => {
     const errors = collectErrors(page);
     await page.goto(EXPLORER);
@@ -347,7 +409,17 @@ function registerUnit() {
         unknownField: reason(mk({content: {extra: 'x'}})),
         missingName: reason(mk({dropContentKeys: ['name']})),
         missingSummary: reason(mk({dropContentKeys: ['summary']})),
-        badVersion: reason(mk({content: {version: 2}})),
+        /* 1 and 2 are both profiles this reader knows (§4.2 rule 7); 3 is not one, and an
+           unrecognised version is refused rather than guessed at. `version: 2` moved into the v2
+           test below, where it is accepted. */
+        badVersion: reason(mk({content: {version: 3}})),
+        zeroVersion: reason(mk({content: {version: 0}})),
+        stringVersion: reason(mk({content: {version: '2'}})),
+        /* §4.2 rule 7: the key set belongs to the version the record itself states, so a record
+           claiming v1 may not carry v2's keys. Unioning the two sets would let a record announce
+           one profile and use another. */
+        v1WithDescriptions: reason(mk({content: {descriptions: {ja: 'リレークライアント。'}}})),
+        v1WithSummaryLang: reason(mk({content: {summary_lang: 'en'}})),
         longName: reason(mk({content: {name: 'x'.repeat(121)}})),
         longSummary: reason(mk({content: {summary: 'x'.repeat(1001)}})),
         httpHomepage: reason(mk({content: {homepage: 'http://example.com/'}})),
@@ -380,6 +452,10 @@ function registerUnit() {
     expect(r.missingName).toBe('bad-schema');
     expect(r.missingSummary).toBe('bad-schema');
     expect(r.badVersion).toBe('bad-version');
+    expect(r.zeroVersion).toBe('bad-version');
+    expect(r.stringVersion).toBe('bad-version');
+    expect(r.v1WithDescriptions).toBe('unknown-field');
+    expect(r.v1WithSummaryLang).toBe('unknown-field');
     expect(r.longName).toBe('bad-schema');
     expect(r.longSummary).toBe('bad-schema');
     expect(r.httpHomepage).toBe('bad-schema');

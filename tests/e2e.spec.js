@@ -70,10 +70,20 @@ function catalogueSearchMatches(data, query) {
    nothing about search. */
 /* An entry with a recorded description in every language the catalogue uses, plus one that records
    only the collected original. Both are read out of data.js: `descriptions` is a plain language ->
-   text map and the original stays canonical, so an unrecorded language is a fallback, never a blank. */
+   text map and the original stays canonical, so an unrecorded language is a fallback, never a blank.
+
+   What is asserted is the property, not the roster. `['en','ja']` was what this pinned, and it was
+   pinning the bug: `descriptions.en` was a byte-for-byte copy of `summary` (#14 D14-6), so the map
+   looked bilingual while carrying one language and one duplicate. The catalogue is free to record
+   any language or none; what it may not do is record a text that merely repeats the original, or
+   record nothing at all in a language and leave a blank on the card. */
 function describedEntries(data) {
   const languages = [...new Set(data.tools.flatMap(tool => Object.keys(tool.descriptions || {})))].sort();
-  expect(languages, 'catalogue records descriptions in ja and en').toEqual(['en', 'ja']);
+  expect(languages.length, 'catalogue records at least one language of description').toBeGreaterThan(0);
+  const copies = data.tools.flatMap(tool => Object.entries(tool.descriptions || {})
+    .filter(([, text]) => text === tool.summary)
+    .map(([language]) => `${tool.id}/${language}`));
+  expect(copies, 'no recorded description is a second copy of the record\'s own summary').toEqual([]);
   const translated = data.tools.find(tool => tool.descriptions?.ja && tool.descriptions.ja !== tool.summary);
   expect(translated, 'catalogue records a description that differs from the collected original').toBeTruthy();
   /* The fallback case, taken from the catalogue rather than arranged: an entry with no recorded
@@ -216,30 +226,47 @@ test('explorer search records descriptions and tags in either UI language', asyn
   const data = catalogueData();
   const {languages, translated, noRecordedText} = describedEntries(data);
   await page.goto('nip-explorer.html');
-  const absentLabel = await page.evaluate(() => window.NOSMAPS_I18N.t('explorer.summaryAbsent'));
-  expect(absentLabel, 'the absent-summary wording is a real label').toBeTruthy();
 
   /* (a) A query taken from a recorded description brings back exactly the entries data.js says it
      should, and the answer does not move when the UI language does: search reads every recorded
-     language, so the result set is a property of the catalogue, not of the switch. One query per
-     recorded language, each a phrase only the subject's own text holds. */
-  const queries = languages.map(language => translated.descriptions[language].slice(0, 24));
+     language, so the result set is a property of the catalogue, not of the switch.
+
+     Four queries, covering the four ways a term reaches the index. The first two are the pair that
+     matters: a phrase that exists ONLY in a translation, and a phrase that exists ONLY in the
+     collected original. Neither is on screen in both languages, so a search restricted to the
+     language being displayed would answer one of them with an empty list in one language and the
+     right list in the other -- which is what "the catalogue answers, not the switch" forbids. */
+  const queries = [
+    ...languages.map(language => translated.descriptions[language].slice(0, 24)),
+    translated.summary.slice(0, 24),
+    uniqueCatalogueName(data),
+    [...new Set(data.tools.flatMap(tool => tool.topics || []).filter(topic => !data.seedTopics.includes(topic)))].sort()[0]
+  ];
+  expect(queries.length, 'at least three queries, from three different term sources').toBeGreaterThanOrEqual(3);
+  for (const query of queries) expect(query, 'every query is a real term from data.js').toBeTruthy();
+
+  /** @type {Record<string, string[][]>} */
+  const resultsByLanguage = {};
   for (const [language, switchName] of [['ja', '日本語'], ['en', 'English']]) {
     await page.getByRole('button', {name: switchName}).first().click();
     await expect(page.locator('html')).toHaveAttribute('lang', language);
+    /* The absent-summary wording is read again per language. Reading it once, before the first
+       switch, pinned one language's label and then expected it after switching to the other -- the
+       test passed in the starting language and reported the other one's correct label as wrong. */
+    const absentLabel = await page.evaluate(() => window.NOSMAPS_I18N.t('explorer.summaryAbsent'));
+    expect(absentLabel, `the absent-summary wording is a real label in ${language}`).toBeTruthy();
+
+    resultsByLanguage[language] = [];
     for (const query of queries) {
       const expected = catalogueSearchMatches(data, query);
       expect(expected.length, `${query} matches something in data.js`).toBeGreaterThan(0);
       await page.locator('#feature-query').fill(query);
       await expect.poll(() => page.locator('.feature-tool-card h2').allTextContents().then(names => names.sort()),
-        {message: `explorer/${language} description query ${query}`}).toEqual(expected);
+        {message: `explorer/${language} query ${query}`}).toEqual(expected);
+      /* What the page actually showed, not what was expected of it -- comparing the two languages'
+         expectations would compare data.js with itself and hold no matter what the page did. */
+      resultsByLanguage[language].push((await page.locator('.feature-tool-card h2').allTextContents()).sort());
     }
-    /* A free topic is rendered verbatim, so it is searchable as itself in either language. */
-    const freeTopic = [...new Set(data.tools.flatMap(tool => tool.topics || []).filter(topic => !data.seedTopics.includes(topic)))].sort()[0];
-    expect(freeTopic, 'catalogue has a free topic').toBeTruthy();
-    await page.locator('#feature-query').fill(freeTopic);
-    await expect.poll(() => page.locator('.feature-tool-card h2').allTextContents().then(names => names.sort()),
-      {message: `explorer/${language} tag ${freeTopic}`}).toEqual(catalogueSearchMatches(data, freeTopic));
 
     /* (b) and (c): every card shows the text recorded for the language on screen, falling back to
        the collected original -- and the entry with no recorded ja text is in that list, so the
@@ -252,6 +279,12 @@ test('explorer search records descriptions and tags in either UI language', asyn
     const shown = await page.locator('.feature-tool-card .tool-summary').allTextContents();
     expect(shown.filter(text => !text.trim() || text.includes('undefined')), `explorer/${language} descriptions`).toEqual([]);
   }
+
+  /* Stated as its own assertion rather than left implied by the two loops passing: for every query,
+     the two languages returned the same set. Comparing the languages to each other is what the
+     property says, and it fails on a language-dependent index even if the expectations were wrong. */
+  expect(resultsByLanguage['ja'], 'the same query answers the same in either UI language')
+    .toEqual(resultsByLanguage['en']);
   expect(errors).toEqual([]);
 });
 

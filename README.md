@@ -94,9 +94,18 @@ node tools/new-collector-key.mjs <リポジトリ外のパス>                  
 NOSMAPS_COLLECTOR_KEY_FILE=<そのパス> node tools/sign-catalogue.mjs        # 収集結果に署名して jsonl を書く
 node tools/build-data.mjs                                                 # jsonl から data.js を生成
 node tools/verify-catalogue.mjs                                           # 全行の署名・kind・d・t と data.js との一致を検証
+node tools/check-descriptions.mjs                                         # 画面に出る各言語の説明文がすべて署名に遡れることを検証
 ```
 
-`data.js` は `catalogue-events.jsonl` からの**派生ビルド成果物**です。手で編集しません。`tools/build-data.mjs` は署名が通らない行があればビルドを中断するので、未署名や改竄された記述から `data.js` が生成されることはありません。v1のcontentプロファイルに入らない注記（provenance、NIPクレーム、ライセンス等）は `real-catalog-draft.json` から `d` で突き合わせて付けています。
+`data.js` は `catalogue-events.jsonl` からの**派生ビルド成果物**です。手で編集しません。`tools/build-data.mjs` は署名が通らない行があればビルドを中断するので、未署名や改竄された記述から `data.js` が生成されることはありません。contentプロファイルに入らない注記（provenance、NIPクレーム、ライセンス等）は `real-catalog-draft.json` から `d` で突き合わせて付けています。
+
+### 説明文の多言語化（v2 プロファイル、#14）
+
+各言語の説明文は `content.descriptions`（言語コード→文章）として**署名の中**にあります。訳者フィールドはありません。**署名した鍵がそのまま「誰が書いたか」**だからです（同じ事実を2か所に書けば食い違いうる）。収集した原文は `summary` のままで、訳に上書きされることはなく、記録の無い言語は原文にフォールバックします。原文と同じ文字列を言語コード付きでもう一度置くことはしません。
+
+別の言語を書きたい人は、**同じ `d` に自分の鍵で**イベントを出します。座標は `kind`+`pubkey`+`d` なので互いを置き換えず、両方が読まれます（#18 の重なりと同じ仕組み）。1つの鍵で2言語書く場合は1つの `descriptions` にまとめます（同じ鍵・同じ `d` の2通目は1通目を置き換えるため）。
+
+`version: 1` のイベントも有効なまま読めます。v1 は「各言語の説明文を持たない記録」という意味であって、古い記録という意味ではありません。
 
 ## データと構成
 

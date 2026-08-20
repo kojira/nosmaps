@@ -28,6 +28,12 @@ export interface SoftwareRecord {
   readonly state: RecordState;
   readonly name: string;
   readonly summary: string;
+  /** Per-language texts, v2 only (§4.2 rule 7a). `null` — not `{}` — when the record carries none:
+      "recorded no language" and "recorded an empty map" are the same fact and are stated once. */
+  readonly descriptions: Readonly<Record<string, string>> | null;
+  /** The language of `summary`, when the signer stated it (§4.2 rule 7e). `null` means unrecorded,
+      which is not the same as English and must never be rendered as one. */
+  readonly summaryLang: string | null;
   readonly homepage: string | null;
   readonly supersededBy: string | null;
   readonly topics: readonly string[];
@@ -165,9 +171,17 @@ export function validateSoftwareEvent(
     if (topics.indexOf(topic) === -1) topics.push(topic);
   }
 
-  // §4.2 rule 2: exact content key set for the v1 profile.
+  /* §4.2 rules 2 and 7: the exact content key set, which is the one belonging to the version the
+     record itself states. v1 and v2 are both current: v2 only adds two optional keys, so a v1
+     record is not stale and is not rewritten -- it is a record that carries no per-language text.
+     The key set is chosen by version rather than unioned, so a v1 record naming `descriptions` is
+     still `unknown-field`: it would be claiming a key its own profile does not have. */
+  const version = prop(c, 'version');
+  if (version !== 1 && version !== 2) return fail('bad-version');
   const required = ['schema', 'version', 'state', 'name', 'summary'];
-  const optional = ['homepage', 'superseded_by'];
+  const optional = version === 2
+    ? ['homepage', 'superseded_by', 'descriptions', 'summary_lang']
+    : ['homepage', 'superseded_by'];
   for (const key of Object.keys(c)) {
     if (required.indexOf(key) === -1 && optional.indexOf(key) === -1) {
       return fail('unknown-field');
@@ -176,7 +190,6 @@ export function validateSoftwareEvent(
   for (const key of required) {
     if (!(key in c)) return fail('bad-schema');
   }
-  if (prop(c, 'version') !== 1) return fail('bad-version');
   const state = prop(c, 'state');
   if (state !== 'active' && state !== 'withdrawn') return fail('bad-state');
   const name = prop(c, 'name');
@@ -185,6 +198,41 @@ export function validateSoftwareEvent(
   }
   const summary = prop(c, 'summary');
   if (typeof summary !== 'string' || charLength(summary) > 1000) return fail('bad-schema');
+
+  /* §4.2 rules 7a-7c (v2 only; the key set above already refused these on a v1 record).
+     A language map that is not a map of non-empty string to non-empty string is a *broken* record,
+     not an empty one: dropping the bad entries would make it indistinguishable from a record that
+     recorded nothing, so the whole event is invalid and says why. */
+  let descriptions: Readonly<Record<string, string>> | null = null;
+  if ('descriptions' in c) {
+    const value = prop(c, 'descriptions');
+    if (value === undefined || !isJsonRecord(value)) return fail('bad-schema');
+    const keys = Object.keys(value);
+    if (keys.length === 0) return fail('bad-schema'); // rule 7b: the empty map is not written.
+    const map: Record<string, string> = {};
+    for (const language of keys) {
+      const text = prop(value, language);
+      if (language === '') return fail('bad-schema');
+      if (typeof text !== 'string' || text.length === 0) return fail('bad-schema');
+      if (charLength(text) > 1000) return fail('bad-schema'); // the same ceiling `summary` has.
+      /* rule 7c: the original already lives in `summary`. A second copy of the same bytes is a
+         value that can drift out of agreement with the one it copies, and readers fall back to
+         `summary` anyway, so it buys nothing and is refused rather than quietly kept. */
+      if (text === summary) return fail('bad-schema');
+      map[language] = text;
+    }
+    descriptions = map;
+  }
+
+  /* §4.2 rule 7e: optional, and it stays optional. The language of a text is a fact about that
+     text; a signer who has not determined it writes nothing rather than guessing `en` (D7). */
+  let summaryLang: string | null = null;
+  if ('summary_lang' in c) {
+    const value = prop(c, 'summary_lang');
+    if (typeof value !== 'string' || value.length === 0) return fail('bad-schema');
+    summaryLang = value;
+  }
+
   let homepage: string | null = null;
   if ('homepage' in c) {
     const value = prop(c, 'homepage');
@@ -221,6 +269,8 @@ export function validateSoftwareEvent(
       state,
       name,
       summary,
+      descriptions,
+      summaryLang,
       homepage,
       supersededBy,
       topics,
