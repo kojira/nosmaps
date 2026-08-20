@@ -9,8 +9,8 @@ import {bytesEqual, canonicalize} from '../domain/json.ts';
 import {compareCodePoints, isLowercaseHex64, type NostrEvent, type NostrTag} from '../domain/event.ts';
 import {decodeNpub} from '../domain/npub.ts';
 import {DISCOVERY_TOPIC, POLICY, SOFTWARE_D_PREFIX, SOFTWARE_SCHEMA, WRITE} from '../domain/policy.ts';
-import {validateSoftwareEvent} from '../domain/records.ts';
-import {selectSoftwareWinners} from '../domain/winners.ts';
+import {validateSoftwareEvent, type SoftwareRecord} from '../domain/records.ts';
+import {selectAddressableWinner, selectSoftwareWinners} from '../domain/winners.ts';
 import {createRelayContext, fetchRound, type RelayContext, type Round} from './relay.ts';
 
 /** What the publish form supplies. Every field is optional because a half-filled
@@ -57,6 +57,20 @@ export type PublishState =
   | 'published' | 'published-partial' | 'unconfirmed' | 'failed'
   | 'blocked' | 'invalid' | 'superseded-during-publish' | 'readback-quarantined';
 
+/** §W3.4 / W-I4: how `created_at` was decided, kept so the UI can disclose a
+    `+1` instead of hiding it. */
+export interface ClockDecision {
+  /** Null when no timestamp was chosen because the prior is too far ahead of
+      this device's clock (`clock-conflict`). Nothing is signed in that case. */
+  readonly createdAt: number | null;
+  readonly priorCreatedAt: number | null;
+  /** `absent` and `query-failed` are both "no prior timestamp to beat", but they
+      are not the same fact and are never merged: one is an observation, the
+      other is ignorance (§W5.3 applies the same rule to the read-back). */
+  readonly priorRead: 'winner' | 'absent' | 'query-failed';
+  readonly bumped: boolean;
+}
+
 export interface PublishResult {
   readonly state: PublishState;
   readonly reason: string;
@@ -70,6 +84,8 @@ export interface PublishResult {
     readonly tIndex: 'returned' | 'not-returned';
     readonly winnerId: string | null;
   } | null;
+  /** Null only when the run stopped before the pre-sign read round (§W3.4). */
+  readonly clock: ClockDecision | null;
   readonly attempts: number;
   readonly asOf: number;
 }
@@ -317,6 +333,64 @@ async function readBackOnce(
   return {state: 'returned', round, event: mine, tIndex: 'returned'};
 }
 
+/** §W3.4 the one place a timestamp could be fabricated. Pure, and separated
+    from the round that produces `priorCreatedAt` so the rule can be read (and
+    checked) without a relay: the only inputs are this device's clock and the
+    timestamp actually observed at the coordinate.
+
+    `max(now, prior + 1)` exists because §5.3 breaks ties by lowest event id, so
+    an update stamped at the same second as the record it replaces can simply
+    lose — the user would be staring at their old record after a completely
+    successful publish. The `+1` is bounded by MAX_FUTURE_SKEW_SEC, the same
+    bound every reader applies (§12.3), so we never sign something our own read
+    path would quarantine. Past that bound we refuse instead of forging a
+    farther-future time, which §W3.4 forbids by name. */
+export function decideCreatedAt(
+  nowSec: number,
+  priorCreatedAt: number | null
+): {ok: true; createdAt: number; bumped: boolean} | {ok: false; reason: 'clock-conflict'} {
+  if (priorCreatedAt === null || !Number.isFinite(priorCreatedAt) || nowSec > priorCreatedAt) {
+    return {ok: true, createdAt: nowSec, bumped: false};
+  }
+  const bumped = priorCreatedAt + 1;
+  if (bumped > nowSec + POLICY.MAX_FUTURE_SKEW_SEC) return {ok: false, reason: 'clock-conflict'};
+  return {ok: true, createdAt: bumped, bumped: true};
+}
+
+/** §5 U1: one read round before signing, every time. Not "look in the cache and
+    fall back to a read" — that is two code paths, and when an update loses a
+    tie-break nobody can afterwards say which one decided the timestamp. The
+    cost is one extra logical round per publish, paid so the answer to "why did
+    my update lose" is always available. */
+async function readPriorCreatedAt(
+  ctx: RelayContext,
+  pubkey: string,
+  d: string
+): Promise<{createdAt: number | null; read: 'winner' | 'absent' | 'query-failed'}> {
+  const round = await fetchRound(
+    ctx,
+    [{kinds: [POLICY.SOFTWARE_KIND], authors: [pubkey], '#d': [d], limit: 8}],
+    'publish-prior'
+  );
+  const statuses = Object.keys(round.coverage).map(url => round.coverage[url]?.status);
+  if (statuses.indexOf('eose') === -1) return {createdAt: null, read: 'query-failed'};
+  /* Relays may answer with more than was asked for, so the coordinate is
+     re-derived from the events rather than assumed from the filter. Validity is
+     deliberately NOT required here: a malformed event at this address still
+     occupies it on the relay — replaceable kinds are replaced by the highest
+     created_at, valid or not — so beating only the valid ones would still lose
+     the address. */
+  const atCoordinate = round.events
+    .map(item => item.event)
+    .filter(event => event
+      && event.kind === POLICY.SOFTWARE_KIND
+      && event.pubkey === pubkey
+      && (event.tags ?? []).some(tag => tag[0] === 'd' && tag[1] === d));
+  const winner = selectAddressableWinner(atCoordinate);
+  if (!winner || !Number.isFinite(winner.created_at)) return {createdAt: null, read: 'absent'};
+  return {createdAt: winner.created_at, read: 'winner'};
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -343,10 +417,15 @@ export async function publishSoftwareRecord(opts?: PublishOptions): Promise<Publ
   const nowSec = Number.isSafeInteger(opts?.nowSec)
     ? (opts?.nowSec as number) : Math.floor(Date.now() / 1000);
 
+  /* Set by the pre-sign read round (§W3.4) and reported whatever happens after
+     it, because "we looked, and this is what was there" is exactly the fact a
+     user needs when an update loses. Null while the run has not looked yet. */
+  let clock: ClockDecision | null = null;
+
   const failWith = (state: PublishState, reason: string): PublishResult => ({
     state, reason, eventId: null, coordinate: null, event: null,
     relays: relays.map(url => ({url, outcome: 'not-attempted' as const, notice: ''})),
-    readback: null, attempts: 0, asOf: Date.now()
+    readback: null, clock, attempts: 0, asOf: Date.now()
   });
 
   if (!signer || typeof signer.signEvent !== 'function'
@@ -368,39 +447,66 @@ export async function publishSoftwareRecord(opts?: PublishOptions): Promise<Publ
     return failWith('blocked', 'pubkey-mismatch');
   }
 
-  const draft = buildSoftwareDraft({...opts?.draft, pubkey, createdAt: nowSec});
+  /* Built once at `nowSec` only to run the read path's validator and to learn
+     the coordinate: this draft is never signed. The signed one is rebuilt below
+     with the timestamp the pre-sign read round decides (§W3.4). */
+  const probe = buildSoftwareDraft({...opts?.draft, pubkey, createdAt: nowSec});
   /* §W0.1: the Publish control is enabled by, and only by, the read path's own
      validator. Re-checked here so no caller can route around the gate. */
-  const preflight = validateSoftwareEvent(draft, {receivedAtSec: nowSec});
+  const preflight = validateSoftwareEvent(probe, {receivedAtSec: nowSec});
   if (!preflight.ok) return failWith('invalid', preflight.reason);
   const d = preflight.record.d;
 
-  let signed: NostrEvent | null = null;
-  try {
-    signed = await signer.signEvent(draft);
-  } catch {
-    return failWith('blocked', 'signer-rejected');
-  }
-  const signerProblem = checkSignedEvent(draft, signed, pubkey);
-  if (signerProblem) return failWith('blocked', signerProblem);
-  const postflight = validateSoftwareEvent(signed, {receivedAtSec: nowSec});
-  if (!postflight.ok) return failWith('blocked', 'signer-invalid-record');
-  const coordinate = postflight.record.coordinate;
-  const signedEvent: NostrEvent = signed;
-
   let ctx: RelayContext | null = null;
+  let signedEvent: NostrEvent | null = null;
+  let coordinate: string | null = null;
   try {
     ctx = await createRelayContext(relays, timeoutMs);
     if (!ctx.ok) {
       return {
-        state: 'failed', reason: 'relay-unavailable', eventId: signedEvent.id ?? null,
-        coordinate, event: signedEvent,
+        state: 'failed', reason: 'relay-unavailable', eventId: null,
+        coordinate: null, event: null,
         relays: relays.map(url => ({url, outcome: 'connection-failed' as const, notice: ''})),
-        readback: null, attempts: 0, asOf: Date.now()
+        readback: null, clock, attempts: 0, asOf: Date.now()
       };
     }
+    const relayCtx = ctx;
 
-    const outcomes = await sendEvent(ctx, signedEvent, relays, publishTimeoutMs);
+    /* §W3.4 / §5 U1: read the coordinate before signing, unconditionally, so a
+       tie-break loss can always be explained by an observation rather than by
+       whatever happened to be in a cache. */
+    const prior = await readPriorCreatedAt(relayCtx, pubkey, d);
+    const decision = decideCreatedAt(nowSec, prior.createdAt);
+    if (!decision.ok) {
+      clock = {
+        createdAt: null, priorCreatedAt: prior.createdAt,
+        priorRead: prior.read, bumped: false
+      };
+      /* Nothing was signed and nothing was sent: this run stopped at the gate
+         before the signer, which is `blocked` — not `failed`, which in this
+         file means a relay refused something we had already signed. */
+      return failWith('blocked', decision.reason);
+    }
+    clock = {
+      createdAt: decision.createdAt, priorCreatedAt: prior.createdAt,
+      priorRead: prior.read, bumped: decision.bumped
+    };
+
+    const draft = buildSoftwareDraft({...opts?.draft, pubkey, createdAt: decision.createdAt});
+    let signed: NostrEvent | null = null;
+    try {
+      signed = await signer.signEvent(draft);
+    } catch {
+      return failWith('blocked', 'signer-rejected');
+    }
+    const signerProblem = checkSignedEvent(draft, signed, pubkey);
+    if (signerProblem) return failWith('blocked', signerProblem);
+    const postflight = validateSoftwareEvent(signed, {receivedAtSec: nowSec});
+    if (!postflight.ok) return failWith('blocked', 'signer-invalid-record');
+    coordinate = postflight.record.coordinate;
+    signedEvent = signed;
+
+    const outcomes = await sendEvent(relayCtx, signedEvent, relays, publishTimeoutMs);
     const perRelay: RelayReport[] = relays.map(url => ({
       url,
       outcome: outcomes[url]?.outcome ?? 'connection-failed',
@@ -418,7 +524,7 @@ export async function publishSoftwareRecord(opts?: PublishOptions): Promise<Publ
       return {
         state: 'failed', reason: 'all-relays-rejected', eventId: signedEvent.id ?? null,
         coordinate, event: signedEvent,
-        relays: perRelay, readback: null, attempts: 0, asOf: Date.now()
+        relays: perRelay, readback: null, clock, attempts: 0, asOf: Date.now()
       };
     }
 
@@ -431,7 +537,7 @@ export async function publishSoftwareRecord(opts?: PublishOptions): Promise<Publ
       const wait = Number.isFinite(backoff[i]) ? (backoff[i] as number) : 0;
       if (wait > 0) await delay(wait);
       used = i + 1;
-      readback = await readBackOnce(ctx, signedEvent, d);
+      readback = await readBackOnce(relayCtx, signedEvent, d);
       if (readback.state === 'returned'
           || readback.state === 'superseded-during-publish'
           || readback.state === 'readback-quarantined') break;
@@ -459,16 +565,173 @@ export async function publishSoftwareRecord(opts?: PublishOptions): Promise<Publ
       readback: readback
         ? {state: readback.state, tIndex: readback.tIndex, winnerId: readback.winnerId ?? null}
         : null,
+      clock,
       attempts: used,
       asOf: Date.now()
     };
   } catch {
     return {
-      state: 'failed', reason: 'publish-error', eventId: signedEvent.id ?? null,
+      state: 'failed', reason: 'publish-error', eventId: signedEvent?.id ?? null,
       coordinate, event: signedEvent,
       relays: relays.map(url => ({url, outcome: 'connection-failed' as const, notice: ''})),
-      readback: null, attempts: 0, asOf: Date.now()
+      readback: null, clock, attempts: 0, asOf: Date.now()
     };
+  } finally {
+    const rx = ctx?.rxNostr;
+    if (rx && typeof rx.dispose === 'function') {
+      try {
+        rx.dispose();
+      } catch { /* noop */ }
+    }
+  }
+}
+
+/** §W6.2: the Withdraw action. It is the same publish chain — one more record
+    at the same coordinate, signed by the same key — with `state` computed from
+    the action rather than read from a control (§W3.3). `name` and `summary`
+    are carried through unchanged, because §7.1 still requires them: a client
+    that only holds the withdrawal must still be able to say *what* was
+    withdrawn. No kind 5 is sent; §7.4 makes the withdrawal event itself the
+    whole mechanism, and a deletion request would claim an erasure nobody can
+    guarantee. */
+export function withdrawSoftwareRecord(opts?: PublishOptions): Promise<PublishResult> {
+  return publishSoftwareRecord({...opts, draft: {...opts?.draft, state: 'withdrawn'}});
+}
+
+/* ---- The publisher's own records (issue #12) ------------------------------
+
+   One logical REQ, one author, one purpose: showing a signed-in user what this
+   app can actually observe of what they signed. Nothing here writes. */
+
+/** How many raw events one manage round asks for. A ceiling, not a count: what
+    comes back is whatever the relays hold, and reaching it is reported rather
+    than hidden (`truncated`). */
+export const MANAGE_LIMIT = 64;
+
+export interface MyRecordsOptions {
+  readonly relays?: readonly string[];
+  readonly timeoutMs?: number;
+  /** The viewer's key, supplied by the caller. This function never asks an
+      extension for it: the signed-in key is the UI's fact, not ours. */
+  readonly pubkey: string;
+}
+
+export type MyRecordsState = 'ok' | 'empty' | 'query-failed' | 'unavailable';
+
+/** Why events were not listed. Diagnostics only — none of these is an error the
+    user has to act on, and `foreignD` is not one at all (see below). */
+export interface MyRecordsDiagnostics {
+  /** Raw events the round delivered, before anything was dropped. */
+  readonly received: number;
+  /** Events by someone else. Relays may answer with more than was asked for. */
+  readonly foreignAuthor: number;
+  /** NIP-78 shares kind 30078 across applications, so another app's record
+      (`d` outside `nosmaps:`) coming back is the normal case, not a fault. It
+      is neither listed nor counted as one of the user's records. */
+  readonly foreignD: number;
+  /** Ours by address, but the read path would not display it. */
+  readonly invalid: number;
+}
+
+export interface MyRecordsResult {
+  readonly state: MyRecordsState;
+  /** One row per coordinate, newest first. SoftwareRecord already carries the
+      coordinate, the event id and created_at, so nothing is wrapped around it. */
+  readonly records: readonly SoftwareRecord[];
+  /** The round returned at least MANAGE_LIMIT raw events, so there may be more
+      than this list shows. Reported because "64 rows" and "the first 64 of an
+      unknown number" are different facts. */
+  readonly truncated: boolean;
+  readonly asOf: number;
+  readonly diagnostics: MyRecordsDiagnostics;
+}
+
+/** §5.2: single-author filter, one logical REQ. Returns a closed set of states
+    because the interesting distinction is not "rows or no rows":
+
+    `query-failed` (no relay reached EOSE) and `empty` (every relay answered and
+    held nothing of ours) are never merged. Merging them would let a page that
+    learned nothing tell a publisher their records are gone — the one sentence
+    this app must never say by accident, since the user's next move after "you
+    have no records" is to publish them again. */
+export async function fetchMyRecords(opts?: MyRecordsOptions): Promise<MyRecordsResult> {
+  const relays = (Array.isArray(opts?.relays) && opts.relays.length
+    ? opts.relays : POLICY.DEFAULT_RELAYS).slice();
+  const timeoutMs = Number.isFinite(opts?.timeoutMs)
+    ? (opts?.timeoutMs as number) : POLICY.REQ_TIMEOUT_MS;
+  const pubkey = typeof opts?.pubkey === 'string' ? opts.pubkey : '';
+
+  const diagnostics = {received: 0, foreignAuthor: 0, foreignD: 0, invalid: 0};
+  const nothing = (state: MyRecordsState): MyRecordsResult =>
+    ({state, records: [], truncated: false, asOf: Date.now(), diagnostics});
+
+  /* No usable key means no REQ was ever sent, which is ignorance about the
+     relays and not an observation of zero. */
+  if (!isLowercaseHex64(pubkey)) return nothing('query-failed');
+
+  let ctx: RelayContext | null = null;
+  try {
+    ctx = await createRelayContext(relays, timeoutMs);
+    if (!ctx.ok) return nothing('unavailable');
+    const round = await fetchRound(
+      ctx,
+      [{kinds: [POLICY.SOFTWARE_KIND], authors: [pubkey], limit: MANAGE_LIMIT}],
+      'my-records'
+    );
+    const statuses = Object.keys(round.coverage).map(url => round.coverage[url]?.status);
+    if (statuses.indexOf('eose') === -1) return nothing('query-failed');
+
+    const events = round.events.map(item => item.event);
+    diagnostics.received = events.length;
+    const truncated = events.length >= MANAGE_LIMIT;
+
+    /* Validity is decided by the read path's own validator (§W0.1), so the list
+       shows what a reader would see and not what we hoped we wrote. */
+    const receivedAtSec = Math.floor(Date.now() / 1000);
+    const byCoordinate = new Map<string, {event: NostrEvent; record: SoftwareRecord}[]>();
+    for (const event of events) {
+      if (!event) continue;
+      if (event.pubkey !== pubkey) {
+        diagnostics.foreignAuthor += 1;
+        continue;
+      }
+      const check = validateSoftwareEvent(event, {receivedAtSec});
+      if (!check.ok) {
+        if (check.reason === 'foreign-d') diagnostics.foreignD += 1;
+        else diagnostics.invalid += 1;
+        continue;
+      }
+      const coordinate = check.record.coordinate;
+      let group = byCoordinate.get(coordinate);
+      if (!group) {
+        group = [];
+        byCoordinate.set(coordinate, group);
+      }
+      group.push({event, record: check.record});
+    }
+
+    /* One row per address, chosen by the same NIP-01 rule the read path uses.
+       Several versions of one record are one record, not several. */
+    const records: SoftwareRecord[] = [];
+    for (const group of byCoordinate.values()) {
+      const winnerEvent = selectAddressableWinner(group.map(entry => entry.event));
+      const winner = winnerEvent ? group.find(entry => entry.event === winnerEvent) : undefined;
+      if (winner) records.push(winner.record);
+    }
+    // Newest first; ties broken by coordinate so the order is not luck.
+    records.sort((a, b) => (b.createdAt - a.createdAt)
+      || compareCodePoints(a.coordinate, b.coordinate));
+
+    return {
+      state: records.length ? 'ok' : 'empty',
+      records,
+      truncated,
+      asOf: Date.now(),
+      diagnostics
+    };
+  } catch {
+    // An exception is not an answer either, so it stays out of `empty`.
+    return nothing('query-failed');
   } finally {
     const rx = ctx?.rxNostr;
     if (rx && typeof rx.dispose === 'function') {

@@ -9478,6 +9478,27 @@ async function readBackOnce(ctx, signed, d) {
   }
   return { state: "returned", round, event: mine, tIndex: "returned" };
 }
+function decideCreatedAt(nowSec, priorCreatedAt) {
+  if (priorCreatedAt === null || !Number.isFinite(priorCreatedAt) || nowSec > priorCreatedAt) {
+    return { ok: true, createdAt: nowSec, bumped: false };
+  }
+  const bumped = priorCreatedAt + 1;
+  if (bumped > nowSec + POLICY.MAX_FUTURE_SKEW_SEC) return { ok: false, reason: "clock-conflict" };
+  return { ok: true, createdAt: bumped, bumped: true };
+}
+async function readPriorCreatedAt(ctx, pubkey, d) {
+  const round = await fetchRound(
+    ctx,
+    [{ kinds: [POLICY.SOFTWARE_KIND], authors: [pubkey], "#d": [d], limit: 8 }],
+    "publish-prior"
+  );
+  const statuses = Object.keys(round.coverage).map((url) => round.coverage[url]?.status);
+  if (statuses.indexOf("eose") === -1) return { createdAt: null, read: "query-failed" };
+  const atCoordinate = round.events.map((item) => item.event).filter((event) => event && event.kind === POLICY.SOFTWARE_KIND && event.pubkey === pubkey && (event.tags ?? []).some((tag) => tag[0] === "d" && tag[1] === d));
+  const winner = selectAddressableWinner(atCoordinate);
+  if (!winner || !Number.isFinite(winner.created_at)) return { createdAt: null, read: "absent" };
+  return { createdAt: winner.created_at, read: "winner" };
+}
 function delay2(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -9489,6 +9510,7 @@ async function publishSoftwareRecord(opts) {
   const backoff2 = Array.isArray(opts?.readbackBackoffMs) ? opts.readbackBackoffMs : WRITE.READBACK_BACKOFF_MS;
   const signer = opts?.signer ?? (typeof window !== "undefined" ? window.nostr : null);
   const nowSec = Number.isSafeInteger(opts?.nowSec) ? opts?.nowSec : Math.floor(Date.now() / 1e3);
+  let clock = null;
   const failWith = (state, reason) => ({
     state,
     reason,
@@ -9497,6 +9519,7 @@ async function publishSoftwareRecord(opts) {
     event: null,
     relays: relays.map((url) => ({ url, outcome: "not-attempted", notice: "" })),
     readback: null,
+    clock,
     attempts: 0,
     asOf: Date.now()
   });
@@ -9513,39 +9536,61 @@ async function publishSoftwareRecord(opts) {
   if (opts?.expectPubkey && opts.expectPubkey !== pubkey) {
     return failWith("blocked", "pubkey-mismatch");
   }
-  const draft = buildSoftwareDraft({ ...opts?.draft, pubkey, createdAt: nowSec });
-  const preflight = validateSoftwareEvent(draft, { receivedAtSec: nowSec });
+  const probe = buildSoftwareDraft({ ...opts?.draft, pubkey, createdAt: nowSec });
+  const preflight = validateSoftwareEvent(probe, { receivedAtSec: nowSec });
   if (!preflight.ok) return failWith("invalid", preflight.reason);
   const d = preflight.record.d;
-  let signed = null;
-  try {
-    signed = await signer.signEvent(draft);
-  } catch {
-    return failWith("blocked", "signer-rejected");
-  }
-  const signerProblem = checkSignedEvent(draft, signed, pubkey);
-  if (signerProblem) return failWith("blocked", signerProblem);
-  const postflight = validateSoftwareEvent(signed, { receivedAtSec: nowSec });
-  if (!postflight.ok) return failWith("blocked", "signer-invalid-record");
-  const coordinate = postflight.record.coordinate;
-  const signedEvent = signed;
   let ctx = null;
+  let signedEvent = null;
+  let coordinate = null;
   try {
     ctx = await createRelayContext(relays, timeoutMs);
     if (!ctx.ok) {
       return {
         state: "failed",
         reason: "relay-unavailable",
-        eventId: signedEvent.id ?? null,
-        coordinate,
-        event: signedEvent,
+        eventId: null,
+        coordinate: null,
+        event: null,
         relays: relays.map((url) => ({ url, outcome: "connection-failed", notice: "" })),
         readback: null,
+        clock,
         attempts: 0,
         asOf: Date.now()
       };
     }
-    const outcomes = await sendEvent(ctx, signedEvent, relays, publishTimeoutMs);
+    const relayCtx = ctx;
+    const prior = await readPriorCreatedAt(relayCtx, pubkey, d);
+    const decision = decideCreatedAt(nowSec, prior.createdAt);
+    if (!decision.ok) {
+      clock = {
+        createdAt: null,
+        priorCreatedAt: prior.createdAt,
+        priorRead: prior.read,
+        bumped: false
+      };
+      return failWith("blocked", decision.reason);
+    }
+    clock = {
+      createdAt: decision.createdAt,
+      priorCreatedAt: prior.createdAt,
+      priorRead: prior.read,
+      bumped: decision.bumped
+    };
+    const draft = buildSoftwareDraft({ ...opts?.draft, pubkey, createdAt: decision.createdAt });
+    let signed = null;
+    try {
+      signed = await signer.signEvent(draft);
+    } catch {
+      return failWith("blocked", "signer-rejected");
+    }
+    const signerProblem = checkSignedEvent(draft, signed, pubkey);
+    if (signerProblem) return failWith("blocked", signerProblem);
+    const postflight = validateSoftwareEvent(signed, { receivedAtSec: nowSec });
+    if (!postflight.ok) return failWith("blocked", "signer-invalid-record");
+    coordinate = postflight.record.coordinate;
+    signedEvent = signed;
+    const outcomes = await sendEvent(relayCtx, signedEvent, relays, publishTimeoutMs);
     const perRelay = relays.map((url) => ({
       url,
       outcome: outcomes[url]?.outcome ?? "connection-failed",
@@ -9564,6 +9609,7 @@ async function publishSoftwareRecord(opts) {
         event: signedEvent,
         relays: perRelay,
         readback: null,
+        clock,
         attempts: 0,
         asOf: Date.now()
       };
@@ -9574,7 +9620,7 @@ async function publishSoftwareRecord(opts) {
       const wait = Number.isFinite(backoff2[i]) ? backoff2[i] : 0;
       if (wait > 0) await delay2(wait);
       used = i + 1;
-      readback = await readBackOnce(ctx, signedEvent, d);
+      readback = await readBackOnce(relayCtx, signedEvent, d);
       if (readback.state === "returned" || readback.state === "superseded-during-publish" || readback.state === "readback-quarantined") break;
     }
     let state;
@@ -9596,6 +9642,7 @@ async function publishSoftwareRecord(opts) {
       relays: perRelay,
       accepted,
       readback: readback ? { state: readback.state, tIndex: readback.tIndex, winnerId: readback.winnerId ?? null } : null,
+      clock,
       attempts: used,
       asOf: Date.now()
     };
@@ -9603,14 +9650,88 @@ async function publishSoftwareRecord(opts) {
     return {
       state: "failed",
       reason: "publish-error",
-      eventId: signedEvent.id ?? null,
+      eventId: signedEvent?.id ?? null,
       coordinate,
       event: signedEvent,
       relays: relays.map((url) => ({ url, outcome: "connection-failed", notice: "" })),
       readback: null,
+      clock,
       attempts: 0,
       asOf: Date.now()
     };
+  } finally {
+    const rx = ctx?.rxNostr;
+    if (rx && typeof rx.dispose === "function") {
+      try {
+        rx.dispose();
+      } catch {
+      }
+    }
+  }
+}
+function withdrawSoftwareRecord(opts) {
+  return publishSoftwareRecord({ ...opts, draft: { ...opts?.draft, state: "withdrawn" } });
+}
+var MANAGE_LIMIT = 64;
+async function fetchMyRecords(opts) {
+  const relays = (Array.isArray(opts?.relays) && opts.relays.length ? opts.relays : POLICY.DEFAULT_RELAYS).slice();
+  const timeoutMs = Number.isFinite(opts?.timeoutMs) ? opts?.timeoutMs : POLICY.REQ_TIMEOUT_MS;
+  const pubkey = typeof opts?.pubkey === "string" ? opts.pubkey : "";
+  const diagnostics = { received: 0, foreignAuthor: 0, foreignD: 0, invalid: 0 };
+  const nothing = (state) => ({ state, records: [], truncated: false, asOf: Date.now(), diagnostics });
+  if (!isLowercaseHex64(pubkey)) return nothing("query-failed");
+  let ctx = null;
+  try {
+    ctx = await createRelayContext(relays, timeoutMs);
+    if (!ctx.ok) return nothing("unavailable");
+    const round = await fetchRound(
+      ctx,
+      [{ kinds: [POLICY.SOFTWARE_KIND], authors: [pubkey], limit: MANAGE_LIMIT }],
+      "my-records"
+    );
+    const statuses = Object.keys(round.coverage).map((url) => round.coverage[url]?.status);
+    if (statuses.indexOf("eose") === -1) return nothing("query-failed");
+    const events = round.events.map((item) => item.event);
+    diagnostics.received = events.length;
+    const truncated = events.length >= MANAGE_LIMIT;
+    const receivedAtSec = Math.floor(Date.now() / 1e3);
+    const byCoordinate = /* @__PURE__ */ new Map();
+    for (const event of events) {
+      if (!event) continue;
+      if (event.pubkey !== pubkey) {
+        diagnostics.foreignAuthor += 1;
+        continue;
+      }
+      const check = validateSoftwareEvent(event, { receivedAtSec });
+      if (!check.ok) {
+        if (check.reason === "foreign-d") diagnostics.foreignD += 1;
+        else diagnostics.invalid += 1;
+        continue;
+      }
+      const coordinate = check.record.coordinate;
+      let group = byCoordinate.get(coordinate);
+      if (!group) {
+        group = [];
+        byCoordinate.set(coordinate, group);
+      }
+      group.push({ event, record: check.record });
+    }
+    const records = [];
+    for (const group of byCoordinate.values()) {
+      const winnerEvent = selectAddressableWinner(group.map((entry) => entry.event));
+      const winner = winnerEvent ? group.find((entry) => entry.event === winnerEvent) : void 0;
+      if (winner) records.push(winner.record);
+    }
+    records.sort((a, b) => b.createdAt - a.createdAt || compareCodePoints(a.coordinate, b.coordinate));
+    return {
+      state: records.length ? "ok" : "empty",
+      records,
+      truncated,
+      asOf: Date.now(),
+      diagnostics
+    };
+  } catch {
+    return nothing("query-failed");
   } finally {
     const rx = ctx?.rxNostr;
     if (rx && typeof rx.dispose === "function") {
@@ -9912,6 +10033,11 @@ var dictionaries = {
         publishing: "\u6295\u7A3F\u4E2D\u2026",
         eventId: "\u7F72\u540D\u3057\u305F\u30A4\u30D9\u30F3\u30C8ID",
         partialConsequence: "\u53D7\u3051\u4ED8\u3051\u306A\u304B\u3063\u305F\u30EA\u30EC\u30FC\u3060\u3051\u3092\u8AAD\u3093\u3067\u3044\u308B\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306B\u306F\u3001\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u306F\u898B\u3048\u307E\u305B\u3093\u3002",
+        /* §W3.4 / W-I4: created_at を1秒進めたことは隠さない。進めた理由と、進める前に
+           実際に観測した値を並べて出す。「勝手に時刻を作った」と「同じ秒で負けないように
+           1秒だけ足した」は別のことなので、後者だと分かる形で書く。 */
+        clockBumped: "\u540C\u3058\u5EA7\u6A19\u306B created_at {prior} \u306E\u30EC\u30B3\u30FC\u30C9\u3092\u89B3\u6E2C\u3057\u305F\u306E\u3067\u3001\u540C\u3058\u79D2\u3067\u8CA0\u3051\u306A\u3044\u3088\u3046\u306B created_at \u3092 {createdAt} \u306B\u3057\u307E\u3057\u305F\uFF08+1\u79D2\uFF09\u3002",
+        clockConflictDetail: "\u89B3\u6E2C\u3057\u305F created_at \u306F {prior} \u3067\u3001\u3053\u306E\u7AEF\u672B\u306E\u6642\u8A08\uFF08{now}\uFF09\u3088\u308A\u5148\u3067\u3059\u3002\u4F55\u3082\u7F72\u540D\u3057\u3066\u3044\u307E\u305B\u3093\u3002",
         headlines: {
           published: "{total}\u53F0\u4E2D{accepted}\u53F0\u306B\u516C\u958B\u3057\u3001\u8AAD\u307F\u623B\u305B\u307E\u3057\u305F\u3002",
           partial: "{total}\u53F0\u4E2D{accepted}\u53F0\u306B\u516C\u958B\u3057\u3001\u8AAD\u307F\u623B\u305B\u307E\u3057\u305F\u3002",
@@ -9952,6 +10078,7 @@ var dictionaries = {
           "signer-invalid-record": "\u7F72\u540D\u5F8C\u306E\u30A4\u30D9\u30F3\u30C8\u304C\u691C\u8A3C\u3092\u901A\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u4F55\u3082\u9001\u3063\u3066\u3044\u307E\u305B\u3093\u3002",
           "nip07-key-unparsable": "NIP-07\u62E1\u5F35\u304C\u516C\u958B\u9375\u3068\u3057\u3066\u8AAD\u3081\u306A\u3044\u5024\u3092\u8FD4\u3057\u307E\u3057\u305F\u3002",
           "pubkey-mismatch": "\u30B5\u30A4\u30F3\u30A4\u30F3\u6642\u3068\u5225\u306E\u516C\u958B\u9375\u304C\u8FD4\u308A\u307E\u3057\u305F\u3002\u4F55\u3082\u9001\u3063\u3066\u3044\u307E\u305B\u3093\u3002",
+          "clock-conflict": "\u3053\u306E\u5EA7\u6A19\u306E\u30EC\u30B3\u30FC\u30C9\u304C\u3001\u3053\u306E\u7AEF\u672B\u306E\u6642\u8A08\u3088\u308A\u5148\u306E\u6642\u523B\u3067\u8A18\u9332\u3055\u308C\u3066\u3044\u307E\u3059\u3002\u7AEF\u672B\u306E\u6642\u8A08\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
           "relay-unavailable": "\u30EA\u30EC\u30FC\u5C64\u3092\u521D\u671F\u5316\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002",
           "all-relays-rejected": "\u3059\u3079\u3066\u306E\u30EA\u30EC\u30FC\u304C\u62D2\u5426\u3057\u307E\u3057\u305F\u3002",
           "publish-error": "\u6295\u7A3F\u306E\u9014\u4E2D\u3067\u30A8\u30E9\u30FC\u304C\u8D77\u304D\u307E\u3057\u305F\u3002\u516C\u958B\u3055\u308C\u305F\u304B\u3069\u3046\u304B\u306F\u5206\u304B\u308A\u307E\u305B\u3093\u3002",
@@ -9963,6 +10090,40 @@ var dictionaries = {
           unavailable: "\u30C7\u30FC\u30BF\u5C64\u3092\u8AAD\u307F\u8FBC\u3081\u3066\u3044\u307E\u305B\u3093\u3002",
           unknownReason: "\u7406\u7531: {reason}"
         }
+      },
+      /* issue #12: 自分が出したレコードの一覧。「観測できなかった」と「問い合わせが完了しなかった」を
+         別の文言にしてあるのは、利用者が次に取る行動が違うから —— 後者を「0件」と書くと、
+         もう出してあるレコードをもう一度出しに行かせることになる。 */
+      manage: {
+        title: "\u81EA\u5206\u304C\u51FA\u3057\u305F\u30EC\u30B3\u30FC\u30C9",
+        loading: "\u30EA\u30EC\u30FC\u306B\u554F\u3044\u5408\u308F\u305B\u3066\u3044\u307E\u3059\u2026",
+        empty: "\u3053\u306E\u30EA\u30EC\u30FC\u3067\u306F\u3001\u3042\u306A\u305F\u306E\u7F72\u540D\u3057\u305F\u30EC\u30B3\u30FC\u30C9\u306F\u89B3\u6E2C\u3055\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u5B58\u5728\u3057\u306A\u3044\u3068\u3044\u3046\u610F\u5473\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
+        queryFailed: "\u554F\u3044\u5408\u308F\u305B\u304C\u5B8C\u4E86\u3057\u306A\u304B\u3063\u305F\u306E\u3067\u3001\u4EF6\u6570\u306F0\u3067\u306F\u306A\u304F\u4E0D\u660E\u3067\u3059\u3002\u4F55\u3082\u89B3\u6E2C\u3067\u304D\u3066\u3044\u307E\u305B\u3093\u3002",
+        unavailable: "\u30EA\u30EC\u30FC\u306B1\u53F0\u3082\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u89B3\u6E2C\u3067\u304D\u305F\u3053\u3068\u306F\u4F55\u3082\u3042\u308A\u307E\u305B\u3093\u3002",
+        truncated: "\u4E0A\u9650 {limit} \u4EF6\u307E\u3067\u8AAD\u307F\u307E\u3057\u305F\u3002\u3053\u308C\u3088\u308A\u591A\u304F\u306E\u30EC\u30B3\u30FC\u30C9\u304C\u3042\u308B\u53EF\u80FD\u6027\u304C\u3042\u308A\u307E\u3059\u3002",
+        count: "{count} \u4EF6",
+        coordinate: "\u8B58\u5225\u5B50 d",
+        updatedAt: "\u6700\u7D42\u66F4\u65B0",
+        /* §W6.5 取り下げ。確認文が「取り下げは削除ではない」と述べるのは §7.3 の要請で、
+           取り下げを削除と読ませないため。結果の語彙は、読み戻しで確認できたときにだけ
+           「確認しました」と言い、確認できていない間は「まだ active に見える」と書く。 */
+        withdraw: "\u53D6\u308A\u4E0B\u3052\u308B",
+        withdrawing: "\u53D6\u308A\u4E0B\u3052\u4E2D\u2026",
+        withdrawConfirm: "\u53D6\u308A\u4E0B\u3052\u3092\u5B9F\u884C",
+        withdrawCancel: "\u3084\u3081\u308B",
+        withdrawPrompt: "\u300C{name}\u300D\u3092\u53D6\u308A\u4E0B\u3052\u307E\u3059\u3002\u53D6\u308A\u4E0B\u3052\u306F\u524A\u9664\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002\u53D6\u308A\u4E0B\u3052\u3092\u89B3\u6E2C\u3057\u305F\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306F\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u3092\u4E00\u89A7\u306B\u51FA\u3055\u306A\u304F\u306A\u308A\u307E\u3059\u304C\u3001\u30A4\u30D9\u30F3\u30C8\u304C\u6D88\u3048\u308B\u308F\u3051\u3067\u306F\u306A\u304F\u3001\u53D6\u308A\u4E0B\u3052\u3092\u89B3\u6E2C\u3057\u3066\u3044\u306A\u3044\u30EA\u30EC\u30FC\u3084\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306B\u306F\u53E4\u3044\u7248\u304C\u305D\u306E\u307E\u307E\u6B8B\u308A\u307E\u3059\u3002",
+        withdrawHeadlines: {
+          confirmed: "\u53D6\u308A\u4E0B\u3052\u3092\u8AAD\u307F\u623B\u3057\u3066\u78BA\u8A8D\u3057\u307E\u3057\u305F\uFF08{accepted}/{total} \u4EF6\u306E\u30EA\u30EC\u30FC\u304C\u53D7\u3051\u53D6\u308A\u307E\u3057\u305F\uFF09\u3002",
+          partial: "\u53D6\u308A\u4E0B\u3052\u3092\u8AAD\u307F\u623B\u3057\u3066\u78BA\u8A8D\u3057\u307E\u3057\u305F\u304C\u3001\u53D7\u3051\u53D6\u3063\u305F\u306E\u306F {accepted}/{total} \u4EF6\u306E\u30EA\u30EC\u30FC\u3060\u3051\u3067\u3059\u3002",
+          unconfirmed: "\u53D6\u308A\u4E0B\u3052\u3092\u8AAD\u307F\u623B\u305B\u307E\u305B\u3093\u3067\u3057\u305F\uFF08{attempts} \u56DE\u8A66\u884C\uFF09\u3002\u5C4A\u3044\u305F\u304B\u3069\u3046\u304B\u306F\u5206\u304B\u3063\u3066\u3044\u307E\u305B\u3093\u3002",
+          failed: "\u53D6\u308A\u4E0B\u3052\u3092\u3069\u306E\u30EA\u30EC\u30FC\u306B\u3082\u5C4A\u3051\u3089\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002",
+          invalid: "\u53D6\u308A\u4E0B\u3052\u308B\u30EC\u30B3\u30FC\u30C9\u304C\u691C\u8A3C\u3092\u901A\u3089\u306A\u304B\u3063\u305F\u306E\u3067\u3001\u4F55\u3082\u7F72\u540D\u3057\u3066\u3044\u307E\u305B\u3093\u3002",
+          blocked: "\u53D6\u308A\u4E0B\u3052\u306F\u9001\u308B\u524D\u306B\u6B62\u307E\u308A\u307E\u3057\u305F\u3002\u4F55\u3082\u7F72\u540D\u3057\u3066\u3044\u307E\u305B\u3093\u3002",
+          other: "\u53D6\u308A\u4E0B\u3052\u306E\u72B6\u614B: {state}"
+        },
+        withdrawNotDeletion: "\u53D6\u308A\u4E0B\u3052\u306F\u524A\u9664\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002\u53E4\u3044\u7248\u3092\u6301\u3063\u3066\u3044\u308B\u30EA\u30EC\u30FC\u304B\u3089\u30A4\u30D9\u30F3\u30C8\u304C\u6D88\u3048\u308B\u308F\u3051\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
+        withdrawStillActive: "\u53D6\u308A\u4E0B\u3052\u3092\u8AAD\u307F\u623B\u3057\u3066\u78BA\u8A8D\u3067\u304D\u3066\u3044\u306A\u3044\u306E\u3067\u3001\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u304C\u307E\u3060 active \u306B\u898B\u3048\u308B\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u304C\u3042\u308A\u307E\u3059\u3002",
+        withdrawPartialActive: "\u53D6\u308A\u4E0B\u3052\u3092\u53D7\u3051\u53D6\u3063\u3066\u3044\u306A\u3044\u30EA\u30EC\u30FC\u3060\u3051\u3092\u8AAD\u3080\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306B\u306F\u3001\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u306F\u307E\u3060 active \u306B\u898B\u3048\u307E\u3059\u3002"
       },
       /* NIP-07 サインイン。失敗の原因は原因ごとに別の文言で出す —— 「拡張が無い」「断られた」
          「エラーが返った」「応答が無い」は利用者が次に取る行動が違う。 */
@@ -10316,6 +10477,8 @@ var dictionaries = {
         publishing: "Publishing\u2026",
         eventId: "Signed event id",
         partialConsequence: "Clients that read only the relays which did not accept it will not see this record.",
+        clockBumped: "A record at this address was observed with created_at {prior}, so created_at was set to {createdAt} (+1 second) rather than risk losing a same-second tie.",
+        clockConflictDetail: "The observed created_at is {prior}, which is ahead of this device clock ({now}). Nothing was signed.",
         headlines: {
           published: "Published to {accepted} of {total} relays and read back.",
           partial: "Published to {accepted} of {total} relays and read back.",
@@ -10356,6 +10519,7 @@ var dictionaries = {
           "signer-invalid-record": "The signed event did not pass validation. Nothing was sent.",
           "nip07-key-unparsable": "The extension returned a value that is not a readable public key.",
           "pubkey-mismatch": "A different public key came back than the one you signed in with. Nothing was sent.",
+          "clock-conflict": "A record at this address is already timestamped ahead of this device\u2019s clock. Check your system time.",
           "relay-unavailable": "The relay layer could not be initialised.",
           "all-relays-rejected": "Every relay refused it.",
           "publish-error": "Publishing errored part way through. Whether it was stored is unknown.",
@@ -10367,6 +10531,34 @@ var dictionaries = {
           unavailable: "The data layer is not loaded.",
           unknownReason: "Reason: {reason}"
         }
+      },
+      manage: {
+        title: "Records you published",
+        loading: "Asking the relays\u2026",
+        empty: "No record signed by you was observed on these relays. That is not a claim that none exists.",
+        queryFailed: "The query did not complete, so the number of records is unknown, not zero. Nothing was observed.",
+        unavailable: "Not one relay could be reached, so nothing was observed at all.",
+        truncated: "Read up to the ceiling of {limit} records. There may be more than this list shows.",
+        count: "{count} records",
+        coordinate: "Identifier d",
+        updatedAt: "Last updated",
+        withdraw: "Withdraw",
+        withdrawing: "Withdrawing\u2026",
+        withdrawConfirm: "Withdraw it",
+        withdrawCancel: "Cancel",
+        withdrawPrompt: "Withdraw \u201C{name}\u201D. Withdrawal is not deletion: clients that observe the withdrawal stop listing this record, but no event is erased, and relays or clients that never observe it keep serving the older version.",
+        withdrawHeadlines: {
+          confirmed: "The withdrawal was read back and confirmed ({accepted} of {total} relays took it).",
+          partial: "The withdrawal was read back, but only {accepted} of {total} relays took it.",
+          unconfirmed: "The withdrawal could not be read back after {attempts} attempts. Whether it arrived is unknown.",
+          failed: "The withdrawal reached no relay at all.",
+          invalid: "The record failed validation, so nothing was signed.",
+          blocked: "The withdrawal stopped before anything was sent. Nothing was signed.",
+          other: "Withdrawal state: {state}"
+        },
+        withdrawNotDeletion: "Withdrawal is not deletion. No event is erased from relays that hold the older version.",
+        withdrawStillActive: "The withdrawal has not been read back, so some clients still see this record as active.",
+        withdrawPartialActive: "Clients reading only the relays that did not take the withdrawal still see this record as active."
       },
       viewer: {
         label: "Viewer sign-in state",
@@ -11987,8 +12179,10 @@ function mountExplorer(data) {
     homepage: "",
     topics: "",
     busy: false,
-    result: null
+    result: null,
+    action: "publish"
   };
+  const withdrawState = { confirming: "", busy: "" };
   const PUBLISH_D_MAX_BYTES = 192;
   function saveDraft2() {
     saveDraft(publish);
@@ -12046,18 +12240,38 @@ function mountExplorer(data) {
     const total = result.relays.length;
     const accepted = result.relays.filter((entry) => entry.outcome === "accepted").length;
     const rows = result.relays.map((entry) => `<li><code>${esc3(entry.url)}</code> \u2014 ${esc3(publishOutcomeText(entry.outcome))}${entry.notice ? ` \u2014 <q class="relay-notice">${esc3(entry.notice)}</q>` : ""}</li>`).join("");
+    const readBack = result.state === "published" || result.state === "published-partial";
+    const withdrawing = publish.action === "withdraw";
     let headline;
-    if (result.state === "published") headline = t("explorer.publish.headlines.published", { accepted, total });
+    if (withdrawing) {
+      if (result.state === "published") headline = t("explorer.manage.withdrawHeadlines.confirmed", { accepted, total });
+      else if (result.state === "published-partial") headline = t("explorer.manage.withdrawHeadlines.partial", { accepted, total });
+      else if (result.state === "unconfirmed") headline = t("explorer.manage.withdrawHeadlines.unconfirmed", { attempts: result.attempts });
+      else if (result.state === "failed") headline = t("explorer.manage.withdrawHeadlines.failed");
+      else if (result.state === "invalid") headline = t("explorer.manage.withdrawHeadlines.invalid");
+      else if (result.state === "blocked") headline = t("explorer.manage.withdrawHeadlines.blocked");
+      else headline = t("explorer.manage.withdrawHeadlines.other", { state: result.state });
+    } else if (result.state === "published") headline = t("explorer.publish.headlines.published", { accepted, total });
     else if (result.state === "published-partial") headline = t("explorer.publish.headlines.partial", { accepted, total });
     else if (result.state === "unconfirmed") headline = t("explorer.publish.headlines.unconfirmed", { attempts: result.attempts });
     else if (result.state === "failed") headline = t("explorer.publish.headlines.failed");
     else if (result.state === "invalid") headline = t("explorer.publish.headlines.invalid");
     else if (result.state === "blocked") headline = t("explorer.publish.headlines.blocked");
     else headline = t("explorer.publish.headlines.other", { state: result.state });
-    const consequence = result.state === "published-partial" ? `<p class="publish-consequence">${esc3(t("explorer.publish.partialConsequence"))}</p>` : "";
-    const reason = result.reason && result.state !== "published" && result.state !== "published-partial" ? `<p class="publish-reason" data-publish-reason="${esc3(result.reason)}">${esc3(publishReasonText(result.reason))}</p>` : "";
+    let consequence;
+    if (withdrawing) {
+      const lines = readBack ? result.state === "published-partial" ? [t("explorer.manage.withdrawPartialActive"), t("explorer.manage.withdrawNotDeletion")] : [t("explorer.manage.withdrawNotDeletion")] : [t("explorer.manage.withdrawStillActive")];
+      consequence = lines.map((line) => `<p class="publish-consequence">${esc3(line)}</p>`).join("");
+    } else consequence = result.state === "published-partial" ? `<p class="publish-consequence">${esc3(t("explorer.publish.partialConsequence"))}</p>` : "";
+    let clockNote = "";
+    if (result.clock && result.clock.bumped && result.clock.createdAt !== null && result.clock.priorCreatedAt !== null) {
+      clockNote = `<p class="publish-clock" data-publish-clock="bumped">${esc3(t("explorer.publish.clockBumped", { prior: result.clock.priorCreatedAt, createdAt: result.clock.createdAt }))}</p>`;
+    } else if (result.reason === "clock-conflict" && result.clock && result.clock.priorCreatedAt !== null) {
+      clockNote = `<p class="publish-clock" data-publish-clock="conflict">${esc3(t("explorer.publish.clockConflictDetail", { prior: result.clock.priorCreatedAt, now: Math.floor(result.asOf / 1e3) }))}</p>`;
+    }
+    const reason = result.reason && !readBack ? `<p class="publish-reason" data-publish-reason="${esc3(result.reason)}">${esc3(publishReasonText(result.reason))}</p>` : "";
     const id = result.eventId ? `<p class="publish-event-id">${esc3(t("explorer.publish.eventId"))} <code data-publish-event-id>${esc3(result.eventId)}</code></p>` : "";
-    return `<div class="publish-result" data-publish-state="${esc3(result.state)}"><p class="publish-headline" data-publish-headline>${esc3(headline)}</p>${consequence}${reason}${id}<ul class="publish-relays">${rows}</ul></div>`;
+    return `<div class="publish-result" data-publish-state="${esc3(result.state)}" data-publish-action="${esc3(publish.action)}"><p class="publish-headline" data-publish-headline>${esc3(headline)}</p>${consequence}${reason}${clockNote}${id}<ul class="publish-relays">${rows}</ul></div>`;
   }
   function publishMarkup() {
     if (!signerCanSign()) return `<p class="publish-unavailable" data-publish-unavailable>${esc3(t("explorer.publish.noSigner"))}</p>`;
@@ -12066,11 +12280,75 @@ function mountExplorer(data) {
     const bytes = publishDBytes();
     const canPublish = validation.ok && !publish.busy;
     const hint = validation.ok ? "" : publishReasonText(validation.reason);
-    return `<h2 class="publish-title">${esc3(t("explorer.publish.title"))}</h2><p class="publish-lead">${esc3(t("explorer.publish.lead"))}</p><form class="publish-form" data-publish-form novalidate><label class="field">${esc3(t("explorer.publish.dLocal"))}<input id="publish-d" type="text" autocomplete="off" value="${esc3(publish.dLocal)}" placeholder="com.example.tool"${publishDLocked() ? " readonly" : ""}><small class="publish-bytes" data-publish-bytes>${esc3(t("explorer.publish.dBytes", { bytes, max: PUBLISH_D_MAX_BYTES }))}</small><small class="publish-d-note" data-publish-d-note>${esc3(publishDLocked() ? t("explorer.publish.dLockedNote") : t("explorer.publish.dChangeNote"))}</small></label><label class="field">${esc3(t("explorer.publish.name"))}<input id="publish-name" type="text" autocomplete="off" value="${esc3(publish.name)}"></label><label class="field">${esc3(t("explorer.publish.summary"))}<textarea id="publish-summary" rows="3">${esc3(publish.summary)}</textarea><small>${esc3(t("explorer.publish.summaryHelp"))}</small></label><label class="field">${esc3(t("explorer.publish.homepage"))}<input id="publish-homepage" type="text" autocomplete="off" inputmode="url" value="${esc3(publish.homepage)}" placeholder="https://"></label><label class="field">${esc3(t("explorer.publish.topics"))}<input id="publish-topics" type="text" autocomplete="off" value="${esc3(publish.topics)}" placeholder="clients, relay"><small>${esc3(t("explorer.publish.topicsHelp"))}</small></label><p class="publish-hint" data-publish-hint>${esc3(hint)}</p><button class="primary" type="submit" data-publish-submit ${canPublish ? "" : "disabled"}>${esc3(publish.busy ? t("explorer.publish.publishing") : t("explorer.publish.submit"))}</button></form>${publishResultMarkup()}`;
+    return `<h2 class="publish-title">${esc3(t("explorer.publish.title"))}</h2><p class="publish-lead">${esc3(t("explorer.publish.lead"))}</p><form class="publish-form" data-publish-form novalidate><label class="field">${esc3(t("explorer.publish.dLocal"))}<input id="publish-d" type="text" autocomplete="off" value="${esc3(publish.dLocal)}" placeholder="com.example.tool"${publishDLocked() ? " readonly" : ""}><small class="publish-bytes" data-publish-bytes>${esc3(t("explorer.publish.dBytes", { bytes, max: PUBLISH_D_MAX_BYTES }))}</small><small class="publish-d-note" data-publish-d-note>${esc3(publishDLocked() ? t("explorer.publish.dLockedNote") : t("explorer.publish.dChangeNote"))}</small></label><label class="field">${esc3(t("explorer.publish.name"))}<input id="publish-name" type="text" autocomplete="off" value="${esc3(publish.name)}"></label><label class="field">${esc3(t("explorer.publish.summary"))}<textarea id="publish-summary" rows="3">${esc3(publish.summary)}</textarea><small>${esc3(t("explorer.publish.summaryHelp"))}</small></label><label class="field">${esc3(t("explorer.publish.homepage"))}<input id="publish-homepage" type="text" autocomplete="off" inputmode="url" value="${esc3(publish.homepage)}" placeholder="https://"></label><label class="field">${esc3(t("explorer.publish.topics"))}<input id="publish-topics" type="text" autocomplete="off" value="${esc3(publish.topics)}" placeholder="clients, relay"><small>${esc3(t("explorer.publish.topicsHelp"))}</small></label><p class="publish-hint" data-publish-hint>${esc3(hint)}</p><button class="primary" type="submit" data-publish-submit ${canPublish ? "" : "disabled"}>${esc3(publish.busy ? t("explorer.publish.publishing") : t("explorer.publish.submit"))}</button></form>${publishResultMarkup()}${myRecordsMarkup()}`;
+  }
+  const myRecords = { state: "signed-out", result: null, loadedFor: "" };
+  function myRecordActionsMarkup(record) {
+    const coordinate = record.coordinate;
+    const busy = withdrawState.busy === coordinate;
+    const locked = publish.busy || withdrawState.busy !== "";
+    if (withdrawState.confirming === coordinate && !busy) {
+      return `<div class="my-record-actions" data-withdraw-panel="${esc3(coordinate)}"><p class="my-record-withdraw-prompt">${esc3(t("explorer.manage.withdrawPrompt", { name: record.name }))}</p><button type="button" data-withdraw-confirm="${esc3(coordinate)}"${locked ? " disabled" : ""}>${esc3(t("explorer.manage.withdrawConfirm"))}</button><button type="button" data-withdraw-cancel="${esc3(coordinate)}">${esc3(t("explorer.manage.withdrawCancel"))}</button></div>`;
+    }
+    return `<div class="my-record-actions"><button type="button" data-withdraw-record="${esc3(coordinate)}"${locked ? " disabled" : ""}>${esc3(busy ? t("explorer.manage.withdrawing") : t("explorer.manage.withdraw"))}</button></div>`;
+  }
+  function myRecordRowMarkup(record) {
+    return `<li class="my-record" data-my-record data-coordinate="${esc3(record.coordinate)}" data-event-id="${esc3(record.eventId ?? "")}"><strong class="my-record-name">${esc3(record.name)}</strong><span class="my-record-field"><span class="my-record-label">${esc3(t("explorer.manage.coordinate"))}</span> <code class="my-record-d">${esc3(record.d)}</code></span><span class="my-record-field"><span class="my-record-label">${esc3(t("explorer.manage.updatedAt"))}</span> <time>${esc3(formatObserved(record.createdAt * 1e3))}</time></span>` + myRecordActionsMarkup(record) + `</li>`;
+  }
+  function myRecordsMarkup() {
+    if (viewer.status !== "signedIn" || myRecords.state === "signed-out") return "";
+    const state2 = myRecords.state;
+    const note = (key) => `<p class="my-records-note">${esc3(t(`explorer.manage.${key}`))}</p>`;
+    let body;
+    if (state2 === "loading") body = note("loading");
+    else if (state2 === "unavailable") body = note("unavailable");
+    else if (state2 === "query-failed") body = note("queryFailed");
+    else if (state2 === "empty" || !myRecords.result) body = note("empty");
+    else {
+      const result = myRecords.result;
+      body = `<p class="my-records-count">${esc3(t("explorer.manage.count", { count: result.records.length }))}</p><ul class="my-records-list">${result.records.map(myRecordRowMarkup).join("")}</ul>` + (result.truncated ? `<p class="my-records-note">${esc3(t("explorer.manage.truncated", { limit: MANAGE_LIMIT }))}</p>` : "");
+    }
+    return `<section class="my-records" data-my-records="${esc3(state2)}"><h3 class="my-records-title">${esc3(t("explorer.manage.title"))}</h3>${body}</section>`;
+  }
+  function renderMyRecords() {
+    const host = $("#publish-panel");
+    const section = host ? host.querySelector("[data-my-records]") : null;
+    if (!section) return;
+    section.outerHTML = myRecordsMarkup();
+  }
+  async function loadMyRecords(force) {
+    const pubkey = signedInPubkey();
+    if (!pubkey) {
+      myRecords.state = "signed-out";
+      myRecords.result = null;
+      myRecords.loadedFor = "";
+      return;
+    }
+    if (!force && myRecords.loadedFor === pubkey) return;
+    myRecords.loadedFor = pubkey;
+    myRecords.state = "loading";
+    myRecords.result = null;
+    renderMyRecords();
+    const relays = explorerParams.relays.length ? [...explorerParams.relays] : [...POLICY.DEFAULT_RELAYS];
+    let result;
+    try {
+      result = await fetchMyRecords({ relays, pubkey });
+    } catch (error) {
+      console.error("[nosmaps] my records load failed", error);
+      myRecords.state = "query-failed";
+      myRecords.result = null;
+      renderMyRecords();
+      return;
+    }
+    if (signedInPubkey() !== pubkey) return;
+    myRecords.state = result.state;
+    myRecords.result = result;
+    renderMyRecords();
   }
   function renderPublish() {
     const host = $("#publish-panel");
     if (!host) return;
+    void loadMyRecords();
     host.innerHTML = publishMarkup();
   }
   function refreshPublishState() {
@@ -12086,10 +12364,11 @@ function mountExplorer(data) {
     bytes.textContent = t("explorer.publish.dBytes", { bytes: publishDBytes(), max: PUBLISH_D_MAX_BYTES });
   }
   async function submitPublish() {
-    if (publish.busy) return;
+    if (publish.busy || withdrawState.busy) return;
     const signer = signingSigner();
     if (!signer) return;
     publish.busy = true;
+    publish.action = "publish";
     publish.result = null;
     renderPublish();
     const relays = explorerParams.relays.length ? [...explorerParams.relays] : [...POLICY.DEFAULT_RELAYS];
@@ -12120,6 +12399,7 @@ function mountExplorer(data) {
         event: null,
         relays: relays.map((url) => ({ url, outcome: "connection-failed", notice: "" })),
         readback: null,
+        clock: null,
         attempts: 0,
         asOf: Date.now()
       };
@@ -12128,8 +12408,65 @@ function mountExplorer(data) {
     publish.result = result;
     if (result.state === "published" || result.state === "published-partial") clearStoredDraft();
     renderPublish();
-    if (result.state === "published") await loadRelayCatalog();
-    else if (result.state === "published-partial") await loadRelayCatalog();
+    if (result.state === "published" || result.state === "published-partial") {
+      void loadMyRecords(true);
+      await loadRelayCatalog();
+    }
+  }
+  async function withdrawRecord(coordinate) {
+    if (publish.busy || withdrawState.busy) return;
+    const record = myRecords.result?.records.find((item) => item.coordinate === coordinate);
+    if (!record) return;
+    const signer = signingSigner();
+    if (!signer) return;
+    withdrawState.confirming = "";
+    withdrawState.busy = coordinate;
+    publish.busy = true;
+    publish.action = "withdraw";
+    publish.result = null;
+    renderPublish();
+    const relays = explorerParams.relays.length ? [...explorerParams.relays] : [...POLICY.DEFAULT_RELAYS];
+    const dLocal = record.d.startsWith(SOFTWARE_D_PREFIX) ? record.d.slice(SOFTWARE_D_PREFIX.length) : record.d;
+    let result;
+    try {
+      result = await withdrawSoftwareRecord({
+        relays,
+        signer,
+        expectPubkey: viewer.pubkey ?? "",
+        draft: {
+          dLocal,
+          name: record.name,
+          summary: record.summary,
+          homepage: record.homepage ?? "",
+          topics: [...record.topics]
+        },
+        readbackAttempts: publishReadbackAttempts,
+        readbackBackoffMs: publishReadbackBackoff,
+        publishTimeoutMs
+      });
+    } catch (error) {
+      console.error("[nosmaps] withdraw failed", error);
+      result = {
+        state: "failed",
+        reason: "publish-error",
+        eventId: null,
+        coordinate: null,
+        event: null,
+        relays: relays.map((url) => ({ url, outcome: "connection-failed", notice: "" })),
+        readback: null,
+        clock: null,
+        attempts: 0,
+        asOf: Date.now()
+      };
+    }
+    publish.busy = false;
+    withdrawState.busy = "";
+    publish.result = result;
+    renderPublish();
+    if (result.state === "published" || result.state === "published-partial") {
+      void loadMyRecords(true);
+      await loadRelayCatalog();
+    }
   }
   const reactionBusy = /* @__PURE__ */ new Set();
   function applyObservation(observation) {
@@ -12708,6 +13045,24 @@ function mountExplorer(data) {
     }
     if (target.closest("[data-graph-apply]")) {
       loadRelayCatalog({ viewerPubkey: inputValue("#graph-npub"), useNip07: false });
+      return;
+    }
+    const withdrawStart = target.closest("[data-withdraw-record]");
+    if (withdrawStart) {
+      if (publish.busy || withdrawState.busy) return;
+      withdrawState.confirming = attr(withdrawStart, "withdrawRecord");
+      renderPublish();
+      return;
+    }
+    const withdrawCancel = target.closest("[data-withdraw-cancel]");
+    if (withdrawCancel) {
+      withdrawState.confirming = "";
+      renderPublish();
+      return;
+    }
+    const withdrawConfirm = target.closest("[data-withdraw-confirm]");
+    if (withdrawConfirm) {
+      void withdrawRecord(attr(withdrawConfirm, "withdrawConfirm"));
       return;
     }
     const setState2 = target.closest("[data-set-state]");

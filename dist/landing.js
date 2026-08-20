@@ -290,6 +290,8 @@ var dictionaries = {
         signInFirst: "\u6295\u7A3F\u3059\u308B\u306B\u306FNIP-07\u3067\u30B5\u30A4\u30F3\u30A4\u30F3\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
         dLocal: "\u8B58\u5225\u5B50\uFF08d \u306E nosmaps: \u3088\u308A\u5F8C\u308D\uFF09",
         dBytes: "d \u5168\u4F53\u3067 {bytes} / {max} \u30D0\u30A4\u30C8\uFF08nosmaps: \u306E8\u30D0\u30A4\u30C8\u3092\u542B\u3080\uFF09",
+        dChangeNote: "\u8B58\u5225\u5B50\u3092\u5909\u3048\u308B\u3068\u3001\u540C\u3058\u30EC\u30B3\u30FC\u30C9\u306E\u66F4\u65B0\u3067\u306F\u306A\u304F\u5225\u306E\u30EC\u30B3\u30FC\u30C9\u306B\u306A\u308A\u307E\u3059\u3002",
+        dLockedNote: "\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u306F\u516C\u958B\u6E08\u307F\u3067\u3059\u3002\u8B58\u5225\u5B50\u3092\u5909\u3048\u308B\u3068\u5225\u306E\u30EC\u30B3\u30FC\u30C9\u306B\u306A\u308B\u305F\u3081\u3001\u5909\u66F4\u3067\u304D\u307E\u305B\u3093\u3002",
         name: "\u540D\u524D",
         summary: "\u6982\u8981",
         summaryHelp: "\u7A7A\u6B04\u306E\u307E\u307E\u3067\u3082\u6295\u7A3F\u3067\u304D\u307E\u3059\u3002\u767A\u884C\u8005\u304C\u66F8\u3044\u305F\u6982\u8981\u304C\u7121\u3044\u3053\u3068\u306F\u3001\u7121\u3044\u3068\u66F8\u304F\u306E\u304C\u6B63\u78BA\u3067\u3059\u3002",
@@ -300,6 +302,11 @@ var dictionaries = {
         publishing: "\u6295\u7A3F\u4E2D\u2026",
         eventId: "\u7F72\u540D\u3057\u305F\u30A4\u30D9\u30F3\u30C8ID",
         partialConsequence: "\u53D7\u3051\u4ED8\u3051\u306A\u304B\u3063\u305F\u30EA\u30EC\u30FC\u3060\u3051\u3092\u8AAD\u3093\u3067\u3044\u308B\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306B\u306F\u3001\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u306F\u898B\u3048\u307E\u305B\u3093\u3002",
+        /* §W3.4 / W-I4: created_at を1秒進めたことは隠さない。進めた理由と、進める前に
+           実際に観測した値を並べて出す。「勝手に時刻を作った」と「同じ秒で負けないように
+           1秒だけ足した」は別のことなので、後者だと分かる形で書く。 */
+        clockBumped: "\u540C\u3058\u5EA7\u6A19\u306B created_at {prior} \u306E\u30EC\u30B3\u30FC\u30C9\u3092\u89B3\u6E2C\u3057\u305F\u306E\u3067\u3001\u540C\u3058\u79D2\u3067\u8CA0\u3051\u306A\u3044\u3088\u3046\u306B created_at \u3092 {createdAt} \u306B\u3057\u307E\u3057\u305F\uFF08+1\u79D2\uFF09\u3002",
+        clockConflictDetail: "\u89B3\u6E2C\u3057\u305F created_at \u306F {prior} \u3067\u3001\u3053\u306E\u7AEF\u672B\u306E\u6642\u8A08\uFF08{now}\uFF09\u3088\u308A\u5148\u3067\u3059\u3002\u4F55\u3082\u7F72\u540D\u3057\u3066\u3044\u307E\u305B\u3093\u3002",
         headlines: {
           published: "{total}\u53F0\u4E2D{accepted}\u53F0\u306B\u516C\u958B\u3057\u3001\u8AAD\u307F\u623B\u305B\u307E\u3057\u305F\u3002",
           partial: "{total}\u53F0\u4E2D{accepted}\u53F0\u306B\u516C\u958B\u3057\u3001\u8AAD\u307F\u623B\u305B\u307E\u3057\u305F\u3002",
@@ -340,6 +347,7 @@ var dictionaries = {
           "signer-invalid-record": "\u7F72\u540D\u5F8C\u306E\u30A4\u30D9\u30F3\u30C8\u304C\u691C\u8A3C\u3092\u901A\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u4F55\u3082\u9001\u3063\u3066\u3044\u307E\u305B\u3093\u3002",
           "nip07-key-unparsable": "NIP-07\u62E1\u5F35\u304C\u516C\u958B\u9375\u3068\u3057\u3066\u8AAD\u3081\u306A\u3044\u5024\u3092\u8FD4\u3057\u307E\u3057\u305F\u3002",
           "pubkey-mismatch": "\u30B5\u30A4\u30F3\u30A4\u30F3\u6642\u3068\u5225\u306E\u516C\u958B\u9375\u304C\u8FD4\u308A\u307E\u3057\u305F\u3002\u4F55\u3082\u9001\u3063\u3066\u3044\u307E\u305B\u3093\u3002",
+          "clock-conflict": "\u3053\u306E\u5EA7\u6A19\u306E\u30EC\u30B3\u30FC\u30C9\u304C\u3001\u3053\u306E\u7AEF\u672B\u306E\u6642\u8A08\u3088\u308A\u5148\u306E\u6642\u523B\u3067\u8A18\u9332\u3055\u308C\u3066\u3044\u307E\u3059\u3002\u7AEF\u672B\u306E\u6642\u8A08\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
           "relay-unavailable": "\u30EA\u30EC\u30FC\u5C64\u3092\u521D\u671F\u5316\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002",
           "all-relays-rejected": "\u3059\u3079\u3066\u306E\u30EA\u30EC\u30FC\u304C\u62D2\u5426\u3057\u307E\u3057\u305F\u3002",
           "publish-error": "\u6295\u7A3F\u306E\u9014\u4E2D\u3067\u30A8\u30E9\u30FC\u304C\u8D77\u304D\u307E\u3057\u305F\u3002\u516C\u958B\u3055\u308C\u305F\u304B\u3069\u3046\u304B\u306F\u5206\u304B\u308A\u307E\u305B\u3093\u3002",
@@ -351,6 +359,40 @@ var dictionaries = {
           unavailable: "\u30C7\u30FC\u30BF\u5C64\u3092\u8AAD\u307F\u8FBC\u3081\u3066\u3044\u307E\u305B\u3093\u3002",
           unknownReason: "\u7406\u7531: {reason}"
         }
+      },
+      /* issue #12: 自分が出したレコードの一覧。「観測できなかった」と「問い合わせが完了しなかった」を
+         別の文言にしてあるのは、利用者が次に取る行動が違うから —— 後者を「0件」と書くと、
+         もう出してあるレコードをもう一度出しに行かせることになる。 */
+      manage: {
+        title: "\u81EA\u5206\u304C\u51FA\u3057\u305F\u30EC\u30B3\u30FC\u30C9",
+        loading: "\u30EA\u30EC\u30FC\u306B\u554F\u3044\u5408\u308F\u305B\u3066\u3044\u307E\u3059\u2026",
+        empty: "\u3053\u306E\u30EA\u30EC\u30FC\u3067\u306F\u3001\u3042\u306A\u305F\u306E\u7F72\u540D\u3057\u305F\u30EC\u30B3\u30FC\u30C9\u306F\u89B3\u6E2C\u3055\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u5B58\u5728\u3057\u306A\u3044\u3068\u3044\u3046\u610F\u5473\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
+        queryFailed: "\u554F\u3044\u5408\u308F\u305B\u304C\u5B8C\u4E86\u3057\u306A\u304B\u3063\u305F\u306E\u3067\u3001\u4EF6\u6570\u306F0\u3067\u306F\u306A\u304F\u4E0D\u660E\u3067\u3059\u3002\u4F55\u3082\u89B3\u6E2C\u3067\u304D\u3066\u3044\u307E\u305B\u3093\u3002",
+        unavailable: "\u30EA\u30EC\u30FC\u306B1\u53F0\u3082\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u89B3\u6E2C\u3067\u304D\u305F\u3053\u3068\u306F\u4F55\u3082\u3042\u308A\u307E\u305B\u3093\u3002",
+        truncated: "\u4E0A\u9650 {limit} \u4EF6\u307E\u3067\u8AAD\u307F\u307E\u3057\u305F\u3002\u3053\u308C\u3088\u308A\u591A\u304F\u306E\u30EC\u30B3\u30FC\u30C9\u304C\u3042\u308B\u53EF\u80FD\u6027\u304C\u3042\u308A\u307E\u3059\u3002",
+        count: "{count} \u4EF6",
+        coordinate: "\u8B58\u5225\u5B50 d",
+        updatedAt: "\u6700\u7D42\u66F4\u65B0",
+        /* §W6.5 取り下げ。確認文が「取り下げは削除ではない」と述べるのは §7.3 の要請で、
+           取り下げを削除と読ませないため。結果の語彙は、読み戻しで確認できたときにだけ
+           「確認しました」と言い、確認できていない間は「まだ active に見える」と書く。 */
+        withdraw: "\u53D6\u308A\u4E0B\u3052\u308B",
+        withdrawing: "\u53D6\u308A\u4E0B\u3052\u4E2D\u2026",
+        withdrawConfirm: "\u53D6\u308A\u4E0B\u3052\u3092\u5B9F\u884C",
+        withdrawCancel: "\u3084\u3081\u308B",
+        withdrawPrompt: "\u300C{name}\u300D\u3092\u53D6\u308A\u4E0B\u3052\u307E\u3059\u3002\u53D6\u308A\u4E0B\u3052\u306F\u524A\u9664\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002\u53D6\u308A\u4E0B\u3052\u3092\u89B3\u6E2C\u3057\u305F\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306F\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u3092\u4E00\u89A7\u306B\u51FA\u3055\u306A\u304F\u306A\u308A\u307E\u3059\u304C\u3001\u30A4\u30D9\u30F3\u30C8\u304C\u6D88\u3048\u308B\u308F\u3051\u3067\u306F\u306A\u304F\u3001\u53D6\u308A\u4E0B\u3052\u3092\u89B3\u6E2C\u3057\u3066\u3044\u306A\u3044\u30EA\u30EC\u30FC\u3084\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306B\u306F\u53E4\u3044\u7248\u304C\u305D\u306E\u307E\u307E\u6B8B\u308A\u307E\u3059\u3002",
+        withdrawHeadlines: {
+          confirmed: "\u53D6\u308A\u4E0B\u3052\u3092\u8AAD\u307F\u623B\u3057\u3066\u78BA\u8A8D\u3057\u307E\u3057\u305F\uFF08{accepted}/{total} \u4EF6\u306E\u30EA\u30EC\u30FC\u304C\u53D7\u3051\u53D6\u308A\u307E\u3057\u305F\uFF09\u3002",
+          partial: "\u53D6\u308A\u4E0B\u3052\u3092\u8AAD\u307F\u623B\u3057\u3066\u78BA\u8A8D\u3057\u307E\u3057\u305F\u304C\u3001\u53D7\u3051\u53D6\u3063\u305F\u306E\u306F {accepted}/{total} \u4EF6\u306E\u30EA\u30EC\u30FC\u3060\u3051\u3067\u3059\u3002",
+          unconfirmed: "\u53D6\u308A\u4E0B\u3052\u3092\u8AAD\u307F\u623B\u305B\u307E\u305B\u3093\u3067\u3057\u305F\uFF08{attempts} \u56DE\u8A66\u884C\uFF09\u3002\u5C4A\u3044\u305F\u304B\u3069\u3046\u304B\u306F\u5206\u304B\u3063\u3066\u3044\u307E\u305B\u3093\u3002",
+          failed: "\u53D6\u308A\u4E0B\u3052\u3092\u3069\u306E\u30EA\u30EC\u30FC\u306B\u3082\u5C4A\u3051\u3089\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002",
+          invalid: "\u53D6\u308A\u4E0B\u3052\u308B\u30EC\u30B3\u30FC\u30C9\u304C\u691C\u8A3C\u3092\u901A\u3089\u306A\u304B\u3063\u305F\u306E\u3067\u3001\u4F55\u3082\u7F72\u540D\u3057\u3066\u3044\u307E\u305B\u3093\u3002",
+          blocked: "\u53D6\u308A\u4E0B\u3052\u306F\u9001\u308B\u524D\u306B\u6B62\u307E\u308A\u307E\u3057\u305F\u3002\u4F55\u3082\u7F72\u540D\u3057\u3066\u3044\u307E\u305B\u3093\u3002",
+          other: "\u53D6\u308A\u4E0B\u3052\u306E\u72B6\u614B: {state}"
+        },
+        withdrawNotDeletion: "\u53D6\u308A\u4E0B\u3052\u306F\u524A\u9664\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002\u53E4\u3044\u7248\u3092\u6301\u3063\u3066\u3044\u308B\u30EA\u30EC\u30FC\u304B\u3089\u30A4\u30D9\u30F3\u30C8\u304C\u6D88\u3048\u308B\u308F\u3051\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
+        withdrawStillActive: "\u53D6\u308A\u4E0B\u3052\u3092\u8AAD\u307F\u623B\u3057\u3066\u78BA\u8A8D\u3067\u304D\u3066\u3044\u306A\u3044\u306E\u3067\u3001\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u304C\u307E\u3060 active \u306B\u898B\u3048\u308B\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u304C\u3042\u308A\u307E\u3059\u3002",
+        withdrawPartialActive: "\u53D6\u308A\u4E0B\u3052\u3092\u53D7\u3051\u53D6\u3063\u3066\u3044\u306A\u3044\u30EA\u30EC\u30FC\u3060\u3051\u3092\u8AAD\u3080\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306B\u306F\u3001\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u306F\u307E\u3060 active \u306B\u898B\u3048\u307E\u3059\u3002"
       },
       /* NIP-07 サインイン。失敗の原因は原因ごとに別の文言で出す —— 「拡張が無い」「断られた」
          「エラーが返った」「応答が無い」は利用者が次に取る行動が違う。 */
@@ -692,6 +734,8 @@ var dictionaries = {
         signInFirst: "Sign in with NIP-07 to publish.",
         dLocal: "Identifier (the part of d after nosmaps:)",
         dBytes: "{bytes} / {max} bytes for the whole d (the 8 bytes of nosmaps: included)",
+        dChangeNote: "Changing the identifier does not update this record; it creates a different one.",
+        dLockedNote: "This record is published. The identifier is locked, because changing it would create a different record rather than update this one.",
         name: "Name",
         summary: "Summary",
         summaryHelp: "Leaving this empty is allowed. If the publisher wrote no summary, an empty one is the accurate answer.",
@@ -702,6 +746,8 @@ var dictionaries = {
         publishing: "Publishing\u2026",
         eventId: "Signed event id",
         partialConsequence: "Clients that read only the relays which did not accept it will not see this record.",
+        clockBumped: "A record at this address was observed with created_at {prior}, so created_at was set to {createdAt} (+1 second) rather than risk losing a same-second tie.",
+        clockConflictDetail: "The observed created_at is {prior}, which is ahead of this device clock ({now}). Nothing was signed.",
         headlines: {
           published: "Published to {accepted} of {total} relays and read back.",
           partial: "Published to {accepted} of {total} relays and read back.",
@@ -742,6 +788,7 @@ var dictionaries = {
           "signer-invalid-record": "The signed event did not pass validation. Nothing was sent.",
           "nip07-key-unparsable": "The extension returned a value that is not a readable public key.",
           "pubkey-mismatch": "A different public key came back than the one you signed in with. Nothing was sent.",
+          "clock-conflict": "A record at this address is already timestamped ahead of this device\u2019s clock. Check your system time.",
           "relay-unavailable": "The relay layer could not be initialised.",
           "all-relays-rejected": "Every relay refused it.",
           "publish-error": "Publishing errored part way through. Whether it was stored is unknown.",
@@ -753,6 +800,34 @@ var dictionaries = {
           unavailable: "The data layer is not loaded.",
           unknownReason: "Reason: {reason}"
         }
+      },
+      manage: {
+        title: "Records you published",
+        loading: "Asking the relays\u2026",
+        empty: "No record signed by you was observed on these relays. That is not a claim that none exists.",
+        queryFailed: "The query did not complete, so the number of records is unknown, not zero. Nothing was observed.",
+        unavailable: "Not one relay could be reached, so nothing was observed at all.",
+        truncated: "Read up to the ceiling of {limit} records. There may be more than this list shows.",
+        count: "{count} records",
+        coordinate: "Identifier d",
+        updatedAt: "Last updated",
+        withdraw: "Withdraw",
+        withdrawing: "Withdrawing\u2026",
+        withdrawConfirm: "Withdraw it",
+        withdrawCancel: "Cancel",
+        withdrawPrompt: "Withdraw \u201C{name}\u201D. Withdrawal is not deletion: clients that observe the withdrawal stop listing this record, but no event is erased, and relays or clients that never observe it keep serving the older version.",
+        withdrawHeadlines: {
+          confirmed: "The withdrawal was read back and confirmed ({accepted} of {total} relays took it).",
+          partial: "The withdrawal was read back, but only {accepted} of {total} relays took it.",
+          unconfirmed: "The withdrawal could not be read back after {attempts} attempts. Whether it arrived is unknown.",
+          failed: "The withdrawal reached no relay at all.",
+          invalid: "The record failed validation, so nothing was signed.",
+          blocked: "The withdrawal stopped before anything was sent. Nothing was signed.",
+          other: "Withdrawal state: {state}"
+        },
+        withdrawNotDeletion: "Withdrawal is not deletion. No event is erased from relays that hold the older version.",
+        withdrawStillActive: "The withdrawal has not been read back, so some clients still see this record as active.",
+        withdrawPartialActive: "Clients reading only the relays that did not take the withdrawal still see this record as active."
       },
       viewer: {
         label: "Viewer sign-in state",

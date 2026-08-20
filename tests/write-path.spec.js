@@ -36,6 +36,11 @@ function collectErrors(page) {
    claim publication from the second one (§W4.3). */
 function installWriteMocks(seckey) {
   window.__MOCK_RELAY__ = {events: [], urls: [], sent: [], reqs: [], published: [], ok: true, serveBack: true};
+  /* One ordered log of the two things whose *order* is under test (§5 U1): the
+     coordinate is read before the signer is touched. Kept separate from
+     __NOSTR_CALLS__ because that array carries the "no NIP-07 call before a
+     gesture" assertion, which a REQ entry would break. */
+  window.__TIMELINE__ = [];
 
   function matchesFilter(filter, event) {
     if (Array.isArray(filter.kinds) && filter.kinds.indexOf(event.kind) === -1) return false;
@@ -82,6 +87,7 @@ function installWriteMocks(seckey) {
       const subId = message[1];
       const filters = message.slice(2);
       window.__MOCK_RELAY__.reqs.push({subId, filters});
+      window.__TIMELINE__.push({call: 'REQ', filters: JSON.parse(JSON.stringify(filters))});
       const pool = window.__MOCK_RELAY__.events || [];
       const matched = pool.filter(event => filters.some(filter => matchesFilter(filter, event)));
       setTimeout(() => {
@@ -118,6 +124,7 @@ function installWriteMocks(seckey) {
     },
     async signEvent(draft) {
       window.__NOSTR_CALLS__.push('signEvent');
+      window.__TIMELINE__.push({call: 'signEvent', createdAt: draft && draft.created_at});
       // Recorded before signing so a regression to a library-defaulted timestamp
       // (§W3.4) is visible as a missing property rather than as a plausible time.
       window.__SIGN_ARG__ = JSON.parse(JSON.stringify(draft));
@@ -162,6 +169,31 @@ async function fillForm(page, values) {
   await page.locator('#publish-summary').fill(values.summary);
   await page.locator('#publish-homepage').fill(values.homepage);
   await page.locator('#publish-topics').fill(values.topics);
+}
+
+/* Puts a real, really-signed record of the *same* publisher into the relay pool
+   at a chosen created_at. Signed rather than faked because rx-nostr's verifier
+   drops anything else before the app can see it, so an unsigned stand-in would
+   make the pre-sign read round look empty and the test would pass on a broken
+   implementation. Returns the created_at actually used, so the assertions can
+   name it rather than recompute a clock that has since moved. */
+async function seedPrior(page, seckey, {dLocal, name, offsetSec}) {
+  return page.evaluate(async ({seckey, dLocal, name, offsetSec}) => {
+    const module = await import(new URL('dist/rx-nostr-crypto.js', location.href).href);
+    const signer = module.seckeySigner(seckey);
+    const createdAt = Math.floor(Date.now() / 1000) + offsetSec;
+    const event = await signer.signEvent({
+      kind: 30078,
+      created_at: createdAt,
+      tags: [['d', `nosmaps:${dLocal}`], ['t', 'nosmaps']],
+      content: JSON.stringify({
+        schema: 'org.nosmaps.software', version: 1, state: 'active',
+        name, summary: 'The record already at this coordinate.'
+      })
+    });
+    window.__MOCK_RELAY__.events.push(event);
+    return {createdAt, id: event.id};
+  }, {seckey, dLocal, name, offsetSec});
 }
 
 test('a signed-in publisher submits one entry and it comes back as a row carrying the published id', async ({page}) => {
@@ -290,5 +322,293 @@ test('an acknowledged but unreadable record is reported as unconfirmed, never as
   // §W5.6: nothing unconfirmed is painted into the catalog.
   const rows = await page.evaluate(() => ((window.__NOSMAPS_RELAY_RESULT__ || {}).entries || []).map(entry => entry.coordinate));
   expect(rows.some(coordinate => coordinate.includes('com.example.unread'))).toBe(false);
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
+/* issue #12 G2 (§W3.4, AC-G2-1 / AC-G2-3 / AC-G2-4, and §5 U1).
+
+   What is under test is not "an update was published" but *which second it was
+   stamped with*. §5.3 breaks ties by lowest event id, so an update stamped at
+   the same second as the record it replaces can lose -- a completely successful
+   publish that leaves the user staring at their old record. So the assertion is
+   on the bytes handed to the signer, and on the fact that the coordinate was
+   read from a relay *before* those bytes existed. Reading it from a warm cache
+   instead would still produce a +1 and would still pass a weaker test, which is
+   exactly why the order is asserted here and not the arithmetic alone. */
+test('an update to an existing coordinate is stamped past the observed winner, after reading it from the relay', async ({page}) => {
+  const errors = collectErrors(page);
+  await openExplorer(page);
+  await signIn(page);
+
+  // A prior at this coordinate, stamped in the same second the publish will run
+  // in: the case where `now` alone would tie.
+  const prior = await seedPrior(page, PUBLISHER_SECKEY, {
+    dLocal: 'com.example.update', name: 'Before The Edit', offsetSec: 0
+  });
+
+  await fillForm(page, {
+    dLocal: 'com.example.update',
+    name: 'After The Edit',
+    summary: 'The same coordinate, corrected.',
+    homepage: '',
+    topics: ''
+  });
+  await page.locator('[data-publish-submit]').click();
+  await expect(page.locator('[data-publish-state]')).toHaveAttribute('data-publish-state', 'published', {timeout: 20_000});
+
+  const observed = await page.evaluate(() => ({
+    signArg: window.__SIGN_ARG__,
+    timeline: window.__TIMELINE__,
+    published: window.__MOCK_RELAY__.published.map(event => ({id: event.id, created_at: event.created_at}))
+  }));
+
+  // AC-G2-3: this app set the field; no library defaulted it.
+  expect(Object.prototype.hasOwnProperty.call(observed.signArg, 'created_at')).toBe(true);
+  // AC-G2-1: strictly past the winner that was actually observed. `>` alone
+  // would also pass on `now` when the clock happens to have ticked, so the
+  // exact +1 is named -- the seed is stamped at the same second on purpose.
+  expect(observed.signArg.created_at).toBe(prior.createdAt + 1);
+  expect(observed.published.at(-1).created_at).toBe(prior.createdAt + 1);
+
+  /* §5 U1: the read happened before the signer was touched, and it asked for
+     this coordinate. A cache-first regression puts signEvent first (or drops
+     the `#d` round entirely) and lands here rather than in the arithmetic. */
+  const signIndex = observed.timeline.findIndex(entry => entry.call === 'signEvent');
+  expect(signIndex, 'signEvent never happened').toBeGreaterThan(-1);
+  const priorReqIndex = observed.timeline.findIndex(entry => entry.call === 'REQ'
+    && entry.filters.some(filter => Array.isArray(filter['#d']) && filter['#d'].includes('nosmaps:com.example.update')));
+  expect(priorReqIndex, 'no REQ for this coordinate before signing').toBeGreaterThan(-1);
+  expect(priorReqIndex).toBeLessThan(signIndex);
+
+  // AC-G2-4: the +1 is disclosed, not hidden. A user who is told "published"
+  // and shown a second they did not choose deserves the reason on the screen.
+  const note = page.locator('[data-publish-clock="bumped"]');
+  await expect(note).toHaveCount(1);
+  await expect(note).toContainText(String(prior.createdAt + 1));
+
+  expect(await page.locator('body').innerText()).not.toContain('undefined');
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
+/* AC-G2-2. The prior is stamped further ahead than MAX_FUTURE_SKEW_SEC (600)
+   allows this device to reach, so there is no honest timestamp that would win.
+   The design forbids forging a farther-future time, which leaves refusing --
+   and refusing has to happen *before* the signer, because a signature the user
+   was asked for and that can never be sent is a cost with no product. */
+test('a coordinate timestamped beyond the skew bound stops before the signer rather than forging a time', async ({page}) => {
+  const errors = collectErrors(page);
+  await openExplorer(page);
+  await signIn(page);
+
+  await seedPrior(page, PUBLISHER_SECKEY, {
+    dLocal: 'com.example.futurewinner', name: 'Stamped In The Future', offsetSec: 1200
+  });
+
+  await fillForm(page, {
+    dLocal: 'com.example.futurewinner',
+    name: 'Cannot Beat That Clock',
+    summary: 'The record at this address is ahead of this device.',
+    homepage: '',
+    topics: ''
+  });
+  await page.locator('[data-publish-submit]').click();
+
+  await expect(page.locator('[data-publish-state]')).toHaveAttribute('data-publish-state', 'blocked', {timeout: 20_000});
+  await expect(page.locator('[data-publish-reason]')).toHaveAttribute('data-publish-reason', 'clock-conflict');
+
+  // Nothing was signed and nothing was sent. Both, because either one alone
+  // leaves the other regression alive.
+  const after = await page.evaluate(() => ({
+    calls: window.__NOSTR_CALLS__,
+    published: window.__MOCK_RELAY__.published.length,
+    signArg: window.__SIGN_ARG__
+  }));
+  expect(after.calls.filter(call => call === 'signEvent')).toHaveLength(0);
+  expect(after.published, 'EVENTs sent on a clock conflict').toBe(0);
+  expect(after.signArg).toBeUndefined();
+
+  // The cause is on screen: this is a clock problem, and the user can only act
+  // on it if told so.
+  await expect(page.locator('[data-publish-clock="conflict"]')).toHaveCount(1);
+
+  expect(await page.locator('body').innerText()).not.toContain('undefined');
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
+/* Puts a *foreign* 30078 of the same publisher into the pool: NIP-78 shares the
+   kind across applications, so another app's settings record living under the
+   same author is the normal case, not a fault. Really signed for the same reason
+   seedPrior is -- rx-nostr's verifier drops anything else, and a dropped event
+   would make this seed prove nothing. */
+async function seedForeignApp(page, seckey, {d, content}) {
+  return page.evaluate(async ({seckey, d, content}) => {
+    const module = await import(new URL('dist/rx-nostr-crypto.js', location.href).href);
+    const signer = module.seckeySigner(seckey);
+    const event = await signer.signEvent({
+      kind: 30078,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [['d', d]],
+      content: JSON.stringify(content)
+    });
+    window.__MOCK_RELAY__.events.push(event);
+    return event.id;
+  }, {seckey, d, content});
+}
+
+/* issue #12: the signed-in publisher sees what this app can actually observe of
+   what they signed -- and only that. The foreign record is the load-bearing half
+   of the test: kind 30078 is shared (NIP-78), so a list that counted everything
+   the author signed under that kind would tell the user they published records
+   they never published, in an app they may not even use. */
+test('the signed-in publisher sees their own records, and another app’s 30078 is not one of them', async ({page}) => {
+  const errors = collectErrors(page);
+  await openExplorer(page);
+
+  // Seeded before signing in, because the list is fetched as soon as the key is
+  // known: seeding afterwards would race the round it is supposed to be in.
+  const mine = await seedPrior(page, PUBLISHER_SECKEY, {
+    dLocal: 'com.example.mine', name: 'My Own Record', offsetSec: -60
+  });
+  const foreignId = await seedForeignApp(page, PUBLISHER_SECKEY, {
+    d: 'AmethystSettings', content: {theme: 'dark', lastRead: 1712345678}
+  });
+
+  await signIn(page);
+
+  const list = page.locator('[data-my-records]');
+  await expect(list).toHaveAttribute('data-my-records', 'ok', {timeout: 20_000});
+
+  // Exactly one row: the foreign record is neither listed nor counted.
+  const rows = page.locator('[data-my-record]');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveAttribute('data-event-id', mine.id);
+  await expect(rows.first()).toContainText('My Own Record');
+  await expect(rows.first()).toContainText('nosmaps:com.example.mine');
+  expect(await page.locator('.my-records').innerText()).not.toContain('AmethystSettings');
+  expect(await page.locator('[data-my-record]').first().getAttribute('data-event-id')).not.toBe(foreignId);
+
+  expect(await page.locator('body').innerText()).not.toContain('undefined');
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
+/* issue #12 §W6 (withdraw). The withdrawal is not a new mechanism: it is one
+   more record at the same coordinate, signed by the same key, with `state`
+   flipped to `withdrawn` (§W6.2). Two things are load-bearing and easy to get
+   wrong, so both are asserted on the bytes rather than on the headline. First,
+   the withdrawal is a *tombstone*, not an erasure: §7.1 keeps name and summary
+   required, so a client that only ever sees the withdrawal must still be able
+   to say what was withdrawn -- blanking them would leave the publisher unable
+   to tell which record they retired. Second, §W6.6 forbids a NIP-09 kind 5:
+   a deletion request claims an erasure no one can guarantee, so the withdrawal
+   event has to be the whole of it. That "no kind 5" is the main point here and
+   is checked explicitly, not implied by "it worked". */
+test('withdrawing a record republishes a withdrawn tombstone that keeps its name and summary, and sends no kind 5', async ({page}) => {
+  const errors = collectErrors(page);
+  await openExplorer(page);
+
+  // Seeded before signing in, because the "records you published" list is
+  // fetched the instant the key is known: seeding after would race that round
+  // (same reason as the my-records test above).
+  const mine = await seedPrior(page, PUBLISHER_SECKEY, {
+    dLocal: 'com.example.retire', name: 'Ready To Retire', offsetSec: -30
+  });
+  await signIn(page);
+
+  const list = page.locator('[data-my-records]');
+  await expect(list).toHaveAttribute('data-my-records', 'ok', {timeout: 20_000});
+  const rows = page.locator('[data-my-record]');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveAttribute('data-event-id', mine.id);
+
+  // Two-stage on purpose (§W6.5 / §7.3): the first click only opens the confirm
+  // copy that says withdrawal is not deletion; nothing is signed until confirm.
+  await page.locator('[data-withdraw-record]').click();
+  await page.locator('[data-withdraw-confirm]').click();
+
+  // The relay served the withdrawal back, so this is the confirmed path.
+  await expect(page.locator('[data-publish-state]')).toHaveAttribute('data-publish-state', 'published', {timeout: 20_000});
+  // The same result panel, read in the withdrawal's vocabulary: the action flag
+  // is what picks that vocabulary, and the confirmed headline only appears once
+  // the read-back has actually happened.
+  await expect(page.locator('.publish-result')).toHaveAttribute('data-publish-action', 'withdraw');
+  const panel = await page.locator('#publish-panel').innerText();
+  expect(panel).toContain('read back and confirmed');
+
+  const relay = await page.evaluate(() => {
+    const published = window.__MOCK_RELAY__.published;
+    const record = published.find(event => event.kind === 30078);
+    return {
+      kinds: published.map(event => event.kind),
+      deletions: published.filter(event => event.kind === 5).length,
+      content: record ? JSON.parse(record.content) : null
+    };
+  });
+  // §W6.2: the withdrawal flips state, and nothing else about the record.
+  expect(relay.content.state).toBe('withdrawn');
+  // §7.1: name and summary survive the withdrawal -- the tombstone still names
+  // its dead. These are the values that were on the seeded record.
+  expect(relay.content.name).toBe('Ready To Retire');
+  expect(relay.content.summary).toBe('The record already at this coordinate.');
+  // §W6.6: no NIP-09 deletion was sent. This is the assertion the whole design
+  // choice rests on, so it is named rather than left to "it succeeded".
+  expect(relay.deletions, `a kind 5 was published; kinds were ${JSON.stringify(relay.kinds)}`).toBe(0);
+
+  expect(await page.locator('body').innerText()).not.toContain('undefined');
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
+/* §W6.5 / W-I3, the same honesty the publish path owes (§W5.5): a withdrawal
+   that is acknowledged but never served back must not read as "withdrawn".
+   The seeded record is pushed straight into the pool, so the pre-sign read of
+   the coordinate still succeeds with serveBack off (that only stops the *new*
+   event from joining the pool) -- which is exactly the shape under test: the
+   withdrawal is signed and sent, the relay just never hands it back. The
+   confirmed copy ("read back and confirmed") must be absent, and the page must
+   say instead that some clients still see the record as active. */
+test('a withdrawal the relay never serves back is reported as unconfirmed, and does not claim the record is withdrawn', async ({page}) => {
+  const errors = collectErrors(page);
+  await openExplorer(page);
+
+  // A neutral record name: "Withdrawn" must not appear in the fixture, because
+  // this test asserts the *absence* of withdrawal-completion copy in the panel,
+  // and a future change that prints the record name would turn a name carrying
+  // that word into a false positive/negative.
+  const mine = await seedPrior(page, PUBLISHER_SECKEY, {
+    dLocal: 'com.example.retire.unread', name: 'Never Confirmed Retirement', offsetSec: -30
+  });
+  await signIn(page);
+
+  const list = page.locator('[data-my-records]');
+  await expect(list).toHaveAttribute('data-my-records', 'ok', {timeout: 20_000});
+  await expect(page.locator('[data-my-record]')).toHaveCount(1);
+  await expect(page.locator('[data-my-record]').first()).toHaveAttribute('data-event-id', mine.id);
+
+  // Cut the read-back at the relay, only now -- after the list (which reads the
+  // pool the seed was pushed into) has already rendered.
+  await page.evaluate(() => { window.__MOCK_RELAY__.serveBack = false; });
+
+  await page.locator('[data-withdraw-record]').click();
+  await page.locator('[data-withdraw-confirm]').click();
+
+  await expect(page.locator('[data-publish-state]')).toHaveAttribute('data-publish-state', 'unconfirmed', {timeout: 20_000});
+  // Scoped to the result panel, not #publish-panel: the publish form's static
+  // lead permanently reads "...says published when the record was read back
+  // from a relay", so "was read back" lives on the page in every state and a
+  // whole-panel check would fire regardless of the outcome. The claim under
+  // test is what the *result* asserts, and that is what .publish-result holds.
+  const result = await page.locator('.publish-result').innerText();
+  // No "read back" *success* claim in the result. Both headlines that assert the
+  // withdrawal was observed share the phrase "was read back" -- confirmed ("was
+  // read back and confirmed") and partial ("was read back, but only ...") --
+  // while the honest states say "could not be read back" (unconfirmed) and "has
+  // not been read back" (the consequence). So the substring "was read back"
+  // seals both success wordings in one assertion without colliding with the
+  // wording this state is allowed to print.
+  expect(result).not.toContain('was read back');
+  // And the page says the true thing instead: until the withdrawal is observed,
+  // some clients still see this record as active.
+  expect(result).toContain('still see this record as active');
+
+  expect(await page.locator('body').innerText()).not.toContain('undefined');
   expect(errors, 'console/page errors').toEqual([]);
 });

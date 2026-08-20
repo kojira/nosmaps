@@ -151,6 +151,11 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
         publishing: '投稿中…',
         eventId: '署名したイベントID',
         partialConsequence: '受け付けなかったリレーだけを読んでいるクライアントには、このレコードは見えません。',
+        /* §W3.4 / W-I4: created_at を1秒進めたことは隠さない。進めた理由と、進める前に
+           実際に観測した値を並べて出す。「勝手に時刻を作った」と「同じ秒で負けないように
+           1秒だけ足した」は別のことなので、後者だと分かる形で書く。 */
+        clockBumped: '同じ座標に created_at {prior} のレコードを観測したので、同じ秒で負けないように created_at を {createdAt} にしました（+1秒）。',
+        clockConflictDetail: '観測した created_at は {prior} で、この端末の時計（{now}）より先です。何も署名していません。',
         headlines: {
           published: '{total}台中{accepted}台に公開し、読み戻せました。',
           partial: '{total}台中{accepted}台に公開し、読み戻せました。',
@@ -191,6 +196,7 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
           'signer-invalid-record': '署名後のイベントが検証を通りませんでした。何も送っていません。',
           'nip07-key-unparsable': 'NIP-07拡張が公開鍵として読めない値を返しました。',
           'pubkey-mismatch': 'サインイン時と別の公開鍵が返りました。何も送っていません。',
+          'clock-conflict': 'この座標のレコードが、この端末の時計より先の時刻で記録されています。端末の時計を確認してください。',
           'relay-unavailable': 'リレー層を初期化できませんでした。',
           'all-relays-rejected': 'すべてのリレーが拒否しました。',
           'publish-error': '投稿の途中でエラーが起きました。公開されたかどうかは分かりません。',
@@ -202,6 +208,40 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
           unavailable: 'データ層を読み込めていません。',
           unknownReason: '理由: {reason}'
         }
+      },
+      /* issue #12: 自分が出したレコードの一覧。「観測できなかった」と「問い合わせが完了しなかった」を
+         別の文言にしてあるのは、利用者が次に取る行動が違うから —— 後者を「0件」と書くと、
+         もう出してあるレコードをもう一度出しに行かせることになる。 */
+      manage: {
+        title: '自分が出したレコード',
+        loading: 'リレーに問い合わせています…',
+        empty: 'このリレーでは、あなたの署名したレコードは観測されませんでした。存在しないという意味ではありません。',
+        queryFailed: '問い合わせが完了しなかったので、件数は0ではなく不明です。何も観測できていません。',
+        unavailable: 'リレーに1台も接続できませんでした。観測できたことは何もありません。',
+        truncated: '上限 {limit} 件まで読みました。これより多くのレコードがある可能性があります。',
+        count: '{count} 件',
+        coordinate: '識別子 d',
+        updatedAt: '最終更新',
+        /* §W6.5 取り下げ。確認文が「取り下げは削除ではない」と述べるのは §7.3 の要請で、
+           取り下げを削除と読ませないため。結果の語彙は、読み戻しで確認できたときにだけ
+           「確認しました」と言い、確認できていない間は「まだ active に見える」と書く。 */
+        withdraw: '取り下げる',
+        withdrawing: '取り下げ中…',
+        withdrawConfirm: '取り下げを実行',
+        withdrawCancel: 'やめる',
+        withdrawPrompt: '「{name}」を取り下げます。取り下げは削除ではありません。取り下げを観測したクライアントはこのレコードを一覧に出さなくなりますが、イベントが消えるわけではなく、取り下げを観測していないリレーやクライアントには古い版がそのまま残ります。',
+        withdrawHeadlines: {
+          confirmed: '取り下げを読み戻して確認しました（{accepted}/{total} 件のリレーが受け取りました）。',
+          partial: '取り下げを読み戻して確認しましたが、受け取ったのは {accepted}/{total} 件のリレーだけです。',
+          unconfirmed: '取り下げを読み戻せませんでした（{attempts} 回試行）。届いたかどうかは分かっていません。',
+          failed: '取り下げをどのリレーにも届けられませんでした。',
+          invalid: '取り下げるレコードが検証を通らなかったので、何も署名していません。',
+          blocked: '取り下げは送る前に止まりました。何も署名していません。',
+          other: '取り下げの状態: {state}'
+        },
+        withdrawNotDeletion: '取り下げは削除ではありません。古い版を持っているリレーからイベントが消えるわけではありません。',
+        withdrawStillActive: '取り下げを読み戻して確認できていないので、このレコードがまだ active に見えるクライアントがあります。',
+        withdrawPartialActive: '取り下げを受け取っていないリレーだけを読むクライアントには、このレコードはまだ active に見えます。'
       },
       /* NIP-07 サインイン。失敗の原因は原因ごとに別の文言で出す —— 「拡張が無い」「断られた」
          「エラーが返った」「応答が無い」は利用者が次に取る行動が違う。 */
@@ -310,6 +350,8 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
         publishing: 'Publishing…',
         eventId: 'Signed event id',
         partialConsequence: 'Clients that read only the relays which did not accept it will not see this record.',
+        clockBumped: 'A record at this address was observed with created_at {prior}, so created_at was set to {createdAt} (+1 second) rather than risk losing a same-second tie.',
+        clockConflictDetail: 'The observed created_at is {prior}, which is ahead of this device clock ({now}). Nothing was signed.',
         headlines: {
           published: 'Published to {accepted} of {total} relays and read back.',
           partial: 'Published to {accepted} of {total} relays and read back.',
@@ -350,6 +392,7 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
           'signer-invalid-record': 'The signed event did not pass validation. Nothing was sent.',
           'nip07-key-unparsable': 'The extension returned a value that is not a readable public key.',
           'pubkey-mismatch': 'A different public key came back than the one you signed in with. Nothing was sent.',
+          'clock-conflict': 'A record at this address is already timestamped ahead of this device\u2019s clock. Check your system time.',
           'relay-unavailable': 'The relay layer could not be initialised.',
           'all-relays-rejected': 'Every relay refused it.',
           'publish-error': 'Publishing errored part way through. Whether it was stored is unknown.',
@@ -361,6 +404,34 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
           unavailable: 'The data layer is not loaded.',
           unknownReason: 'Reason: {reason}'
         }
+      },
+      manage: {
+        title: 'Records you published',
+        loading: 'Asking the relays…',
+        empty: 'No record signed by you was observed on these relays. That is not a claim that none exists.',
+        queryFailed: 'The query did not complete, so the number of records is unknown, not zero. Nothing was observed.',
+        unavailable: 'Not one relay could be reached, so nothing was observed at all.',
+        truncated: 'Read up to the ceiling of {limit} records. There may be more than this list shows.',
+        count: '{count} records',
+        coordinate: 'Identifier d',
+        updatedAt: 'Last updated',
+        withdraw: 'Withdraw',
+        withdrawing: 'Withdrawing…',
+        withdrawConfirm: 'Withdraw it',
+        withdrawCancel: 'Cancel',
+        withdrawPrompt: 'Withdraw “{name}”. Withdrawal is not deletion: clients that observe the withdrawal stop listing this record, but no event is erased, and relays or clients that never observe it keep serving the older version.',
+        withdrawHeadlines: {
+          confirmed: 'The withdrawal was read back and confirmed ({accepted} of {total} relays took it).',
+          partial: 'The withdrawal was read back, but only {accepted} of {total} relays took it.',
+          unconfirmed: 'The withdrawal could not be read back after {attempts} attempts. Whether it arrived is unknown.',
+          failed: 'The withdrawal reached no relay at all.',
+          invalid: 'The record failed validation, so nothing was signed.',
+          blocked: 'The withdrawal stopped before anything was sent. Nothing was signed.',
+          other: 'Withdrawal state: {state}'
+        },
+        withdrawNotDeletion: 'Withdrawal is not deletion. No event is erased from relays that hold the older version.',
+        withdrawStillActive: 'The withdrawal has not been read back, so some clients still see this record as active.',
+        withdrawPartialActive: 'Clients reading only the relays that did not take the withdrawal still see this record as active.'
       },
       viewer: {
         label: 'Viewer sign-in state', signedIn: 'Signed in', signedOut: 'Not signed in',
