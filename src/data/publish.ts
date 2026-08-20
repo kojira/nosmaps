@@ -586,6 +586,18 @@ export async function publishSoftwareRecord(opts?: PublishOptions): Promise<Publ
   }
 }
 
+/** §W6.2: the Withdraw action. It is the same publish chain — one more record
+    at the same coordinate, signed by the same key — with `state` computed from
+    the action rather than read from a control (§W3.3). `name` and `summary`
+    are carried through unchanged, because §7.1 still requires them: a client
+    that only holds the withdrawal must still be able to say *what* was
+    withdrawn. No kind 5 is sent; §7.4 makes the withdrawal event itself the
+    whole mechanism, and a deletion request would claim an erasure nobody can
+    guarantee. */
+export function withdrawSoftwareRecord(opts?: PublishOptions): Promise<PublishResult> {
+  return publishSoftwareRecord({...opts, draft: {...opts?.draft, state: 'withdrawn'}});
+}
+
 /* ---- The publisher's own records (issue #12) ------------------------------
 
    One logical REQ, one author, one purpose: showing a signed-in user what this
