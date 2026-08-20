@@ -54,9 +54,20 @@ function selectedNips(page) {
 
 /* カタログ側の真値。nip-explorer.js の判定と同じ規則を data.js から独立に組み立てる：
    要求ファミリ内で precedence を持つ主張があればその最上位、無ければ——他ファミリの主張だけを
-   持つなら out_of_family、主張が何も無ければ unknown。 */
-/** @param {import('@playwright/test').Page} page @param {string[]} nips */
-function supportByTool(page, nips) {
+   持つなら out_of_family、主張が何も無ければ unknown。
+
+   issue #10: `accounts` だけは規則が違う。NIP 一覧は「複数アカウントを切り替えられるか」に
+   答えていない（NIP-19 は bech32 のエンコードであって、アカウントの話を一言もしていない）ので、
+   実際に見に行って記録した `accountSwitching` が答えになる。未観測（null）は unknown であって
+   「非対応」ではない。ここでも期待値は書き写さず、data.js から導く。 */
+/** @param {import('@playwright/test').Page} page @param {string[]} nips @param {string} [feature] */
+function supportByTool(page, nips, feature) {
+  if (feature === 'accounts') {
+    return page.evaluate(() => window.NOSMAPS_DATA.tools.map(tool => ({
+      id: tool.id,
+      value: tool.accountSwitching && tool.accountSwitching.result !== 'unknown' ? tool.accountSwitching.result : 'unknown'
+    })));
+  }
   return page.evaluate(nipIds => {
     const data = window.NOSMAPS_DATA;
     const family = data.registry.family;
@@ -108,7 +119,7 @@ test('with a feature selected and the default mode, no unstated entry is in the 
 
     const nips = await selectedNips(page);
     expect(nips.length, `${feature} NIP references`).toBeGreaterThan(0);
-    const support = await supportByTool(page, nips);
+    const support = await supportByTool(page, nips, feature);
     const confirmed = support.filter(entry => CONFIRMED.includes(entry.value)).map(entry => entry.id);
     const unstated = support.filter(entry => UNSTATED.includes(entry.value)).map(entry => entry.id);
     // どちらの枝も実在する。空集合を相手に「混ざっていない」と言っても何も守らない。

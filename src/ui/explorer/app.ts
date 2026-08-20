@@ -15,12 +15,13 @@
    publishes live in src/entry/nip-explorer.ts. */
 
 import type {
-  CapabilityClaim, Data, LivenessObservation, NipRegistryEntry, ProvenanceSource, Tool, ToolClaim
+  AccountSwitchingObservation, CapabilityClaim, Data, LivenessObservation, NipRegistryEntry,
+  ProvenanceSource, Tool, ToolClaim
 } from '../../domain/entry.ts';
 import type {CatalogEntry, CuratorSummary} from '../../domain/catalogue.ts';
 import {
-  DEFAULT_SUPPORT, featureById, featureDefinitions, isUiState,
-  precedenceOf as precedenceOfIn, supportPasses, UNSTATED_SUPPORT,
+  accountSwitchingSupport, DEFAULT_SUPPORT, featureById, featureDefinitions, isUiState,
+  OBSERVED_FEATURE_ID, precedenceOf as precedenceOfIn, supportPasses, UNSTATED_SUPPORT,
   metadataValues, ossState, isOss, normaliseNipQuery,
   type DisplayResult, type FeatureDefinition, type UiState
 } from '../../domain/explorer.ts';
@@ -59,6 +60,14 @@ export type Row = Tool | RelayRow;
 /** The claims a row carries. A relay row carries none — it has not been asked. */
 function rowCapabilities(row: Row): readonly CapabilityClaim[] {
   return row.provenance === 'relay' ? [] : row.capabilities;
+}
+
+/** issue #10: the account-switching observation a row carries. A relay row carries
+    none for the same reason it carries no claims — a live 30078 record states
+    nothing about it and nobody has gone and looked — so it is null, which reads as
+    `unknown` and never as "does not support it". */
+function rowAccountSwitching(row: Row): AccountSwitchingObservation | null {
+  return row.provenance === 'relay' ? null : row.accountSwitching;
 }
 
 /* A relay row's topics are the `t` tags of the 30078 record. Most of them are
@@ -537,8 +546,16 @@ export function mountExplorer(data: Data): ExplorerHandles {
       (best, record) => precedenceOf(record.result) > precedenceOf(best.result) ? record : best, first);
   }
   /* §21.3 R3 case 2 / the brief: no claim at all is `unknown`, never "not supported" and never an
-     empty checklist that reads as a set of negatives. It is a value, so it always has a badge. */
+     empty checklist that reads as a set of negatives. It is a value, so it always has a badge.
+
+     issue #10: `accounts` is the one feature whose answer is NOT the NIP list. "Can a person switch
+     between several accounts" is not something any NIP states — NIP-19 is bech32 encoding — so the
+     answer is the observation someone actually recorded, and a row nobody looked at stays `unknown`
+     rather than being read as a negative. Every other feature goes through the same path as before.
+     `featureSupportRecord` is deliberately left alone: it answers "which NIP claim does this row
+     carry", which is what the NIP evidence button is about, and that is still true of the row. */
   function featureSupport(tool: Row, feature: FeatureDefinition): DisplayResult {
+    if (feature.id === OBSERVED_FEATURE_ID) return accountSwitchingSupport({accountSwitching: rowAccountSwitching(tool)});
     const record = featureSupportRecord(tool, feature);
     if (record) return record.result;
     return outOfFamily(tool) ? 'out_of_family' : 'unknown';
