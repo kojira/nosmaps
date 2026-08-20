@@ -5,6 +5,8 @@
    design says it is, and a malformed value falls back to the default rather than
    producing NaN or an empty relay list. */
 
+import {WRITE} from '../../domain/policy.ts';
+
 export interface ExplorerParams {
   /** §W0.2 read-back attempts. Default 3. */
   readonly readbackAttempts: number;
@@ -12,8 +14,11 @@ export interface ExplorerParams {
   readonly readbackBackoff: readonly number[];
   /** Default 15000 ms. */
   readonly publishTimeoutMs: number;
-  /** NIP-07 getPublicKey() timeout. Default 20000 ms — an extension whose prompt
-      is never answered would otherwise never settle. */
+  /** NIP-07 getPublicKey() timeout. Defaults to WRITE.SIGNER_TIMEOUT_MS (60000 ms):
+      what this bounds is how long a *person* may take to answer the extension's
+      prompt, not how long a socket may take, so the shipped value follows §W0.2
+      rather than a number typed here. An extension whose prompt is never answered
+      would otherwise never settle. */
   readonly nip07TimeoutMs: number;
   /** `?relay=1` asks for the live catalogue. */
   readonly relayRequested: boolean;
@@ -53,7 +58,7 @@ export function readExplorerParams(search: string): ExplorerParams {
     readbackAttempts: positiveNumber(params.get('readbackattempts'), 3),
     readbackBackoff: backoff(params.get('readbackbackoff')),
     publishTimeoutMs: positiveNumber(params.get('publishtimeout'), 15000),
-    nip07TimeoutMs: positiveNumber(params.get('nip07timeout'), 20000),
+    nip07TimeoutMs: positiveNumber(params.get('nip07timeout'), WRITE.SIGNER_TIMEOUT_MS),
     relayRequested: params.get('relay') === '1',
     viewerPubkey: (params.get('viewer') ?? '').trim(),
     relays: list(params.get('relays')),
