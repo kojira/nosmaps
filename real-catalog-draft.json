@@ -3,13 +3,15 @@
     "generated": "2026-08-18",
     "generator": "manual collection; every value traced to a primary source listed per entry",
     "head_commit": "822f56f",
-    "profile": "design-relay-native-data.md §4.2 rule 2 — content is exactly {schema:'org.nosmaps.software', version:1, state, name, summary, homepage?, superseded_by?}; unknown keys rejected in the v1 profile. Tag rules from §4.2 rules 1/1b/4/5 and §5.1.",
+    "profile": "design-relay-native-data.md §4.2 rules 2 and 7 — content is exactly {schema:'org.nosmaps.software', version:2, state, name, summary, descriptions?, summary_lang?, homepage?, superseded_by?}; unknown keys rejected. The skeletons were collected against the v1 profile (version:1, no `descriptions`) and were raised to v2 on 2026-08-20 so the per-language texts could be signed instead of being injected by the build (#14). Nothing else about them changed: no summary, name, homepage, state or topic was touched, and v1 remains a valid profile for records that state it. Tag rules from §4.2 rules 1/1b/4/5/7f and §5.1.",
     "profile_field_list": [
       "schema",
       "version",
       "state",
       "name",
       "summary",
+      "descriptions (optional, v2)",
+      "summary_lang (optional, v2)",
       "homepage (optional)",
       "superseded_by (optional)"
     ],
@@ -42,15 +44,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Damus",
           "summary": "A twitter-like nostr client for iPhone, iPad and MacOS.",
+          "descriptions": {
+            "ja": "iPhone・iPad・macOS向けの、Twitterに似たNostrクライアント。"
+          },
           "homepage": "https://damus.io/"
         }
       },
@@ -135,15 +140,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Amethyst",
           "summary": "Nostr client for Android",
+          "descriptions": {
+            "ja": "Android向けのNostrクライアント。"
+          },
           "homepage": "https://amethyst.social"
         }
       },
@@ -307,15 +315,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Primal Web App",
           "summary": "Primal's web app for Nostr, as experienced on primal.net.",
+          "descriptions": {
+            "ja": "primal.netで使われているものと同じ、PrimalのNostrウェブアプリ。"
+          },
           "homepage": "https://primal.net"
         }
       },
@@ -386,15 +397,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Coracle",
           "summary": "An experimental Nostr client focused on unlocking the full potential of multiple relays. Browse, filter, zap, and create custom feeds to create a curated Nostr experience.",
+          "descriptions": {
+            "ja": "複数リレーの潜在能力を引き出すことに主眼を置いた実験的なNostrクライアント。閲覧、絞り込み、Zap、カスタムフィードの作成により、自分好みのNostr体験を組み立てられる。"
+          },
           "homepage": "https://app.coracle.social"
         }
       },
@@ -475,15 +489,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Snort",
           "summary": "Feature packed nostr web UI",
+          "descriptions": {
+            "ja": "機能を詰め込んだNostrのウェブUI。"
+          },
           "homepage": "https://phoenix.social"
         }
       },
@@ -597,15 +614,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Iris",
           "summary": "Highly performant and normie-friendly offline-first Nostr web client that is not dependent on any single relay or other server. Featuring a Cashu wallet, secure DMs and social graph based content filtering.",
+          "descriptions": {
+            "ja": "単一のリレーやサーバーに依存しない、高速でとっつきやすいオフラインファーストのNostrウェブクライアント。Cashuウォレット、安全なDM、ソーシャルグラフに基づく内容の絞り込みを備える。"
+          },
           "homepage": "https://iris.to"
         }
       },
@@ -675,15 +695,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "nostter",
           "summary": "Nostr client for web.",
+          "descriptions": {
+            "ja": "ウェブ向けのNostrクライアント。"
+          },
           "homepage": "https://nostter.app"
         }
       },
@@ -744,15 +767,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Gossip",
-          "summary": "Gossip is a nostr client"
+          "summary": "Gossip is a nostr client",
+          "descriptions": {
+            "ja": "GossipはNostrクライアント。"
+          }
         }
       },
       "provenance": [
@@ -828,15 +854,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "noStrudel",
           "summary": "A sandbox for exploring nostr",
+          "descriptions": {
+            "ja": "Nostrを探索するための砂場。"
+          },
           "homepage": "https://nostrudel.ninja/"
         }
       },
@@ -906,15 +935,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Rabbit",
           "summary": "🐰 A nostr client like TweetDeck",
+          "descriptions": {
+            "ja": "🐰 TweetDeckのようなNostrクライアント。"
+          },
           "homepage": "https://rabbit.syusui.net"
         }
       },
@@ -976,15 +1008,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "0xchat",
-          "summary": "A secure, open-source chat app built on the Nostr protocol. Available on Android, iOS, macOS, Linux and Windows."
+          "summary": "A secure, open-source chat app built on the Nostr protocol. Available on Android, iOS, macOS, Linux and Windows.",
+          "descriptions": {
+            "ja": "Nostrプロトコル上に作られた、安全でオープンソースのチャットアプリ。Android、iOS、macOS、Linux、Windowsで利用できる。"
+          }
         }
       },
       "provenance": [
@@ -1053,15 +1088,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "YakiHonne Web App",
           "summary": "A decentralized social payment client on Nostr & Bitcoin.",
+          "descriptions": {
+            "ja": "Nostrとビットコイン上の分散型ソーシャルペイメントクライアント。"
+          },
           "homepage": "https://yakihonne.com"
         }
       },
@@ -1148,12 +1186,12 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Olas",
           "summary": "Unknown"
@@ -1231,15 +1269,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Habla",
           "summary": "Habla allows you to read, write, curate and monetize long form content over Nostr, a censorship-resistant protocol for social media.",
+          "descriptions": {
+            "ja": "HablaはNostr上で長文コンテンツを読み、書き、集め、収益化できるようにする。Nostrはソーシャルメディアのための検閲耐性のあるプロトコル。"
+          },
           "homepage": "https://habla.news"
         }
       },
@@ -1313,15 +1354,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "zap.stream",
           "summary": "Nostr live streaming",
+          "descriptions": {
+            "ja": "Nostrのライブ配信。"
+          },
           "homepage": "https://zap.stream"
         }
       },
@@ -1387,15 +1431,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Ditto",
           "summary": "Your content. Your vibe. Your rules.",
+          "descriptions": {
+            "ja": "あなたのコンテンツ。あなたの雰囲気。あなたのルール。"
+          },
           "homepage": "https://ditto.pub"
         }
       },
@@ -1461,15 +1508,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Shopstr",
           "summary": "A global, permissionless Nostr marketplace for Bitcoin commerce",
+          "descriptions": {
+            "ja": "ビットコイン商取引のための、世界規模で許可の要らないNostrマーケットプレイス。"
+          },
           "homepage": "https://shopstr.market"
         }
       },
@@ -1561,15 +1611,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Amber",
-          "summary": "Amber is a nostr event signer for Android. It allows users to keep their nsec segregated in a single, dedicated app. The goal of Amber is to have your smartphone act as a NIP-46 signing device without any need for servers or additional hardware."
+          "summary": "Amber is a nostr event signer for Android. It allows users to keep their nsec segregated in a single, dedicated app. The goal of Amber is to have your smartphone act as a NIP-46 signing device without any need for servers or additional hardware.",
+          "descriptions": {
+            "ja": "AmberはAndroid向けのNostrイベント署名アプリ。nsecを専用のアプリひとつに隔離しておける。Amberの目的は、サーバーも追加のハードウェアも要らずに、手元のスマートフォンをNIP-46の署名デバイスとして働かせること。"
+          }
         }
       },
       "provenance": [
@@ -1644,15 +1697,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "nos2x",
-          "summary": "nostr signer extension"
+          "summary": "nostr signer extension",
+          "descriptions": {
+            "ja": "Nostrの署名拡張機能。"
+          }
         }
       },
       "provenance": [
@@ -1724,15 +1780,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "nsec.app (noauth)",
           "summary": "Noauth Nostr key manager.",
+          "descriptions": {
+            "ja": "Noauth Nostr鍵マネージャー。"
+          },
           "homepage": "https://use.nsec.app"
         }
       },
@@ -1798,15 +1857,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Alby Browser Extension",
           "summary": "The Bitcoin Lightning Browser Extension that brings deep Lightning & Nostr integration to the web. Wallet interface to multiple lightning nodes and key signer for Nostr, Liquid and onchain use.",
+          "descriptions": {
+            "ja": "ウェブに深いLightningとNostrの統合をもたらすビットコインLightningブラウザ拡張機能。複数のLightningノードへのウォレットインターフェースであり、Nostr・Liquid・オンチェーンで使う鍵の署名役でもある。"
+          },
           "homepage": "https://getalby.com/#extension"
         }
       },
@@ -1870,15 +1932,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Pokey",
           "summary": "Display live notifications for your nostr events and allow other apps to receive and interact with them.",
+          "descriptions": {
+            "ja": "自分のNostrイベントの通知をその場で表示し、他のアプリがそれを受け取って操作できるようにする。"
+          },
           "homepage": "https://njump.me/npub1h2685kkxa4q50qpexuae9geqep7frr0u8t8pcy9zj0xnza9phvtsnkd9tm"
         }
       },
@@ -1948,15 +2013,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "strfry",
-          "summary": "strfry is a relay for the nostr protocol. No external database required: all data is stored locally on the filesystem in LMDB."
+          "summary": "strfry is a relay for the nostr protocol. No external database required: all data is stored locally on the filesystem in LMDB.",
+          "descriptions": {
+            "ja": "strfryはNostrプロトコルのリレー。外部データベースは不要で、データはすべてLMDBを使ってファイルシステム上にローカルに保存される。"
+          }
         }
       },
       "provenance": [
@@ -2038,15 +2106,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "nostr-rs-relay",
-          "summary": "A nostr relay written in Rust."
+          "summary": "A nostr relay written in Rust.",
+          "descriptions": {
+            "ja": "Rustで書かれたNostrリレー。"
+          }
         }
       },
       "provenance": [
@@ -2146,15 +2217,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "khatru",
           "summary": "a framework for making custom Nostr relays",
+          "descriptions": {
+            "ja": "独自のNostrリレーを作るためのフレームワーク。"
+          },
           "homepage": "https://khatru.nostr.technology/"
         }
       },
@@ -2219,15 +2293,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "nostream",
-          "summary": "A Nostr Relay written in TypeScript"
+          "summary": "A Nostr Relay written in TypeScript",
+          "descriptions": {
+            "ja": "TypeScriptで書かれたNostrリレー。"
+          }
         }
       },
       "provenance": [
@@ -2333,15 +2410,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Nostrcheck server",
           "summary": "The community's Nostr brain: The only server with relay, File Hosting (NIP-96 & Blossom), Nostr Address (NIP-05), Lightning Redirects, NWC, WoT, and much more.",
+          "descriptions": {
+            "ja": "コミュニティのNostrの頭脳。リレー、ファイルホスティング（NIP-96とBlossom）、Nostrアドレス（NIP-05）、Lightningリダイレクト、NWC、WoT、その他多数を備えた唯一のサーバー。"
+          },
           "homepage": "https://nostrcheck.me/"
         }
       },
@@ -2434,15 +2514,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "HAVEN",
-          "summary": "High Availability Vault for Events on Nostr"
+          "summary": "High Availability Vault for Events on Nostr",
+          "descriptions": {
+            "ja": "Nostrのイベントのための高可用性の保管庫。"
+          }
         }
       },
       "provenance": [
@@ -2511,15 +2594,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Blossom server",
-          "summary": "A blossom server written in Deno"
+          "summary": "A blossom server written in Deno",
+          "descriptions": {
+            "ja": "Denoで書かれたBlossomサーバー。"
+          }
         }
       },
       "provenance": [
@@ -2601,15 +2687,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Blossom",
-          "summary": "Blobs stored simply on mediaservers — the specification documents (BUDs) for the Blossom protocol."
+          "summary": "Blobs stored simply on mediaservers — the specification documents (BUDs) for the Blossom protocol.",
+          "descriptions": {
+            "ja": "メディアサーバー上に素朴に保管されるブロブ ― Blossomプロトコルの仕様文書（BUD）。"
+          }
         }
       },
       "provenance": [
@@ -2678,15 +2767,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "nostr.build",
           "summary": "nostr.build media uploader — media hosting for Nostr.",
+          "descriptions": {
+            "ja": "nostr.buildのメディアアップローダー ― Nostrのためのメディアホスティング。"
+          },
           "homepage": "https://nostr.build/"
         }
       },
@@ -2763,15 +2855,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "void.cat",
-          "summary": "Free, simple file hosting."
+          "summary": "Free, simple file hosting.",
+          "descriptions": {
+            "ja": "無料で単純なファイルホスティング。"
+          }
         }
       },
       "provenance": [
@@ -2842,15 +2937,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Zeus",
           "summary": "A mobile Bitcoin wallet fit for the gods.",
+          "descriptions": {
+            "ja": "神々にふさわしいモバイルビットコインウォレット。"
+          },
           "homepage": "https://zeusln.com"
         }
       },
@@ -2922,15 +3020,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Alby Hub",
           "summary": "Alby Hub - Your own Bitcoin Lightning node: easy, connectable, feature-rich. Run anywhere. Become self-sovereign.",
+          "descriptions": {
+            "ja": "Alby Hub ― 自分だけのビットコインLightningノード。手軽で、つながりやすく、機能豊富。どこででも動かせる。自分で主権を持つ。"
+          },
           "homepage": "https://albyhub.com"
         }
       },
@@ -2995,15 +3096,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Mutiny Wallet",
           "summary": "Mutiny is a self-custodial lightning wallet that runs in the browser.",
+          "descriptions": {
+            "ja": "Mutinyはブラウザの中で動く自己管理型のLightningウォレット。"
+          },
           "homepage": "https://app.mutinywallet.com"
         }
       },
@@ -3075,15 +3179,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "nostr-tools",
-          "summary": "Tools for developing Nostr clients."
+          "summary": "Tools for developing Nostr clients.",
+          "descriptions": {
+            "ja": "Nostrクライアントを開発するための道具一式。"
+          }
         }
       },
       "provenance": [
@@ -3161,15 +3268,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "NDK (Nostr Development Kit)",
           "summary": "Nostr Development Kit with outbox-model support",
+          "descriptions": {
+            "ja": "アウトボックスモデルに対応したNostr開発キット。"
+          },
           "homepage": "https://nostr-dev-kit.github.io/ndk/"
         }
       },
@@ -3255,15 +3365,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "rust-nostr",
           "summary": "Rust implementation of the nostr protocol, high-level client library, Nostr Wallet Connect and more.",
+          "descriptions": {
+            "ja": "NostrプロトコルのRust実装。高水準のクライアントライブラリ、Nostr Wallet Connectなどを含む。"
+          },
           "homepage": "https://nostrdevkit.org"
         }
       },
@@ -3332,15 +3445,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "nak",
-          "summary": "a command line tool for doing all things nostr"
+          "summary": "a command line tool for doing all things nostr",
+          "descriptions": {
+            "ja": "Nostrに関することを何でもやるためのコマンドラインツール。"
+          }
         }
       },
       "provenance": [
@@ -3408,15 +3524,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "nostr.watch",
           "summary": "nostr.watch provides the infrastructure for observing the Nostr relay network.",
+          "descriptions": {
+            "ja": "nostr.watchはNostrリレーネットワークを観測するための基盤を提供する。"
+          },
           "homepage": "https://nostr.watch"
         }
       },
@@ -3481,15 +3600,18 @@
           ],
           [
             "v",
-            "1"
+            "2"
           ]
         ],
         "content": {
           "schema": "org.nosmaps.software",
-          "version": 1,
+          "version": 2,
           "state": "active",
           "name": "Zapstore",
           "summary": "The open app store where users meet builders. Curated by communities. Android apps.",
+          "descriptions": {
+            "ja": "利用者と作り手が出会うオープンなアプリストア。コミュニティが選ぶ。Androidアプリ。"
+          },
           "homepage": "https://zapstore.dev"
         }
       },

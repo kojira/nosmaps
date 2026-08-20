@@ -721,7 +721,6 @@ window.NOSMAPS_DATA={
    "summary": "A twitter-like nostr client for iPhone, iPad and MacOS.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "A twitter-like nostr client for iPhone, iPad and MacOS.",
     "ja": "iPhone・iPad・macOS向けの、Twitterに似たNostrクライアント。"
    },
    "homepage": "https://damus.io/",
@@ -957,7 +956,6 @@ window.NOSMAPS_DATA={
    "summary": "Nostr client for Android",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Nostr client for Android",
     "ja": "Android向けのNostrクライアント。"
    },
    "homepage": "https://amethyst.social",
@@ -2444,7 +2442,6 @@ window.NOSMAPS_DATA={
    "summary": "Primal's web app for Nostr, as experienced on primal.net.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Primal's web app for Nostr, as experienced on primal.net.",
     "ja": "primal.netで使われているものと同じ、PrimalのNostrウェブアプリ。"
    },
    "homepage": "https://primal.net",
@@ -2517,7 +2514,6 @@ window.NOSMAPS_DATA={
    "summary": "An experimental Nostr client focused on unlocking the full potential of multiple relays. Browse, filter, zap, and create custom feeds to create a curated Nostr experience.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "An experimental Nostr client focused on unlocking the full potential of multiple relays. Browse, filter, zap, and create custom feeds to create a curated Nostr experience.",
     "ja": "複数リレーの潜在能力を引き出すことに主眼を置いた実験的なNostrクライアント。閲覧、絞り込み、Zap、カスタムフィードの作成により、自分好みのNostr体験を組み立てられる。"
    },
    "homepage": "https://app.coracle.social",
@@ -2826,7 +2822,6 @@ window.NOSMAPS_DATA={
    "summary": "Feature packed nostr web UI",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Feature packed nostr web UI",
     "ja": "機能を詰め込んだNostrのウェブUI。"
    },
    "homepage": "https://phoenix.social",
@@ -3630,7 +3625,6 @@ window.NOSMAPS_DATA={
    "summary": "Highly performant and normie-friendly offline-first Nostr web client that is not dependent on any single relay or other server. Featuring a Cashu wallet, secure DMs and social graph based content filtering.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Highly performant and normie-friendly offline-first Nostr web client that is not dependent on any single relay or other server. Featuring a Cashu wallet, secure DMs and social graph based content filtering.",
     "ja": "単一のリレーやサーバーに依存しない、高速でとっつきやすいオフラインファーストのNostrウェブクライアント。Cashuウォレット、安全なDM、ソーシャルグラフに基づく内容の絞り込みを備える。"
    },
    "homepage": "https://iris.to",
@@ -3711,7 +3705,6 @@ window.NOSMAPS_DATA={
    "summary": "Nostr client for web.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Nostr client for web.",
     "ja": "ウェブ向けのNostrクライアント。"
    },
    "homepage": "https://nostter.app",
@@ -3775,7 +3768,6 @@ window.NOSMAPS_DATA={
    "summary": "Gossip is a nostr client",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Gossip is a nostr client",
     "ja": "GossipはNostrクライアント。"
    },
    "homepage": null,
@@ -3893,7 +3885,6 @@ window.NOSMAPS_DATA={
    "summary": "A sandbox for exploring nostr",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "A sandbox for exploring nostr",
     "ja": "Nostrを探索するための砂場。"
    },
    "homepage": "https://nostrudel.ninja/",
@@ -3965,7 +3956,6 @@ window.NOSMAPS_DATA={
    "summary": "🐰 A nostr client like TweetDeck",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "🐰 A nostr client like TweetDeck",
     "ja": "🐰 TweetDeckのようなNostrクライアント。"
    },
    "homepage": "https://rabbit.syusui.net",
@@ -4029,7 +4019,6 @@ window.NOSMAPS_DATA={
    "summary": "A secure, open-source chat app built on the Nostr protocol. Available on Android, iOS, macOS, Linux and Windows.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "A secure, open-source chat app built on the Nostr protocol. Available on Android, iOS, macOS, Linux and Windows.",
     "ja": "Nostrプロトコル上に作られた、安全でオープンソースのチャットアプリ。Android、iOS、macOS、Linux、Windowsで利用できる。"
    },
    "homepage": null,
@@ -4096,7 +4085,6 @@ window.NOSMAPS_DATA={
    "summary": "A decentralized social payment client on Nostr & Bitcoin.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "A decentralized social payment client on Nostr & Bitcoin.",
     "ja": "Nostrとビットコイン上の分散型ソーシャルペイメントクライアント。"
    },
    "homepage": "https://yakihonne.com",
@@ -4419,7 +4407,6 @@ window.NOSMAPS_DATA={
    "summary": "Habla allows you to read, write, curate and monetize long form content over Nostr, a censorship-resistant protocol for social media.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Habla allows you to read, write, curate and monetize long form content over Nostr, a censorship-resistant protocol for social media.",
     "ja": "HablaはNostr上で長文コンテンツを読み、書き、集め、収益化できるようにする。Nostrはソーシャルメディアのための検閲耐性のあるプロトコル。"
    },
    "homepage": "https://habla.news",
@@ -4486,7 +4473,6 @@ window.NOSMAPS_DATA={
    "summary": "Nostr live streaming",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Nostr live streaming",
     "ja": "Nostrのライブ配信。"
    },
    "homepage": "https://zap.stream",
@@ -4568,7 +4554,6 @@ window.NOSMAPS_DATA={
    "summary": "Your content. Your vibe. Your rules.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Your content. Your vibe. Your rules.",
     "ja": "あなたのコンテンツ。あなたの雰囲気。あなたのルール。"
    },
    "homepage": "https://ditto.pub",
@@ -4652,7 +4637,6 @@ window.NOSMAPS_DATA={
    "summary": "A global, permissionless Nostr marketplace for Bitcoin commerce",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "A global, permissionless Nostr marketplace for Bitcoin commerce",
     "ja": "ビットコイン商取引のための、世界規模で許可の要らないNostrマーケットプレイス。"
    },
    "homepage": "https://shopstr.market",
@@ -5151,7 +5135,6 @@ window.NOSMAPS_DATA={
    "summary": "Amber is a nostr event signer for Android. It allows users to keep their nsec segregated in a single, dedicated app. The goal of Amber is to have your smartphone act as a NIP-46 signing device without any need for servers or additional hardware.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Amber is a nostr event signer for Android. It allows users to keep their nsec segregated in a single, dedicated app. The goal of Amber is to have your smartphone act as a NIP-46 signing device without any need for servers or additional hardware.",
     "ja": "AmberはAndroid向けのNostrイベント署名アプリ。nsecを専用のアプリひとつに隔離しておける。Amberの目的は、サーバーも追加のハードウェアも要らずに、手元のスマートフォンをNIP-46の署名デバイスとして働かせること。"
    },
    "homepage": null,
@@ -5252,7 +5235,6 @@ window.NOSMAPS_DATA={
    "summary": "nostr signer extension",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "nostr signer extension",
     "ja": "Nostrの署名拡張機能。"
    },
    "homepage": null,
@@ -5337,7 +5319,6 @@ window.NOSMAPS_DATA={
    "summary": "Noauth Nostr key manager.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Noauth Nostr key manager.",
     "ja": "Noauth Nostr鍵マネージャー。"
    },
    "homepage": "https://use.nsec.app",
@@ -5420,7 +5401,6 @@ window.NOSMAPS_DATA={
    "summary": "The Bitcoin Lightning Browser Extension that brings deep Lightning & Nostr integration to the web. Wallet interface to multiple lightning nodes and key signer for Nostr, Liquid and onchain use.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "The Bitcoin Lightning Browser Extension that brings deep Lightning & Nostr integration to the web. Wallet interface to multiple lightning nodes and key signer for Nostr, Liquid and onchain use.",
     "ja": "ウェブに深いLightningとNostrの統合をもたらすビットコインLightningブラウザ拡張機能。複数のLightningノードへのウォレットインターフェースであり、Nostr・Liquid・オンチェーンで使う鍵の署名役でもある。"
    },
    "homepage": "https://getalby.com/#extension",
@@ -5487,7 +5467,6 @@ window.NOSMAPS_DATA={
    "summary": "Display live notifications for your nostr events and allow other apps to receive and interact with them.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Display live notifications for your nostr events and allow other apps to receive and interact with them.",
     "ja": "自分のNostrイベントの通知をその場で表示し、他のアプリがそれを受け取って操作できるようにする。"
    },
    "homepage": "https://njump.me/npub1h2685kkxa4q50qpexuae9geqep7frr0u8t8pcy9zj0xnza9phvtsnkd9tm",
@@ -5553,7 +5532,6 @@ window.NOSMAPS_DATA={
    "summary": "strfry is a relay for the nostr protocol. No external database required: all data is stored locally on the filesystem in LMDB.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "strfry is a relay for the nostr protocol. No external database required: all data is stored locally on the filesystem in LMDB.",
     "ja": "strfryはNostrプロトコルのリレー。外部データベースは不要で、データはすべてLMDBを使ってファイルシステム上にローカルに保存される。"
    },
    "homepage": null,
@@ -5798,7 +5776,6 @@ window.NOSMAPS_DATA={
    "summary": "A nostr relay written in Rust.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "A nostr relay written in Rust.",
     "ja": "Rustで書かれたNostrリレー。"
    },
    "homepage": null,
@@ -6153,7 +6130,6 @@ window.NOSMAPS_DATA={
    "summary": "a framework for making custom Nostr relays",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "a framework for making custom Nostr relays",
     "ja": "独自のNostrリレーを作るためのフレームワーク。"
    },
    "homepage": "https://khatru.nostr.technology/",
@@ -6237,7 +6213,6 @@ window.NOSMAPS_DATA={
    "summary": "A Nostr Relay written in TypeScript",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "A Nostr Relay written in TypeScript",
     "ja": "TypeScriptで書かれたNostrリレー。"
    },
    "homepage": null,
@@ -6677,7 +6652,6 @@ window.NOSMAPS_DATA={
    "summary": "The community's Nostr brain: The only server with relay, File Hosting (NIP-96 & Blossom), Nostr Address (NIP-05), Lightning Redirects, NWC, WoT, and much more.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "The community's Nostr brain: The only server with relay, File Hosting (NIP-96 & Blossom), Nostr Address (NIP-05), Lightning Redirects, NWC, WoT, and much more.",
     "ja": "コミュニティのNostrの頭脳。リレー、ファイルホスティング（NIP-96とBlossom）、Nostrアドレス（NIP-05）、Lightningリダイレクト、NWC、WoT、その他多数を備えた唯一のサーバー。"
    },
    "homepage": "https://nostrcheck.me/",
@@ -7134,7 +7108,6 @@ window.NOSMAPS_DATA={
    "summary": "High Availability Vault for Events on Nostr",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "High Availability Vault for Events on Nostr",
     "ja": "Nostrのイベントのための高可用性の保管庫。"
    },
    "homepage": null,
@@ -7201,7 +7174,6 @@ window.NOSMAPS_DATA={
    "summary": "A blossom server written in Deno",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "A blossom server written in Deno",
     "ja": "Denoで書かれたBlossomサーバー。"
    },
    "homepage": null,
@@ -7397,7 +7369,6 @@ window.NOSMAPS_DATA={
    "summary": "Blobs stored simply on mediaservers — the specification documents (BUDs) for the Blossom protocol.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Blobs stored simply on mediaservers — the specification documents (BUDs) for the Blossom protocol.",
     "ja": "メディアサーバー上に素朴に保管されるブロブ ― Blossomプロトコルの仕様文書（BUD）。"
    },
    "homepage": null,
@@ -7465,7 +7436,6 @@ window.NOSMAPS_DATA={
    "summary": "nostr.build media uploader — media hosting for Nostr.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "nostr.build media uploader — media hosting for Nostr.",
     "ja": "nostr.buildのメディアアップローダー ― Nostrのためのメディアホスティング。"
    },
    "homepage": "https://nostr.build/",
@@ -7544,7 +7514,6 @@ window.NOSMAPS_DATA={
    "summary": "Free, simple file hosting.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Free, simple file hosting.",
     "ja": "無料で単純なファイルホスティング。"
    },
    "homepage": null,
@@ -7627,7 +7596,6 @@ window.NOSMAPS_DATA={
    "summary": "A mobile Bitcoin wallet fit for the gods.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "A mobile Bitcoin wallet fit for the gods.",
     "ja": "神々にふさわしいモバイルビットコインウォレット。"
    },
    "homepage": "https://zeusln.com",
@@ -7700,7 +7668,6 @@ window.NOSMAPS_DATA={
    "summary": "Alby Hub - Your own Bitcoin Lightning node: easy, connectable, feature-rich. Run anywhere. Become self-sovereign.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Alby Hub - Your own Bitcoin Lightning node: easy, connectable, feature-rich. Run anywhere. Become self-sovereign.",
     "ja": "Alby Hub ― 自分だけのビットコインLightningノード。手軽で、つながりやすく、機能豊富。どこででも動かせる。自分で主権を持つ。"
    },
    "homepage": "https://albyhub.com",
@@ -7782,7 +7749,6 @@ window.NOSMAPS_DATA={
    "summary": "Mutiny is a self-custodial lightning wallet that runs in the browser.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Mutiny is a self-custodial lightning wallet that runs in the browser.",
     "ja": "Mutinyはブラウザの中で動く自己管理型のLightningウォレット。"
    },
    "homepage": "https://app.mutinywallet.com",
@@ -7870,7 +7836,6 @@ window.NOSMAPS_DATA={
    "summary": "Tools for developing Nostr clients.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Tools for developing Nostr clients.",
     "ja": "Nostrクライアントを開発するための道具一式。"
    },
    "homepage": null,
@@ -7950,7 +7915,6 @@ window.NOSMAPS_DATA={
    "summary": "Nostr Development Kit with outbox-model support",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Nostr Development Kit with outbox-model support",
     "ja": "アウトボックスモデルに対応したNostr開発キット。"
    },
    "homepage": "https://nostr-dev-kit.github.io/ndk/",
@@ -8366,7 +8330,6 @@ window.NOSMAPS_DATA={
    "summary": "Rust implementation of the nostr protocol, high-level client library, Nostr Wallet Connect and more.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "Rust implementation of the nostr protocol, high-level client library, Nostr Wallet Connect and more.",
     "ja": "NostrプロトコルのRust実装。高水準のクライアントライブラリ、Nostr Wallet Connectなどを含む。"
    },
    "homepage": "https://nostrdevkit.org",
@@ -8450,7 +8413,6 @@ window.NOSMAPS_DATA={
    "summary": "a command line tool for doing all things nostr",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "a command line tool for doing all things nostr",
     "ja": "Nostrに関することを何でもやるためのコマンドラインツール。"
    },
    "homepage": null,
@@ -8516,7 +8478,6 @@ window.NOSMAPS_DATA={
    "summary": "nostr.watch provides the infrastructure for observing the Nostr relay network.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "nostr.watch provides the infrastructure for observing the Nostr relay network.",
     "ja": "nostr.watchはNostrリレーネットワークを観測するための基盤を提供する。"
    },
    "homepage": "https://nostr.watch",
@@ -8598,7 +8559,6 @@ window.NOSMAPS_DATA={
    "summary": "The open app store where users meet builders. Curated by communities. Android apps.",
    "summaryAbsent": false,
    "descriptions": {
-    "en": "The open app store where users meet builders. Curated by communities. Android apps.",
     "ja": "利用者と作り手が出会うオープンなアプリストア。コミュニティが選ぶ。Androidアプリ。"
    },
    "homepage": "https://zapstore.dev",

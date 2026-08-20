@@ -288,6 +288,66 @@ Normative rules:
 5. `t` tags carry discovery topics (§5.1).
 6. Signature and event id MUST validate. `created_at` is subject to future-timestamp quarantine
    (§12.3).
+7. `content.version` is `1` or `2`. Rule 2's key set above is the **v1** profile; **v2** adds two
+   optional keys and changes nothing else (see "The v2 content profile" below). A reader MUST accept
+   both. **v1 is not deprecated and is not rewritten:** an event that states `version: 1` keeps
+   meaning exactly what it meant, which is "this record carries no per-language text".
+
+**The v2 content profile — per-language descriptions (#14).**
+
+v1's key set is enforced as an *exact* set (unknown keys are `unknown-field`), so a record cannot
+carry a description in a second language without a version bump. That is the whole reason v2 exists;
+nothing else about the record changes.
+
+```json
+{
+  "kind": 30078,
+  "tags": [["d", "nosmaps:com.example.tool"], ["t", "nosmaps"], ["state", "active"], ["v", "2"]],
+  "content": "{\"schema\":\"org.nosmaps.software\",\"version\":2,\"state\":\"active\",\"name\":\"Example Tool\",\"summary\":\"A relay client.\",\"descriptions\":{\"ja\":\"リレークライアント。\"}}"
+}
+```
+
+| key | required | v1 → v2 |
+|---|---|---|
+| `schema` / `state` / `name` / `summary` | required | unchanged. `summary` is still the collected original and is **never** overwritten by a translation |
+| `version` | required | value `2` instead of `1` |
+| `homepage` / `superseded_by` | optional | unchanged |
+| **`descriptions`** | optional | **new in v2.** A JSON object mapping a language code to a text |
+| **`summary_lang`** | optional | **new in v2.** The language of `summary`, when the signer knows it |
+
+Normative rules for the new keys:
+
+7a. `descriptions` is a JSON object (not an array, not null). Every key is a non-empty string
+    language code; every value is a non-empty string. A key or value that is not a non-empty string
+    invalidates the event (`bad-schema`) — a broken language map is not silently dropped, because a
+    dropped map is indistinguishable from a record that recorded nothing.
+7b. **The empty map is not written.** "No text in any language" is already stated by omitting the
+    key; `descriptions: {}` states the same thing a second way, so a record that has nothing to say
+    omits `descriptions` entirely. (An absent `summary` — `""`, rule 2b — likewise carries no
+    descriptions: absent stays absent.)
+7c. **A value equal to that record's `summary` MUST NOT be written.** The original already lives in
+    `summary`, and a second copy of the same bytes is a value that can drift out of agreement with
+    the one it copies. Readers fall back to `summary` for every language with no recorded text, so
+    the copy buys nothing. (#14 D14-6.)
+7d. **There is no translator field, in v2 or any later version.** `translator`, `translated_by`,
+    `generator` and the like are rejected by the exact key set, and that is deliberate: the signer's
+    pubkey *is* who says it. Writing it into `content` as well would put the same fact in two places
+    that can disagree — the same rule §4.2 already applies to attribution generally, and the same
+    reason `state` may not be authored twice without agreeing (rule 4).
+7e. `summary_lang`, when present, is a non-empty string language code. It is **optional and stays
+    optional**: the language of an original is a fact about that text, and a signer who has not
+    determined it MUST NOT guess one (D7). A record with no `summary_lang` is read as "original, in
+    an unrecorded language", not as "English".
+7f. The `["v", "2"]` tag accompanies a v2 record for symmetry with the existing `["v","1"]` lines.
+    Like `state`'s tag it is a **scanning aid with no authority**: `content.version` is what a reader
+    decides on. (No code in this repository reads the `v` tag today.)
+
+**How a second language gets written by someone else.** It does not need anything here: a different
+signer publishes their own event under the *same* `d`, which is a different coordinate
+(`kind`+`pubkey`+`d`, NIP-01), so neither replaces the other and both are read. That is the
+multi-signer overlap of #18, unchanged. One signer who wants two languages puts both in one
+`descriptions` map — publishing them as two events under one key would make the second **replace**
+the first.
 
 **Why rule 1's `d` grammar is not narrowed to §10.1's.** §10.1 gives the candidate kinds the
 lowercase ASCII grammar `[a-z0-9](?:[a-z0-9._:/-]{0,190}[a-z0-9])?`. `30078` deliberately does

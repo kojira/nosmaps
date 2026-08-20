@@ -9,8 +9,9 @@
                                 data.js cannot be generated from anything unsigned or tampered with.
                                 Written by tools/sign-catalogue.mjs; checked by
                                 tools/verify-catalogue.mjs. Who collected a record is its `pubkey`.
-     real-catalog-draft.json    The collection notes. The signed event carries only the v1 profile
-                                (§4.2 rule 2: schema/version/state/name/summary/homepage?), so the
+     real-catalog-draft.json    The collection notes. The signed event carries only the record
+                                profile (§4.2 rules 2 and 7:
+                                schema/version/state/name/summary/descriptions?/homepage?), so the
                                 provenance, the capability claims, the licence/platform/distribution
                                 facts and the finding numbers — everything the draft itself files
                                 under `facts_with_no_home_in_v1_profile` — are joined on from here by
@@ -284,55 +285,6 @@ function buildCapabilities(entry, d) {
     .sort((a, b) => (a.family === b.family ? a.key.localeCompare(b.key) : a.family.localeCompare(b.family)));
 }
 
-/* Per-language descriptions. The collected original (`summary`) stays canonical and is never
-   overwritten; this map only adds a text for a language that has one recorded, and the UI falls
-   back to the original for every language that does not. Each entry below is the recorded original
-   of that same record carried into Japanese -- the record is the source, so nothing here states a
-   fact the catalogue does not already state. An entry whose original is absent ("" -- Olas, R5)
-   gets no description in any language: an absent summary stays absent. */
-const DESCRIPTIONS_JA = {
-  'nosmaps:io.damus': 'iPhone・iPad・macOS向けの、Twitterに似たNostrクライアント。',
-  'nosmaps:social.amethyst': 'Android向けのNostrクライアント。',
-  'nosmaps:net.primal.web': 'primal.netで使われているものと同じ、PrimalのNostrウェブアプリ。',
-  'nosmaps:social.coracle': '複数リレーの潜在能力を引き出すことに主眼を置いた実験的なNostrクライアント。閲覧、絞り込み、Zap、カスタムフィードの作成により、自分好みのNostr体験を組み立てられる。',
-  'nosmaps:social.phoenix': '機能を詰め込んだNostrのウェブUI。',
-  'nosmaps:to.iris': '単一のリレーやサーバーに依存しない、高速でとっつきやすいオフラインファーストのNostrウェブクライアント。Cashuウォレット、安全なDM、ソーシャルグラフに基づく内容の絞り込みを備える。',
-  'nosmaps:app.nostter': 'ウェブ向けのNostrクライアント。',
-  'nosmaps:com.mikedilger.gossip': 'GossipはNostrクライアント。',
-  'nosmaps:ninja.nostrudel': 'Nostrを探索するための砂場。',
-  'nosmaps:net.syusui.rabbit': '🐰 TweetDeckのようなNostrクライアント。',
-  'nosmaps:com.0xchat': 'Nostrプロトコル上に作られた、安全でオープンソースのチャットアプリ。Android、iOS、macOS、Linux、Windowsで利用できる。',
-  'nosmaps:com.yakihonne.web': 'Nostrとビットコイン上の分散型ソーシャルペイメントクライアント。',
-  'nosmaps:news.habla': 'HablaはNostr上で長文コンテンツを読み、書き、集め、収益化できるようにする。Nostrはソーシャルメディアのための検閲耐性のあるプロトコル。',
-  'nosmaps:stream.zap': 'Nostrのライブ配信。',
-  'nosmaps:pub.ditto': 'あなたのコンテンツ。あなたの雰囲気。あなたのルール。',
-  'nosmaps:market.shopstr': 'ビットコイン商取引のための、世界規模で許可の要らないNostrマーケットプレイス。',
-  'nosmaps:com.greenart7c3.nostrsigner': 'AmberはAndroid向けのNostrイベント署名アプリ。nsecを専用のアプリひとつに隔離しておける。Amberの目的は、サーバーも追加のハードウェアも要らずに、手元のスマートフォンをNIP-46の署名デバイスとして働かせること。',
-  'nosmaps:com.fiatjaf.nos2x': 'Nostrの署名拡張機能。',
-  'nosmaps:app.nsec': 'Noauth Nostr鍵マネージャー。',
-  'nosmaps:com.getalby.extension': 'ウェブに深いLightningとNostrの統合をもたらすビットコインLightningブラウザ拡張機能。複数のLightningノードへのウォレットインターフェースであり、Nostr・Liquid・オンチェーンで使う鍵の署名役でもある。',
-  'nosmaps:me.njump.pokey': '自分のNostrイベントの通知をその場で表示し、他のアプリがそれを受け取って操作できるようにする。',
-  'nosmaps:com.hoytech.strfry': 'strfryはNostrプロトコルのリレー。外部データベースは不要で、データはすべてLMDBを使ってファイルシステム上にローカルに保存される。',
-  'nosmaps:io.sourcehut.nostr-rs-relay': 'Rustで書かれたNostrリレー。',
-  'nosmaps:technology.nostr.khatru': '独自のNostrリレーを作るためのフレームワーク。',
-  'nosmaps:com.cameri.nostream': 'TypeScriptで書かれたNostrリレー。',
-  'nosmaps:me.nostrcheck.server': 'コミュニティのNostrの頭脳。リレー、ファイルホスティング（NIP-96とBlossom）、Nostrアドレス（NIP-05）、Lightningリダイレクト、NWC、WoT、その他多数を備えた唯一のサーバー。',
-  'nosmaps:com.bitvora.haven': 'Nostrのイベントのための高可用性の保管庫。',
-  'nosmaps:com.hzrd149.blossom-server': 'Denoで書かれたBlossomサーバー。',
-  'nosmaps:com.hzrd149.blossom': 'メディアサーバー上に素朴に保管されるブロブ ― Blossomプロトコルの仕様文書（BUD）。',
-  'nosmaps:build.nostr': 'nostr.buildのメディアアップローダー ― Nostrのためのメディアホスティング。',
-  'nosmaps:cat.void': '無料で単純なファイルホスティング。',
-  'nosmaps:com.zeusln': '神々にふさわしいモバイルビットコインウォレット。',
-  'nosmaps:com.albyhub': 'Alby Hub ― 自分だけのビットコインLightningノード。手軽で、つながりやすく、機能豊富。どこででも動かせる。自分で主権を持つ。',
-  'nosmaps:com.mutinywallet.app': 'Mutinyはブラウザの中で動く自己管理型のLightningウォレット。',
-  'nosmaps:wtf.nbd.nostr-tools': 'Nostrクライアントを開発するための道具一式。',
-  'nosmaps:dev.nostr.ndk': 'アウトボックスモデルに対応したNostr開発キット。',
-  'nosmaps:org.nostrdevkit': 'NostrプロトコルのRust実装。高水準のクライアントライブラリ、Nostr Wallet Connectなどを含む。',
-  'nosmaps:com.fiatjaf.nak': 'Nostrに関することを何でもやるためのコマンドラインツール。',
-  'nosmaps:watch.nostr': 'nostr.watchはNostrリレーネットワークを観測するための基盤を提供する。',
-  'nosmaps:dev.zapstore': '利用者と作り手が出会うオープンなアプリストア。コミュニティが選ぶ。Androidアプリ。'
-};
-
 /* One row of data.js, built from one signed event. `signedRecord` is {event, content, d}: the event
    as it sits in the jsonl, already verified. `entry` is that record's collection notes from
    real-catalog-draft.json, joined on `d` — it supplies only the annotations the v1 profile has no
@@ -353,11 +305,15 @@ function buildTool(signedRecord) {
      why) rather than sealing an invented value into a signature. Read straight through here. */
   const summary = content.summary;
 
-  /* A plain language-code -> text map. `summary` above stays the canonical text and is what every
-     language falls back to; `descriptions.en` is that same original, named by its language so the
-     map is not a Japanese-only side channel. A record with no summary at all carries no
-     descriptions -- absent stays absent rather than becoming an empty string in two languages. */
-  const descriptions = summary ? {en: summary, ...(DESCRIPTIONS_JA[d] ? {ja: DESCRIPTIONS_JA[d]} : {})} : {};
+  /* A plain language-code -> text map, read straight off the signed event and from nowhere else
+     (#14 D14-1). This build authors no text: a description that is not in the signature does not
+     exist, and whoever signed the record is who wrote its translations -- which is why there is no
+     translator field to join on here (D14-3).
+
+     `summary` above stays the canonical original and is what every language with no recorded text
+     falls back to, so the original's own language is NOT copied in under a language code (D14-6):
+     the same bytes in two places can drift apart, and the fallback already covers it. */
+  const descriptions = content.descriptions ? {...content.descriptions} : {};
 
   const nonClaims = Object.entries(NON_CLAIM_KEYS)
     .filter(([key]) => Array.isArray(claim[key]))

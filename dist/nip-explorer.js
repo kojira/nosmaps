@@ -7713,8 +7713,10 @@ function validateSoftwareEvent(event, opts) {
     if (utf8ByteLength(topic) > 128) return fail("bad-topic");
     if (topics.indexOf(topic) === -1) topics.push(topic);
   }
+  const version = prop(c, "version");
+  if (version !== 1 && version !== 2) return fail("bad-version");
   const required = ["schema", "version", "state", "name", "summary"];
-  const optional = ["homepage", "superseded_by"];
+  const optional = version === 2 ? ["homepage", "superseded_by", "descriptions", "summary_lang"] : ["homepage", "superseded_by"];
   for (const key of Object.keys(c)) {
     if (required.indexOf(key) === -1 && optional.indexOf(key) === -1) {
       return fail("unknown-field");
@@ -7723,7 +7725,6 @@ function validateSoftwareEvent(event, opts) {
   for (const key of required) {
     if (!(key in c)) return fail("bad-schema");
   }
-  if (prop(c, "version") !== 1) return fail("bad-version");
   const state = prop(c, "state");
   if (state !== "active" && state !== "withdrawn") return fail("bad-state");
   const name = prop(c, "name");
@@ -7732,6 +7733,29 @@ function validateSoftwareEvent(event, opts) {
   }
   const summary = prop(c, "summary");
   if (typeof summary !== "string" || charLength(summary) > 1e3) return fail("bad-schema");
+  let descriptions = null;
+  if ("descriptions" in c) {
+    const value2 = prop(c, "descriptions");
+    if (value2 === void 0 || !isJsonRecord(value2)) return fail("bad-schema");
+    const keys = Object.keys(value2);
+    if (keys.length === 0) return fail("bad-schema");
+    const map2 = {};
+    for (const language2 of keys) {
+      const text = prop(value2, language2);
+      if (language2 === "") return fail("bad-schema");
+      if (typeof text !== "string" || text.length === 0) return fail("bad-schema");
+      if (charLength(text) > 1e3) return fail("bad-schema");
+      if (text === summary) return fail("bad-schema");
+      map2[language2] = text;
+    }
+    descriptions = map2;
+  }
+  let summaryLang = null;
+  if ("summary_lang" in c) {
+    const value2 = prop(c, "summary_lang");
+    if (typeof value2 !== "string" || value2.length === 0) return fail("bad-schema");
+    summaryLang = value2;
+  }
   let homepage = null;
   if ("homepage" in c) {
     const value2 = prop(c, "homepage");
@@ -7761,6 +7785,8 @@ function validateSoftwareEvent(event, opts) {
       state,
       name,
       summary,
+      descriptions,
+      summaryLang,
       homepage,
       supersededBy,
       topics,
