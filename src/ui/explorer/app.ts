@@ -26,6 +26,7 @@ import {
 } from '../../domain/explorer.ts';
 import {isValidCoordinate} from '../../domain/event.ts';
 import {isSortKey, sortDimension, sortRows, SORT_KEYS, type SortKey} from '../../domain/sorting.ts';
+import {stackRecords, STACK_DRAWN_LIMIT, type RecordStack} from '../../domain/stacks.ts';
 import {decodeNpub, encodeNpub} from '../../domain/npub.ts';
 import {POLICY, SOFTWARE_D_PREFIX} from '../../domain/policy.ts';
 import {validateSoftwareEvent} from '../../domain/records.ts';
@@ -201,6 +202,9 @@ export interface ExplorerHandles {
   /** The last relay result, republished on every round. Null after a failure —
       which is a different thing from a round that returned no entries. */
   readonly onRelayResult: (listener: (result: LoadedCatalog | null) => void) => void;
+  /** issue #18: the relay rows as the list currently holds them, so a spec can
+      read the `d` each row carries without scraping the rendered card. */
+  readonly relayRows: () => readonly RelayRow[];
 }
 
 export function mountExplorer(data: Data): ExplorerHandles {
@@ -946,8 +950,40 @@ export function mountExplorer(data: Data): ExplorerHandles {
      issue #3: the icon sits inside the headline, next to the name it belongs to. It is identity,
      not a fifth field -- the card still has exactly the four rows above, and the icon carries no
      text of its own (see NOSMAPS_ICONS.entity). */
+  /* ---- issue #18: 同じ識別子に複数の署名者 ---------------------------------
+     NIP-01 の置換は `kind:pubkey:d` 単位なので、別の鍵が同じ `d` を書いても
+     上書きは起きず、座標が 2 つ在るだけになる。読み取り側は前からその 2 件を
+     別々の行として持っていたが、「同じ識別子について言っている」と言う場所が
+     どこにも無かった。ここがその場所。
+
+     D1: 既定を選ばない。どれかを代表に立てるフィールドも、収集鍵の定数も置かない。
+     カードは全件そのまま描かれ続ける（＝全件が辿れる）。付けるのは
+     「この識別子には observed 件ある」「これはその何番目か」という観測の事実だけで、
+     順序は state.sort が決めた並びをそのまま使う。手前に来ることは選択ではない。 */
+  function rowIdentifier(row: Row): string { return row.provenance === 'relay' ? row.d : row.id; }
+  /** 現在の並びから引いた、識別子 -> その識別子を共有する行。空なら重なりは無い。 */
+  let stackIndex = new Map<string, RecordStack<Row>>();
+  function rebuildStacks(rows: readonly Row[]): void {
+    /* complete は「リレー到達が完全だったか」。relay 表示中でその判定が付いている
+       ときだけ true を名乗り、収集済みカタログや診断が無いときは false のまま
+       ＝ observed は下限であって総数ではない、と読める側に倒す（I8）。 */
+    const complete = relayState?.result?.status === 'fresh';
+    stackIndex = new Map();
+    for (const stack of stackRecords(rows, rowIdentifier, complete)) stackIndex.set(stack.d, stack);
+  }
+  /** カードに付ける重なりの標識。observed が 1 の識別子には何も付けない
+      （「1 件しか無い」を毎行に書くのはノイズ。M2.2-4）。 */
+  function stackAttributes(tool: Row): string {
+    const stack = stackIndex.get(rowIdentifier(tool));
+    if (!stack || stack.observed < 2) return '';
+    const position = stack.records.indexOf(tool);
+    if (position === -1) return '';
+    /* drawn は描画枚数の上限（3）であって件数ではない。読者に見せる数は observed。 */
+    const drawn = position < STACK_DRAWN_LIMIT;
+    return ` data-stack-d="${esc(stack.d)}" data-stack-observed="${stack.observed}" data-stack-position="${position}" data-stack-drawn="${drawn ? 'yes' : 'no'}" data-stack-complete="${stack.complete ? 'yes' : 'no'}"`;
+  }
   function featureCard(tool: Row): string {
-    return `<article class="feature-tool-card" data-tool-id="${esc(tool.id)}" data-record-state="${esc(tool.recordState)}"><div class="card-headline"><div class="card-identity">${icons.entity(tool)}<h2>${esc(tool.name)}</h2></div><span class="record-state ${esc(tool.recordState)}">${esc(t(`recordStates.${tool.recordState}`))}</span></div><p class="tool-summary${tool.provenance !== 'relay' && tool.summaryAbsent ? ' is-unknown' : ''}">${esc(toolDescription(tool))}</p><div class="card-topics">${topicTags(tool)}</div>${recommendationMarkup(tool)}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${esc(tool.id)}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${esc(tool.id)}">${esc(t('explorer.details'))}</button></div></article>`;
+    return `<article class="feature-tool-card" data-tool-id="${esc(tool.id)}" data-record-state="${esc(tool.recordState)}"${stackAttributes(tool)}><div class="card-headline"><div class="card-identity">${icons.entity(tool)}<h2>${esc(tool.name)}</h2></div><span class="record-state ${esc(tool.recordState)}">${esc(t(`recordStates.${tool.recordState}`))}</span></div><p class="tool-summary${tool.provenance !== 'relay' && tool.summaryAbsent ? ' is-unknown' : ''}">${esc(toolDescription(tool))}</p><div class="card-topics">${topicTags(tool)}</div>${recommendationMarkup(tool)}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${esc(tool.id)}" ${state.compare.includes(tool.id) ? 'checked' : ''}> ${esc(t('explorer.compareAdd'))}</label><button class="secondary" type="button" data-feature-detail="${esc(tool.id)}">${esc(t('explorer.details'))}</button></div></article>`;
   }
 
   /** A removable filter pill: what it says, and the state change removing it makes. */
@@ -1165,6 +1201,9 @@ export function mountExplorer(data: Data): ExplorerHandles {
     /* 並び替えは行を落とさない。数え上げは並び替える前の list のままで、
        ranked + unranked は必ず list と同じ集合になる（issue #1）。 */
     const sorted = sortedList(list);
+    /* 重なりは並べ替えた後の順序から引く。重なりの中の順序と一覧の順序で別の規則を
+       使わない（M2.1-1）ので、ここ以外に順序を決める場所は無い。 */
+    rebuildStacks([...sorted.ranked, ...sorted.unranked]);
     if (list.length) { els.results.innerHTML = sorted.ranked.map(featureCard).join('') + unrankedMarkup(sorted.unranked); return; }
     if (relayActive) { els.results.innerHTML = `<div class="empty zero-results"><h2>${esc(t('explorer.relayEmptyTitle'))}</h2><p>${esc(t('explorer.relayEmpty'))}</p></div>`; return; }
     const relaxations = activeConditions().map(item => ({...item, count: filteredTools(item.overrides).length})).sort((a, b) => b.count - a.count);
@@ -1959,6 +1998,7 @@ export function mountExplorer(data: Data): ExplorerHandles {
   return {
     setState,
     loadRelayCatalog,
-    onRelayResult: listener => { relayResultListeners.push(listener); }
+    onRelayResult: listener => { relayResultListeners.push(listener); },
+    relayRows: () => relayEntries()
   };
 }

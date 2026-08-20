@@ -16,6 +16,11 @@ import type {QuarantinedNewer} from '../../domain/winners.ts';
 export interface RelayRow {
   /** "relay:" + the coordinate, so it never collides with a collected id. */
   readonly id: string;
+  /** issue #18: the record's `d`, carried verbatim off the winning event.
+      Two signers writing the same identifier produce two rows with two ids and
+      two coordinates but ONE `d`, and this is the only field that says so. It is
+      never normalised here — a signed `d` is not rewritten on read (§M1.3). */
+  readonly d: string;
   readonly name: string;
   /** §21.4 R4: the record's state (active / withdrawn) is a different axis from
       whether the project is alive. Leaving it unset rendered
@@ -72,6 +77,7 @@ export function relayEntryToRow(
   const stale = entry.stale === true;
   return {
     id: `relay:${entry.coordinate}`,
+    d: entry.d,
     name: entry.fields.name || entry.coordinate || '—',
     recordState: entry.state,
     category: observedCategory ?? 'clients',

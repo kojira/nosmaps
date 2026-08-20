@@ -8502,6 +8502,35 @@ function sortRows(rows, key) {
   return { ranked: ranked.map((item) => item.row), unranked };
 }
 
+// src/domain/stacks.ts
+function stackRecords(rows, keyOf, complete) {
+  const order = [];
+  const buckets = /* @__PURE__ */ new Map();
+  const list2 = Array.isArray(rows) ? rows : [];
+  for (const row of list2) {
+    const d = keyOf(row);
+    if (typeof d !== "string" || d.length === 0) continue;
+    let bucket = buckets.get(d);
+    if (!bucket) {
+      bucket = [];
+      buckets.set(d, bucket);
+      order.push(d);
+    }
+    bucket.push(row);
+  }
+  const stacks = [];
+  for (const d of order) {
+    const records = buckets.get(d);
+    if (!records || records.length === 0) continue;
+    stacks.push({ d, records, observed: records.length, complete: complete === true });
+  }
+  return stacks;
+}
+var STACK_DRAWN_LIMIT = 3;
+function drawnRecords(stack) {
+  return stack.records.slice(0, STACK_DRAWN_LIMIT);
+}
+
 // src/data/cache.ts
 var DB_NAME = "nosmaps-catalog";
 var DB_VERSION = 2;
@@ -10942,6 +10971,7 @@ function relayEntryToRow(entry, asOf, seeds) {
   const stale = entry.stale === true;
   return {
     id: `relay:${entry.coordinate}`,
+    d: entry.d,
     name: entry.fields.name || entry.coordinate || "\u2014",
     recordState: entry.state,
     category: observedCategory ?? "clients",
@@ -11629,8 +11659,25 @@ function mountExplorer(data) {
     const outOf = outOfFamily(tool) ? ` <span class="out-of-family">${esc3(t("explorer.noNipClaims"))}</span>` : "";
     return `<p class="claim-summary" data-claim-summary="${esc3(String(summary.total))}" data-claim-families="${esc3(Object.keys(summary.byFamily).join(","))}">${esc3(families)}${outOf}</p>`;
   }
+  function rowIdentifier(row) {
+    return row.provenance === "relay" ? row.d : row.id;
+  }
+  let stackIndex = /* @__PURE__ */ new Map();
+  function rebuildStacks(rows) {
+    const complete = relayState?.result?.status === "fresh";
+    stackIndex = /* @__PURE__ */ new Map();
+    for (const stack of stackRecords(rows, rowIdentifier, complete)) stackIndex.set(stack.d, stack);
+  }
+  function stackAttributes(tool) {
+    const stack = stackIndex.get(rowIdentifier(tool));
+    if (!stack || stack.observed < 2) return "";
+    const position = stack.records.indexOf(tool);
+    if (position === -1) return "";
+    const drawn = position < STACK_DRAWN_LIMIT;
+    return ` data-stack-d="${esc3(stack.d)}" data-stack-observed="${stack.observed}" data-stack-position="${position}" data-stack-drawn="${drawn ? "yes" : "no"}" data-stack-complete="${stack.complete ? "yes" : "no"}"`;
+  }
   function featureCard(tool) {
-    return `<article class="feature-tool-card" data-tool-id="${esc3(tool.id)}" data-record-state="${esc3(tool.recordState)}"><div class="card-headline"><div class="card-identity">${icons.entity(tool)}<h2>${esc3(tool.name)}</h2></div><span class="record-state ${esc3(tool.recordState)}">${esc3(t(`recordStates.${tool.recordState}`))}</span></div><p class="tool-summary${tool.provenance !== "relay" && tool.summaryAbsent ? " is-unknown" : ""}">${esc3(toolDescription(tool))}</p><div class="card-topics">${topicTags(tool)}</div>${recommendationMarkup(tool)}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${esc3(tool.id)}" ${state.compare.includes(tool.id) ? "checked" : ""}> ${esc3(t("explorer.compareAdd"))}</label><button class="secondary" type="button" data-feature-detail="${esc3(tool.id)}">${esc3(t("explorer.details"))}</button></div></article>`;
+    return `<article class="feature-tool-card" data-tool-id="${esc3(tool.id)}" data-record-state="${esc3(tool.recordState)}"${stackAttributes(tool)}><div class="card-headline"><div class="card-identity">${icons.entity(tool)}<h2>${esc3(tool.name)}</h2></div><span class="record-state ${esc3(tool.recordState)}">${esc3(t(`recordStates.${tool.recordState}`))}</span></div><p class="tool-summary${tool.provenance !== "relay" && tool.summaryAbsent ? " is-unknown" : ""}">${esc3(toolDescription(tool))}</p><div class="card-topics">${topicTags(tool)}</div>${recommendationMarkup(tool)}<div class="nip-card-actions"><label class="nip-compare-label"><input type="checkbox" data-compare-tool="${esc3(tool.id)}" ${state.compare.includes(tool.id) ? "checked" : ""}> ${esc3(t("explorer.compareAdd"))}</label><button class="secondary" type="button" data-feature-detail="${esc3(tool.id)}">${esc3(t("explorer.details"))}</button></div></article>`;
   }
   function activeConditions() {
     const conditions = state.features.map((id) => ({ key: `feature:${id}`, label: t("explorer.conditionFeature", { value: featureName(id) }), overrides: { features: state.features.filter((value) => value !== id) } }));
@@ -11805,6 +11852,7 @@ function mountExplorer(data) {
     if (!relayActive && state.uiState === "partial") list2 = list2.slice(0, 7);
     els.resultCount.textContent = t("explorer.count", { count: list2.length });
     const sorted = sortedList(list2);
+    rebuildStacks([...sorted.ranked, ...sorted.unranked]);
     if (list2.length) {
       els.results.innerHTML = sorted.ranked.map(featureCard).join("") + unrankedMarkup(sorted.unranked);
       return;
@@ -12744,7 +12792,8 @@ function mountExplorer(data) {
     loadRelayCatalog,
     onRelayResult: (listener) => {
       relayResultListeners.push(listener);
-    }
+    },
+    relayRows: () => relayEntries()
   };
 }
 
@@ -12768,6 +12817,11 @@ var catalog = {
   SORT_KEYS,
   isSortKey,
   sortRows,
+  /* issue #18: 同じ識別子を共有するレコードの束ね方。既定を選ぶ関数ではないので、
+     spec からも純関数のまま直接叩けるように出しておく。 */
+  stackRecords,
+  drawnRecords,
+  STACK_DRAWN_LIMIT,
   /* buildCatalog is re-typed at the boundary only so a caller in a plain .js test
      hands it a value this signature accepts; the function itself is untouched. */
   buildCatalog: (input) => buildCatalog(input),
@@ -12803,6 +12857,7 @@ explorer.onRelayResult((result) => {
 });
 window.__NOSMAPS_RELAY_LOAD__ = explorer.loadRelayCatalog;
 window.__NOSMAPS_SET_STATE__ = explorer.setState;
+window.__NOSMAPS_RELAY_ROWS__ = explorer.relayRows;
 mountSiteFooter();
 /*! Bundled license information:
 
