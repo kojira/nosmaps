@@ -370,7 +370,27 @@ var dictionaries = {
         truncated: "\u4E0A\u9650 {limit} \u4EF6\u307E\u3067\u8AAD\u307F\u307E\u3057\u305F\u3002\u3053\u308C\u3088\u308A\u591A\u304F\u306E\u30EC\u30B3\u30FC\u30C9\u304C\u3042\u308B\u53EF\u80FD\u6027\u304C\u3042\u308A\u307E\u3059\u3002",
         count: "{count} \u4EF6",
         coordinate: "\u8B58\u5225\u5B50 d",
-        updatedAt: "\u6700\u7D42\u66F4\u65B0"
+        updatedAt: "\u6700\u7D42\u66F4\u65B0",
+        /* §W6.5 取り下げ。確認文が「取り下げは削除ではない」と述べるのは §7.3 の要請で、
+           取り下げを削除と読ませないため。結果の語彙は、読み戻しで確認できたときにだけ
+           「確認しました」と言い、確認できていない間は「まだ active に見える」と書く。 */
+        withdraw: "\u53D6\u308A\u4E0B\u3052\u308B",
+        withdrawing: "\u53D6\u308A\u4E0B\u3052\u4E2D\u2026",
+        withdrawConfirm: "\u53D6\u308A\u4E0B\u3052\u3092\u5B9F\u884C",
+        withdrawCancel: "\u3084\u3081\u308B",
+        withdrawPrompt: "\u300C{name}\u300D\u3092\u53D6\u308A\u4E0B\u3052\u307E\u3059\u3002\u53D6\u308A\u4E0B\u3052\u306F\u524A\u9664\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002\u53D6\u308A\u4E0B\u3052\u3092\u89B3\u6E2C\u3057\u305F\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306F\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u3092\u4E00\u89A7\u306B\u51FA\u3055\u306A\u304F\u306A\u308A\u307E\u3059\u304C\u3001\u30A4\u30D9\u30F3\u30C8\u304C\u6D88\u3048\u308B\u308F\u3051\u3067\u306F\u306A\u304F\u3001\u53D6\u308A\u4E0B\u3052\u3092\u89B3\u6E2C\u3057\u3066\u3044\u306A\u3044\u30EA\u30EC\u30FC\u3084\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306B\u306F\u53E4\u3044\u7248\u304C\u305D\u306E\u307E\u307E\u6B8B\u308A\u307E\u3059\u3002",
+        withdrawHeadlines: {
+          confirmed: "\u53D6\u308A\u4E0B\u3052\u3092\u8AAD\u307F\u623B\u3057\u3066\u78BA\u8A8D\u3057\u307E\u3057\u305F\uFF08{accepted}/{total} \u4EF6\u306E\u30EA\u30EC\u30FC\u304C\u53D7\u3051\u53D6\u308A\u307E\u3057\u305F\uFF09\u3002",
+          partial: "\u53D6\u308A\u4E0B\u3052\u3092\u8AAD\u307F\u623B\u3057\u3066\u78BA\u8A8D\u3057\u307E\u3057\u305F\u304C\u3001\u53D7\u3051\u53D6\u3063\u305F\u306E\u306F {accepted}/{total} \u4EF6\u306E\u30EA\u30EC\u30FC\u3060\u3051\u3067\u3059\u3002",
+          unconfirmed: "\u53D6\u308A\u4E0B\u3052\u3092\u8AAD\u307F\u623B\u305B\u307E\u305B\u3093\u3067\u3057\u305F\uFF08{attempts} \u56DE\u8A66\u884C\uFF09\u3002\u5C4A\u3044\u305F\u304B\u3069\u3046\u304B\u306F\u5206\u304B\u3063\u3066\u3044\u307E\u305B\u3093\u3002",
+          failed: "\u53D6\u308A\u4E0B\u3052\u3092\u3069\u306E\u30EA\u30EC\u30FC\u306B\u3082\u5C4A\u3051\u3089\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002",
+          invalid: "\u53D6\u308A\u4E0B\u3052\u308B\u30EC\u30B3\u30FC\u30C9\u304C\u691C\u8A3C\u3092\u901A\u3089\u306A\u304B\u3063\u305F\u306E\u3067\u3001\u4F55\u3082\u7F72\u540D\u3057\u3066\u3044\u307E\u305B\u3093\u3002",
+          blocked: "\u53D6\u308A\u4E0B\u3052\u306F\u9001\u308B\u524D\u306B\u6B62\u307E\u308A\u307E\u3057\u305F\u3002\u4F55\u3082\u7F72\u540D\u3057\u3066\u3044\u307E\u305B\u3093\u3002",
+          other: "\u53D6\u308A\u4E0B\u3052\u306E\u72B6\u614B: {state}"
+        },
+        withdrawNotDeletion: "\u53D6\u308A\u4E0B\u3052\u306F\u524A\u9664\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002\u53E4\u3044\u7248\u3092\u6301\u3063\u3066\u3044\u308B\u30EA\u30EC\u30FC\u304B\u3089\u30A4\u30D9\u30F3\u30C8\u304C\u6D88\u3048\u308B\u308F\u3051\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
+        withdrawStillActive: "\u53D6\u308A\u4E0B\u3052\u3092\u8AAD\u307F\u623B\u3057\u3066\u78BA\u8A8D\u3067\u304D\u3066\u3044\u306A\u3044\u306E\u3067\u3001\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u304C\u307E\u3060 active \u306B\u898B\u3048\u308B\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u304C\u3042\u308A\u307E\u3059\u3002",
+        withdrawPartialActive: "\u53D6\u308A\u4E0B\u3052\u3092\u53D7\u3051\u53D6\u3063\u3066\u3044\u306A\u3044\u30EA\u30EC\u30FC\u3060\u3051\u3092\u8AAD\u3080\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306B\u306F\u3001\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u306F\u307E\u3060 active \u306B\u898B\u3048\u307E\u3059\u3002"
       },
       /* NIP-07 サインイン。失敗の原因は原因ごとに別の文言で出す —— 「拡張が無い」「断られた」
          「エラーが返った」「応答が無い」は利用者が次に取る行動が違う。 */
@@ -786,7 +806,24 @@ var dictionaries = {
         truncated: "Read up to the ceiling of {limit} records. There may be more than this list shows.",
         count: "{count} records",
         coordinate: "Identifier d",
-        updatedAt: "Last updated"
+        updatedAt: "Last updated",
+        withdraw: "Withdraw",
+        withdrawing: "Withdrawing\u2026",
+        withdrawConfirm: "Withdraw it",
+        withdrawCancel: "Cancel",
+        withdrawPrompt: "Withdraw \u201C{name}\u201D. Withdrawal is not deletion: clients that observe the withdrawal stop listing this record, but no event is erased, and relays or clients that never observe it keep serving the older version.",
+        withdrawHeadlines: {
+          confirmed: "The withdrawal was read back and confirmed ({accepted} of {total} relays took it).",
+          partial: "The withdrawal was read back, but only {accepted} of {total} relays took it.",
+          unconfirmed: "The withdrawal could not be read back after {attempts} attempts. Whether it arrived is unknown.",
+          failed: "The withdrawal reached no relay at all.",
+          invalid: "The record failed validation, so nothing was signed.",
+          blocked: "The withdrawal stopped before anything was sent. Nothing was signed.",
+          other: "Withdrawal state: {state}"
+        },
+        withdrawNotDeletion: "Withdrawal is not deletion. No event is erased from relays that hold the older version.",
+        withdrawStillActive: "The withdrawal has not been read back, so some clients still see this record as active.",
+        withdrawPartialActive: "Clients reading only the relays that did not take the withdrawal still see this record as active."
       },
       viewer: {
         label: "Viewer sign-in state",

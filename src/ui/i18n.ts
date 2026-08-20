@@ -219,7 +219,27 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
         truncated: '上限 {limit} 件まで読みました。これより多くのレコードがある可能性があります。',
         count: '{count} 件',
         coordinate: '識別子 d',
-        updatedAt: '最終更新'
+        updatedAt: '最終更新',
+        /* §W6.5 取り下げ。確認文が「取り下げは削除ではない」と述べるのは §7.3 の要請で、
+           取り下げを削除と読ませないため。結果の語彙は、読み戻しで確認できたときにだけ
+           「確認しました」と言い、確認できていない間は「まだ active に見える」と書く。 */
+        withdraw: '取り下げる',
+        withdrawing: '取り下げ中…',
+        withdrawConfirm: '取り下げを実行',
+        withdrawCancel: 'やめる',
+        withdrawPrompt: '「{name}」を取り下げます。取り下げは削除ではありません。取り下げを観測したクライアントはこのレコードを一覧に出さなくなりますが、イベントが消えるわけではなく、取り下げを観測していないリレーやクライアントには古い版がそのまま残ります。',
+        withdrawHeadlines: {
+          confirmed: '取り下げを読み戻して確認しました（{accepted}/{total} 件のリレーが受け取りました）。',
+          partial: '取り下げを読み戻して確認しましたが、受け取ったのは {accepted}/{total} 件のリレーだけです。',
+          unconfirmed: '取り下げを読み戻せませんでした（{attempts} 回試行）。届いたかどうかは分かっていません。',
+          failed: '取り下げをどのリレーにも届けられませんでした。',
+          invalid: '取り下げるレコードが検証を通らなかったので、何も署名していません。',
+          blocked: '取り下げは送る前に止まりました。何も署名していません。',
+          other: '取り下げの状態: {state}'
+        },
+        withdrawNotDeletion: '取り下げは削除ではありません。古い版を持っているリレーからイベントが消えるわけではありません。',
+        withdrawStillActive: '取り下げを読み戻して確認できていないので、このレコードがまだ active に見えるクライアントがあります。',
+        withdrawPartialActive: '取り下げを受け取っていないリレーだけを読むクライアントには、このレコードはまだ active に見えます。'
       },
       /* NIP-07 サインイン。失敗の原因は原因ごとに別の文言で出す —— 「拡張が無い」「断られた」
          「エラーが返った」「応答が無い」は利用者が次に取る行動が違う。 */
@@ -390,7 +410,24 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
         truncated: 'Read up to the ceiling of {limit} records. There may be more than this list shows.',
         count: '{count} records',
         coordinate: 'Identifier d',
-        updatedAt: 'Last updated'
+        updatedAt: 'Last updated',
+        withdraw: 'Withdraw',
+        withdrawing: 'Withdrawing…',
+        withdrawConfirm: 'Withdraw it',
+        withdrawCancel: 'Cancel',
+        withdrawPrompt: 'Withdraw “{name}”. Withdrawal is not deletion: clients that observe the withdrawal stop listing this record, but no event is erased, and relays or clients that never observe it keep serving the older version.',
+        withdrawHeadlines: {
+          confirmed: 'The withdrawal was read back and confirmed ({accepted} of {total} relays took it).',
+          partial: 'The withdrawal was read back, but only {accepted} of {total} relays took it.',
+          unconfirmed: 'The withdrawal could not be read back after {attempts} attempts. Whether it arrived is unknown.',
+          failed: 'The withdrawal reached no relay at all.',
+          invalid: 'The record failed validation, so nothing was signed.',
+          blocked: 'The withdrawal stopped before anything was sent. Nothing was signed.',
+          other: 'Withdrawal state: {state}'
+        },
+        withdrawNotDeletion: 'Withdrawal is not deletion. No event is erased from relays that hold the older version.',
+        withdrawStillActive: 'The withdrawal has not been read back, so some clients still see this record as active.',
+        withdrawPartialActive: 'Clients reading only the relays that did not take the withdrawal still see this record as active.'
       },
       viewer: {
         label: 'Viewer sign-in state', signedIn: 'Signed in', signedOut: 'Not signed in',

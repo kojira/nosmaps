@@ -34,7 +34,7 @@ import {validateSoftwareEvent, type SoftwareRecord} from '../../domain/records.t
 import type {NostrEvent} from '../../domain/event.ts';
 import {loadCatalog, type LoadCatalogOptions, type LoadedCatalog} from '../../data/load.ts';
 import {
-  buildSoftwareDraft, fetchMyRecords, MANAGE_LIMIT, publishSoftwareRecord,
+  buildSoftwareDraft, fetchMyRecords, MANAGE_LIMIT, publishSoftwareRecord, withdrawSoftwareRecord,
   type MyRecordsResult, type MyRecordsState, type Nip07Signer, type PublishResult, type RelayReport
 } from '../../data/publish.ts';
 import {
@@ -1242,11 +1242,17 @@ export function mountExplorer(data: Data): ExplorerHandles {
   interface PublishForm extends PublishDraftFields {
     busy: boolean;
     result: PublishResult | null;
+    /* 直前に走らせたのが公開なのか取り下げなのか。結果は publish.result 一つに乗せる
+       （表示系を二つ作らない）ので、同じ result をどちらの語彙で読むかだけをここが決める。 */
+    action: 'publish' | 'withdraw';
   }
   const publish: PublishForm = {
     dLocal: '', name: '', summary: '', homepage: '', topics: '',
-    busy: false, result: null
+    busy: false, result: null, action: 'publish'
   };
+  /* §W6.5 取り下げ。確認待ちと実行中を座標で持つ —— 行ごとに閉じるための鍵であり、
+     同じ署名経路に二つ流さないための鍵でもある。 */
+  const withdrawState: {confirming: string; busy: string} = {confirming: '', busy: ''};
   const PUBLISH_D_MAX_BYTES = 192;
   /* §W1.4 下書きの保持は ui/explorer/draft-storage.ts に移してある（run 2）。
      消すのは「公開を観測できたとき」だけ、という規則もそこに書いてある。 */
@@ -1302,15 +1308,39 @@ export function mountExplorer(data: Data): ExplorerHandles {
     const total = result.relays.length;
     const accepted = result.relays.filter(entry => entry.outcome === 'accepted').length;
     const rows = result.relays.map((entry: RelayReport) => `<li><code>${esc(entry.url)}</code> — ${esc(publishOutcomeText(entry.outcome))}${entry.notice ? ` — <q class="relay-notice">${esc(entry.notice)}</q>` : ''}</li>`).join('');
+    /* §W5: published / published-partial だけが「読み戻せた」を意味する。取り下げの語彙で
+       確認を語ってよいのはこの二つのときだけで、判定はここ一箇所にしかない。 */
+    const readBack = result.state === 'published' || result.state === 'published-partial';
+    const withdrawing = publish.action === 'withdraw';
     let headline: string;
-    if (result.state === 'published') headline = t('explorer.publish.headlines.published', {accepted, total});
+    if (withdrawing) {
+      if (result.state === 'published') headline = t('explorer.manage.withdrawHeadlines.confirmed', {accepted, total});
+      else if (result.state === 'published-partial') headline = t('explorer.manage.withdrawHeadlines.partial', {accepted, total});
+      else if (result.state === 'unconfirmed') headline = t('explorer.manage.withdrawHeadlines.unconfirmed', {attempts: result.attempts});
+      else if (result.state === 'failed') headline = t('explorer.manage.withdrawHeadlines.failed');
+      else if (result.state === 'invalid') headline = t('explorer.manage.withdrawHeadlines.invalid');
+      else if (result.state === 'blocked') headline = t('explorer.manage.withdrawHeadlines.blocked');
+      else headline = t('explorer.manage.withdrawHeadlines.other', {state: result.state});
+    } else if (result.state === 'published') headline = t('explorer.publish.headlines.published', {accepted, total});
     else if (result.state === 'published-partial') headline = t('explorer.publish.headlines.partial', {accepted, total});
     else if (result.state === 'unconfirmed') headline = t('explorer.publish.headlines.unconfirmed', {attempts: result.attempts});
     else if (result.state === 'failed') headline = t('explorer.publish.headlines.failed');
     else if (result.state === 'invalid') headline = t('explorer.publish.headlines.invalid');
     else if (result.state === 'blocked') headline = t('explorer.publish.headlines.blocked');
     else headline = t('explorer.publish.headlines.other', {state: result.state});
-    const consequence = result.state === 'published-partial' ? `<p class="publish-consequence">${esc(t('explorer.publish.partialConsequence'))}</p>` : '';
+    /* §W6.5: 読み戻せていない取り下げは「取り下げ済み」ではなく「まだ active に見える
+       クライアントがある」と書く。一部のリレーにしか届いていないときは、確認できた
+       という事実と、届いていないリレーだけを読むクライアントの帰結を両方書く。
+       そして取り下げが削除でないことは、確認できたときに必ず書く。 */
+    let consequence: string;
+    if (withdrawing) {
+      const lines = readBack
+        ? (result.state === 'published-partial'
+          ? [t('explorer.manage.withdrawPartialActive'), t('explorer.manage.withdrawNotDeletion')]
+          : [t('explorer.manage.withdrawNotDeletion')])
+        : [t('explorer.manage.withdrawStillActive')];
+      consequence = lines.map(line => `<p class="publish-consequence">${esc(line)}</p>`).join('');
+    } else consequence = result.state === 'published-partial' ? `<p class="publish-consequence">${esc(t('explorer.publish.partialConsequence'))}</p>` : '';
     /* §W3.4 / W-I4: created_at を動かしたなら、動かしたと書く。隠して出すのは「この時刻に
        書いた」という小さなウソになる。clock-conflict のときは何も署名していないので、
        観測した値と端末の時計を並べて、利用者が原因（時計のずれ）に辿り着ける形にする。 */
@@ -1320,10 +1350,10 @@ export function mountExplorer(data: Data): ExplorerHandles {
     } else if (result.reason === 'clock-conflict' && result.clock && result.clock.priorCreatedAt !== null) {
       clockNote = `<p class="publish-clock" data-publish-clock="conflict">${esc(t('explorer.publish.clockConflictDetail', {prior: result.clock.priorCreatedAt, now: Math.floor(result.asOf / 1000)}))}</p>`;
     }
-    const reason = result.reason && result.state !== 'published' && result.state !== 'published-partial'
+    const reason = result.reason && !readBack
       ? `<p class="publish-reason" data-publish-reason="${esc(result.reason)}">${esc(publishReasonText(result.reason))}</p>` : '';
     const id = result.eventId ? `<p class="publish-event-id">${esc(t('explorer.publish.eventId'))} <code data-publish-event-id>${esc(result.eventId)}</code></p>` : '';
-    return `<div class="publish-result" data-publish-state="${esc(result.state)}">`
+    return `<div class="publish-result" data-publish-state="${esc(result.state)}" data-publish-action="${esc(publish.action)}">`
       + `<p class="publish-headline" data-publish-headline>${esc(headline)}</p>${consequence}${reason}${clockNote}${id}`
       + `<ul class="publish-relays">${rows}</ul></div>`;
   }
@@ -1360,11 +1390,30 @@ export function mountExplorer(data: Data): ExplorerHandles {
     loadedFor: string;
   } = {state: 'signed-out', result: null, loadedFor: ''};
 
+  /* 取り下げは押した瞬間には走らない。行の中で二段構えにしてあるのは、確認の文言
+     （取り下げは削除ではない、§W6.5 / §7.3）を読む場所を作るため。 */
+  function myRecordActionsMarkup(record: SoftwareRecord): string {
+    const coordinate = record.coordinate;
+    const busy = withdrawState.busy === coordinate;
+    /* 走らせてよいのは一度に一つ。公開フォームか他の行が走っている間は、この行も押せない。 */
+    const locked = publish.busy || withdrawState.busy !== '';
+    if (withdrawState.confirming === coordinate && !busy) {
+      return `<div class="my-record-actions" data-withdraw-panel="${esc(coordinate)}">`
+        + `<p class="my-record-withdraw-prompt">${esc(t('explorer.manage.withdrawPrompt', {name: record.name}))}</p>`
+        + `<button type="button" data-withdraw-confirm="${esc(coordinate)}"${locked ? ' disabled' : ''}>${esc(t('explorer.manage.withdrawConfirm'))}</button>`
+        + `<button type="button" data-withdraw-cancel="${esc(coordinate)}">${esc(t('explorer.manage.withdrawCancel'))}</button>`
+        + `</div>`;
+    }
+    return `<div class="my-record-actions">`
+      + `<button type="button" data-withdraw-record="${esc(coordinate)}"${locked ? ' disabled' : ''}>`
+      + `${esc(busy ? t('explorer.manage.withdrawing') : t('explorer.manage.withdraw'))}</button></div>`;
+  }
   function myRecordRowMarkup(record: SoftwareRecord): string {
     return `<li class="my-record" data-my-record data-coordinate="${esc(record.coordinate)}" data-event-id="${esc(record.eventId ?? '')}">`
       + `<strong class="my-record-name">${esc(record.name)}</strong>`
       + `<span class="my-record-field"><span class="my-record-label">${esc(t('explorer.manage.coordinate'))}</span> <code class="my-record-d">${esc(record.d)}</code></span>`
       + `<span class="my-record-field"><span class="my-record-label">${esc(t('explorer.manage.updatedAt'))}</span> <time>${esc(formatObserved(record.createdAt * 1000))}</time></span>`
+      + myRecordActionsMarkup(record)
       + `</li>`;
   }
   function myRecordsMarkup(): string {
@@ -1449,10 +1498,11 @@ export function mountExplorer(data: Data): ExplorerHandles {
     bytes.textContent = t('explorer.publish.dBytes', {bytes: publishDBytes(), max: PUBLISH_D_MAX_BYTES});
   }
   async function submitPublish(): Promise<void> {
-    if (publish.busy) return;
+    if (publish.busy || withdrawState.busy) return;
     const signer = signingSigner();
     if (!signer) return;
     publish.busy = true;
+    publish.action = 'publish';
     publish.result = null;
     renderPublish();
     const relays = explorerParams.relays.length ? [...explorerParams.relays] : [...POLICY.DEFAULT_RELAYS];
@@ -1488,6 +1538,62 @@ export function mountExplorer(data: Data): ExplorerHandles {
     // §W5.6: 一覧に出るのは観測できたレコードだけ。読み戻せたときにだけ読み直す。
     if (result.state === 'published' || result.state === 'published-partial') {
       // 自分のレコード一覧も同じ規則で、読み戻せたときにだけ取り直す。
+      void loadMyRecords(true);
+      await loadRelayCatalog();
+    }
+  }
+
+  /* §W6.2 / §W6.5 取り下げ。公開とまったく同じ一本の経路（NIP-07 で署名 → sendEvent →
+     読み戻し）を通り、違うのは content の state だけ。kind 5 は送らない（§W6.6：削除要求は
+     「消えた」と読まれるが、消えはしない）。§7.1 は name / summary を必須と定めているので、
+     観測できたレコードの値をそのまま載せ直す —— 取り下げのために内容を空にすると、
+     その版は読み取り側から見えないレコードになる。 */
+  async function withdrawRecord(coordinate: string): Promise<void> {
+    if (publish.busy || withdrawState.busy) return;
+    /* 出すのは観測できたレコードだけ。一覧に無い座標を取り下げると、見ていないものについて
+       署名することになる。 */
+    const record = myRecords.result?.records.find(item => item.coordinate === coordinate);
+    if (!record) return;
+    const signer = signingSigner();
+    if (!signer) return;
+    withdrawState.confirming = '';
+    withdrawState.busy = coordinate;
+    publish.busy = true;
+    publish.action = 'withdraw';
+    publish.result = null;
+    renderPublish();
+    const relays = explorerParams.relays.length ? [...explorerParams.relays] : [...POLICY.DEFAULT_RELAYS];
+    const dLocal = record.d.startsWith(SOFTWARE_D_PREFIX) ? record.d.slice(SOFTWARE_D_PREFIX.length) : record.d;
+    let result: PublishResult;
+    try {
+      result = await withdrawSoftwareRecord({
+        relays,
+        signer,
+        expectPubkey: viewer.pubkey ?? '',
+        draft: {
+          dLocal, name: record.name, summary: record.summary, homepage: record.homepage ?? '',
+          topics: [...record.topics]
+        },
+        readbackAttempts: publishReadbackAttempts,
+        readbackBackoffMs: publishReadbackBackoff,
+        publishTimeoutMs: publishTimeoutMs
+      });
+    } catch (error) {
+      // 例外を成功に読ませない。取り下がったかどうか分からないなら分からないと書く。
+      console.error('[nosmaps] withdraw failed', error);
+      result = {
+        state: 'failed', reason: 'publish-error', eventId: null, coordinate: null, event: null,
+        relays: relays.map(url => ({url, outcome: 'connection-failed' as const, notice: ''})),
+        readback: null, clock: null, attempts: 0, asOf: Date.now()
+      };
+    }
+    publish.busy = false;
+    withdrawState.busy = '';
+    publish.result = result;
+    renderPublish();
+    /* §W5.6 / §W6.5: 取り下げを読み戻せたときにだけ読み直す。読み戻せていないのに一覧を
+       作り直すと、消えた行が「取り下がった証拠」に見えてしまう —— それはまだ観測していない。 */
+    if (result.state === 'published' || result.state === 'published-partial') {
       void loadMyRecords(true);
       await loadRelayCatalog();
     }
@@ -1992,6 +2098,13 @@ export function mountExplorer(data: Data): ExplorerHandles {
       return;
     }
     if (target.closest<HTMLElement>('[data-graph-apply]')) { loadRelayCatalog({viewerPubkey: inputValue('#graph-npub'), useNip07: false}); return; }
+    /* 取り下げ（issue #12 / §W6.5）。一段目は確認の文言を出すだけで、何も署名しない。 */
+    const withdrawStart = target.closest<HTMLElement>('[data-withdraw-record]');
+    if (withdrawStart) { if (publish.busy || withdrawState.busy) return; withdrawState.confirming = attr(withdrawStart, 'withdrawRecord'); renderPublish(); return; }
+    const withdrawCancel = target.closest<HTMLElement>('[data-withdraw-cancel]');
+    if (withdrawCancel) { withdrawState.confirming = ''; renderPublish(); return; }
+    const withdrawConfirm = target.closest<HTMLElement>('[data-withdraw-confirm]');
+    if (withdrawConfirm) { void withdrawRecord(attr(withdrawConfirm, 'withdrawConfirm')); return; }
     const setState = target.closest<HTMLElement>('[data-set-state]'); if (setState) { const next = attr(setState, 'setState'); if (isUiState(next)) { state.uiState = next; renderAll(); } }
   });
 
