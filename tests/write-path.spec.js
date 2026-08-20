@@ -36,6 +36,11 @@ function collectErrors(page) {
    claim publication from the second one (§W4.3). */
 function installWriteMocks(seckey) {
   window.__MOCK_RELAY__ = {events: [], urls: [], sent: [], reqs: [], published: [], ok: true, serveBack: true};
+  /* One ordered log of the two things whose *order* is under test (§5 U1): the
+     coordinate is read before the signer is touched. Kept separate from
+     __NOSTR_CALLS__ because that array carries the "no NIP-07 call before a
+     gesture" assertion, which a REQ entry would break. */
+  window.__TIMELINE__ = [];
 
   function matchesFilter(filter, event) {
     if (Array.isArray(filter.kinds) && filter.kinds.indexOf(event.kind) === -1) return false;
@@ -82,6 +87,7 @@ function installWriteMocks(seckey) {
       const subId = message[1];
       const filters = message.slice(2);
       window.__MOCK_RELAY__.reqs.push({subId, filters});
+      window.__TIMELINE__.push({call: 'REQ', filters: JSON.parse(JSON.stringify(filters))});
       const pool = window.__MOCK_RELAY__.events || [];
       const matched = pool.filter(event => filters.some(filter => matchesFilter(filter, event)));
       setTimeout(() => {
@@ -118,6 +124,7 @@ function installWriteMocks(seckey) {
     },
     async signEvent(draft) {
       window.__NOSTR_CALLS__.push('signEvent');
+      window.__TIMELINE__.push({call: 'signEvent', createdAt: draft && draft.created_at});
       // Recorded before signing so a regression to a library-defaulted timestamp
       // (§W3.4) is visible as a missing property rather than as a plausible time.
       window.__SIGN_ARG__ = JSON.parse(JSON.stringify(draft));
@@ -162,6 +169,31 @@ async function fillForm(page, values) {
   await page.locator('#publish-summary').fill(values.summary);
   await page.locator('#publish-homepage').fill(values.homepage);
   await page.locator('#publish-topics').fill(values.topics);
+}
+
+/* Puts a real, really-signed record of the *same* publisher into the relay pool
+   at a chosen created_at. Signed rather than faked because rx-nostr's verifier
+   drops anything else before the app can see it, so an unsigned stand-in would
+   make the pre-sign read round look empty and the test would pass on a broken
+   implementation. Returns the created_at actually used, so the assertions can
+   name it rather than recompute a clock that has since moved. */
+async function seedPrior(page, seckey, {dLocal, name, offsetSec}) {
+  return page.evaluate(async ({seckey, dLocal, name, offsetSec}) => {
+    const module = await import(new URL('dist/rx-nostr-crypto.js', location.href).href);
+    const signer = module.seckeySigner(seckey);
+    const createdAt = Math.floor(Date.now() / 1000) + offsetSec;
+    const event = await signer.signEvent({
+      kind: 30078,
+      created_at: createdAt,
+      tags: [['d', `nosmaps:${dLocal}`], ['t', 'nosmaps']],
+      content: JSON.stringify({
+        schema: 'org.nosmaps.software', version: 1, state: 'active',
+        name, summary: 'The record already at this coordinate.'
+      })
+    });
+    window.__MOCK_RELAY__.events.push(event);
+    return {createdAt, id: event.id};
+  }, {seckey, dLocal, name, offsetSec});
 }
 
 test('a signed-in publisher submits one entry and it comes back as a row carrying the published id', async ({page}) => {
@@ -253,5 +285,115 @@ test('an acknowledged but unreadable record is reported as unconfirmed, never as
   // §W5.6: nothing unconfirmed is painted into the catalog.
   const rows = await page.evaluate(() => ((window.__NOSMAPS_RELAY_RESULT__ || {}).entries || []).map(entry => entry.coordinate));
   expect(rows.some(coordinate => coordinate.includes('com.example.unread'))).toBe(false);
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
+/* issue #12 G2 (§W3.4, AC-G2-1 / AC-G2-3 / AC-G2-4, and §5 U1).
+
+   What is under test is not "an update was published" but *which second it was
+   stamped with*. §5.3 breaks ties by lowest event id, so an update stamped at
+   the same second as the record it replaces can lose -- a completely successful
+   publish that leaves the user staring at their old record. So the assertion is
+   on the bytes handed to the signer, and on the fact that the coordinate was
+   read from a relay *before* those bytes existed. Reading it from a warm cache
+   instead would still produce a +1 and would still pass a weaker test, which is
+   exactly why the order is asserted here and not the arithmetic alone. */
+test('an update to an existing coordinate is stamped past the observed winner, after reading it from the relay', async ({page}) => {
+  const errors = collectErrors(page);
+  await openExplorer(page);
+  await signIn(page);
+
+  // A prior at this coordinate, stamped in the same second the publish will run
+  // in: the case where `now` alone would tie.
+  const prior = await seedPrior(page, PUBLISHER_SECKEY, {
+    dLocal: 'com.example.update', name: 'Before The Edit', offsetSec: 0
+  });
+
+  await fillForm(page, {
+    dLocal: 'com.example.update',
+    name: 'After The Edit',
+    summary: 'The same coordinate, corrected.',
+    homepage: '',
+    topics: ''
+  });
+  await page.locator('[data-publish-submit]').click();
+  await expect(page.locator('[data-publish-state]')).toHaveAttribute('data-publish-state', 'published', {timeout: 20_000});
+
+  const observed = await page.evaluate(() => ({
+    signArg: window.__SIGN_ARG__,
+    timeline: window.__TIMELINE__,
+    published: window.__MOCK_RELAY__.published.map(event => ({id: event.id, created_at: event.created_at}))
+  }));
+
+  // AC-G2-3: this app set the field; no library defaulted it.
+  expect(Object.prototype.hasOwnProperty.call(observed.signArg, 'created_at')).toBe(true);
+  // AC-G2-1: strictly past the winner that was actually observed. `>` alone
+  // would also pass on `now` when the clock happens to have ticked, so the
+  // exact +1 is named -- the seed is stamped at the same second on purpose.
+  expect(observed.signArg.created_at).toBe(prior.createdAt + 1);
+  expect(observed.published.at(-1).created_at).toBe(prior.createdAt + 1);
+
+  /* §5 U1: the read happened before the signer was touched, and it asked for
+     this coordinate. A cache-first regression puts signEvent first (or drops
+     the `#d` round entirely) and lands here rather than in the arithmetic. */
+  const signIndex = observed.timeline.findIndex(entry => entry.call === 'signEvent');
+  expect(signIndex, 'signEvent never happened').toBeGreaterThan(-1);
+  const priorReqIndex = observed.timeline.findIndex(entry => entry.call === 'REQ'
+    && entry.filters.some(filter => Array.isArray(filter['#d']) && filter['#d'].includes('nosmaps:com.example.update')));
+  expect(priorReqIndex, 'no REQ for this coordinate before signing').toBeGreaterThan(-1);
+  expect(priorReqIndex).toBeLessThan(signIndex);
+
+  // AC-G2-4: the +1 is disclosed, not hidden. A user who is told "published"
+  // and shown a second they did not choose deserves the reason on the screen.
+  const note = page.locator('[data-publish-clock="bumped"]');
+  await expect(note).toHaveCount(1);
+  await expect(note).toContainText(String(prior.createdAt + 1));
+
+  expect(await page.locator('body').innerText()).not.toContain('undefined');
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
+/* AC-G2-2. The prior is stamped further ahead than MAX_FUTURE_SKEW_SEC (600)
+   allows this device to reach, so there is no honest timestamp that would win.
+   The design forbids forging a farther-future time, which leaves refusing --
+   and refusing has to happen *before* the signer, because a signature the user
+   was asked for and that can never be sent is a cost with no product. */
+test('a coordinate timestamped beyond the skew bound stops before the signer rather than forging a time', async ({page}) => {
+  const errors = collectErrors(page);
+  await openExplorer(page);
+  await signIn(page);
+
+  await seedPrior(page, PUBLISHER_SECKEY, {
+    dLocal: 'com.example.futurewinner', name: 'Stamped In The Future', offsetSec: 1200
+  });
+
+  await fillForm(page, {
+    dLocal: 'com.example.futurewinner',
+    name: 'Cannot Beat That Clock',
+    summary: 'The record at this address is ahead of this device.',
+    homepage: '',
+    topics: ''
+  });
+  await page.locator('[data-publish-submit]').click();
+
+  await expect(page.locator('[data-publish-state]')).toHaveAttribute('data-publish-state', 'blocked', {timeout: 20_000});
+  await expect(page.locator('[data-publish-reason]')).toHaveAttribute('data-publish-reason', 'clock-conflict');
+
+  // Nothing was signed and nothing was sent. Both, because either one alone
+  // leaves the other regression alive.
+  const after = await page.evaluate(() => ({
+    calls: window.__NOSTR_CALLS__,
+    published: window.__MOCK_RELAY__.published.length,
+    signArg: window.__SIGN_ARG__
+  }));
+  expect(after.calls.filter(call => call === 'signEvent')).toHaveLength(0);
+  expect(after.published, 'EVENTs sent on a clock conflict').toBe(0);
+  expect(after.signArg).toBeUndefined();
+
+  // The cause is on screen: this is a clock problem, and the user can only act
+  // on it if told so.
+  await expect(page.locator('[data-publish-clock="conflict"]')).toHaveCount(1);
+
+  expect(await page.locator('body').innerText()).not.toContain('undefined');
   expect(errors, 'console/page errors').toEqual([]);
 });

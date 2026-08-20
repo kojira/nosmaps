@@ -1311,11 +1311,20 @@ export function mountExplorer(data: Data): ExplorerHandles {
     else if (result.state === 'blocked') headline = t('explorer.publish.headlines.blocked');
     else headline = t('explorer.publish.headlines.other', {state: result.state});
     const consequence = result.state === 'published-partial' ? `<p class="publish-consequence">${esc(t('explorer.publish.partialConsequence'))}</p>` : '';
+    /* §W3.4 / W-I4: created_at を動かしたなら、動かしたと書く。隠して出すのは「この時刻に
+       書いた」という小さなウソになる。clock-conflict のときは何も署名していないので、
+       観測した値と端末の時計を並べて、利用者が原因（時計のずれ）に辿り着ける形にする。 */
+    let clockNote = '';
+    if (result.clock && result.clock.bumped && result.clock.createdAt !== null && result.clock.priorCreatedAt !== null) {
+      clockNote = `<p class="publish-clock" data-publish-clock="bumped">${esc(t('explorer.publish.clockBumped', {prior: result.clock.priorCreatedAt, createdAt: result.clock.createdAt}))}</p>`;
+    } else if (result.reason === 'clock-conflict' && result.clock && result.clock.priorCreatedAt !== null) {
+      clockNote = `<p class="publish-clock" data-publish-clock="conflict">${esc(t('explorer.publish.clockConflictDetail', {prior: result.clock.priorCreatedAt, now: Math.floor(result.asOf / 1000)}))}</p>`;
+    }
     const reason = result.reason && result.state !== 'published' && result.state !== 'published-partial'
       ? `<p class="publish-reason" data-publish-reason="${esc(result.reason)}">${esc(publishReasonText(result.reason))}</p>` : '';
     const id = result.eventId ? `<p class="publish-event-id">${esc(t('explorer.publish.eventId'))} <code data-publish-event-id>${esc(result.eventId)}</code></p>` : '';
     return `<div class="publish-result" data-publish-state="${esc(result.state)}">`
-      + `<p class="publish-headline" data-publish-headline>${esc(headline)}</p>${consequence}${reason}${id}`
+      + `<p class="publish-headline" data-publish-headline>${esc(headline)}</p>${consequence}${reason}${clockNote}${id}`
       + `<ul class="publish-relays">${rows}</ul></div>`;
   }
   function publishMarkup(): string {
@@ -1384,7 +1393,7 @@ export function mountExplorer(data: Data): ExplorerHandles {
       result = {
         state: 'failed', reason: 'publish-error', eventId: null, coordinate: null, event: null,
         relays: relays.map(url => ({url, outcome: 'connection-failed' as const, notice: ''})),
-        readback: null, attempts: 0, asOf: Date.now()
+        readback: null, clock: null, attempts: 0, asOf: Date.now()
       };
     }
     publish.busy = false;

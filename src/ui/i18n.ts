@@ -149,6 +149,11 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
         publishing: '投稿中…',
         eventId: '署名したイベントID',
         partialConsequence: '受け付けなかったリレーだけを読んでいるクライアントには、このレコードは見えません。',
+        /* §W3.4 / W-I4: created_at を1秒進めたことは隠さない。進めた理由と、進める前に
+           実際に観測した値を並べて出す。「勝手に時刻を作った」と「同じ秒で負けないように
+           1秒だけ足した」は別のことなので、後者だと分かる形で書く。 */
+        clockBumped: '同じ座標に created_at {prior} のレコードを観測したので、同じ秒で負けないように created_at を {createdAt} にしました（+1秒）。',
+        clockConflictDetail: '観測した created_at は {prior} で、この端末の時計（{now}）より先です。何も署名していません。',
         headlines: {
           published: '{total}台中{accepted}台に公開し、読み戻せました。',
           partial: '{total}台中{accepted}台に公開し、読み戻せました。',
@@ -189,6 +194,7 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
           'signer-invalid-record': '署名後のイベントが検証を通りませんでした。何も送っていません。',
           'nip07-key-unparsable': 'NIP-07拡張が公開鍵として読めない値を返しました。',
           'pubkey-mismatch': 'サインイン時と別の公開鍵が返りました。何も送っていません。',
+          'clock-conflict': 'この座標のレコードが、この端末の時計より先の時刻で記録されています。端末の時計を確認してください。',
           'relay-unavailable': 'リレー層を初期化できませんでした。',
           'all-relays-rejected': 'すべてのリレーが拒否しました。',
           'publish-error': '投稿の途中でエラーが起きました。公開されたかどうかは分かりません。',
@@ -306,6 +312,8 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
         publishing: 'Publishing…',
         eventId: 'Signed event id',
         partialConsequence: 'Clients that read only the relays which did not accept it will not see this record.',
+        clockBumped: 'A record at this address was observed with created_at {prior}, so created_at was set to {createdAt} (+1 second) rather than risk losing a same-second tie.',
+        clockConflictDetail: 'The observed created_at is {prior}, which is ahead of this device clock ({now}). Nothing was signed.',
         headlines: {
           published: 'Published to {accepted} of {total} relays and read back.',
           partial: 'Published to {accepted} of {total} relays and read back.',
@@ -346,6 +354,7 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
           'signer-invalid-record': 'The signed event did not pass validation. Nothing was sent.',
           'nip07-key-unparsable': 'The extension returned a value that is not a readable public key.',
           'pubkey-mismatch': 'A different public key came back than the one you signed in with. Nothing was sent.',
+          'clock-conflict': 'A record at this address is already timestamped ahead of this device\u2019s clock. Check your system time.',
           'relay-unavailable': 'The relay layer could not be initialised.',
           'all-relays-rejected': 'Every relay refused it.',
           'publish-error': 'Publishing errored part way through. Whether it was stored is unknown.',

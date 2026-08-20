@@ -9478,6 +9478,27 @@ async function readBackOnce(ctx, signed, d) {
   }
   return { state: "returned", round, event: mine, tIndex: "returned" };
 }
+function decideCreatedAt(nowSec, priorCreatedAt) {
+  if (priorCreatedAt === null || !Number.isFinite(priorCreatedAt) || nowSec > priorCreatedAt) {
+    return { ok: true, createdAt: nowSec, bumped: false };
+  }
+  const bumped = priorCreatedAt + 1;
+  if (bumped > nowSec + POLICY.MAX_FUTURE_SKEW_SEC) return { ok: false, reason: "clock-conflict" };
+  return { ok: true, createdAt: bumped, bumped: true };
+}
+async function readPriorCreatedAt(ctx, pubkey, d) {
+  const round = await fetchRound(
+    ctx,
+    [{ kinds: [POLICY.SOFTWARE_KIND], authors: [pubkey], "#d": [d], limit: 8 }],
+    "publish-prior"
+  );
+  const statuses = Object.keys(round.coverage).map((url) => round.coverage[url]?.status);
+  if (statuses.indexOf("eose") === -1) return { createdAt: null, read: "query-failed" };
+  const atCoordinate = round.events.map((item) => item.event).filter((event) => event && event.kind === POLICY.SOFTWARE_KIND && event.pubkey === pubkey && (event.tags ?? []).some((tag) => tag[0] === "d" && tag[1] === d));
+  const winner = selectAddressableWinner(atCoordinate);
+  if (!winner || !Number.isFinite(winner.created_at)) return { createdAt: null, read: "absent" };
+  return { createdAt: winner.created_at, read: "winner" };
+}
 function delay2(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -9489,6 +9510,7 @@ async function publishSoftwareRecord(opts) {
   const backoff2 = Array.isArray(opts?.readbackBackoffMs) ? opts.readbackBackoffMs : WRITE.READBACK_BACKOFF_MS;
   const signer = opts?.signer ?? (typeof window !== "undefined" ? window.nostr : null);
   const nowSec = Number.isSafeInteger(opts?.nowSec) ? opts?.nowSec : Math.floor(Date.now() / 1e3);
+  let clock = null;
   const failWith = (state, reason) => ({
     state,
     reason,
@@ -9497,6 +9519,7 @@ async function publishSoftwareRecord(opts) {
     event: null,
     relays: relays.map((url) => ({ url, outcome: "not-attempted", notice: "" })),
     readback: null,
+    clock,
     attempts: 0,
     asOf: Date.now()
   });
@@ -9513,39 +9536,61 @@ async function publishSoftwareRecord(opts) {
   if (opts?.expectPubkey && opts.expectPubkey !== pubkey) {
     return failWith("blocked", "pubkey-mismatch");
   }
-  const draft = buildSoftwareDraft({ ...opts?.draft, pubkey, createdAt: nowSec });
-  const preflight = validateSoftwareEvent(draft, { receivedAtSec: nowSec });
+  const probe = buildSoftwareDraft({ ...opts?.draft, pubkey, createdAt: nowSec });
+  const preflight = validateSoftwareEvent(probe, { receivedAtSec: nowSec });
   if (!preflight.ok) return failWith("invalid", preflight.reason);
   const d = preflight.record.d;
-  let signed = null;
-  try {
-    signed = await signer.signEvent(draft);
-  } catch {
-    return failWith("blocked", "signer-rejected");
-  }
-  const signerProblem = checkSignedEvent(draft, signed, pubkey);
-  if (signerProblem) return failWith("blocked", signerProblem);
-  const postflight = validateSoftwareEvent(signed, { receivedAtSec: nowSec });
-  if (!postflight.ok) return failWith("blocked", "signer-invalid-record");
-  const coordinate = postflight.record.coordinate;
-  const signedEvent = signed;
   let ctx = null;
+  let signedEvent = null;
+  let coordinate = null;
   try {
     ctx = await createRelayContext(relays, timeoutMs);
     if (!ctx.ok) {
       return {
         state: "failed",
         reason: "relay-unavailable",
-        eventId: signedEvent.id ?? null,
-        coordinate,
-        event: signedEvent,
+        eventId: null,
+        coordinate: null,
+        event: null,
         relays: relays.map((url) => ({ url, outcome: "connection-failed", notice: "" })),
         readback: null,
+        clock,
         attempts: 0,
         asOf: Date.now()
       };
     }
-    const outcomes = await sendEvent(ctx, signedEvent, relays, publishTimeoutMs);
+    const relayCtx = ctx;
+    const prior = await readPriorCreatedAt(relayCtx, pubkey, d);
+    const decision = decideCreatedAt(nowSec, prior.createdAt);
+    if (!decision.ok) {
+      clock = {
+        createdAt: null,
+        priorCreatedAt: prior.createdAt,
+        priorRead: prior.read,
+        bumped: false
+      };
+      return failWith("blocked", decision.reason);
+    }
+    clock = {
+      createdAt: decision.createdAt,
+      priorCreatedAt: prior.createdAt,
+      priorRead: prior.read,
+      bumped: decision.bumped
+    };
+    const draft = buildSoftwareDraft({ ...opts?.draft, pubkey, createdAt: decision.createdAt });
+    let signed = null;
+    try {
+      signed = await signer.signEvent(draft);
+    } catch {
+      return failWith("blocked", "signer-rejected");
+    }
+    const signerProblem = checkSignedEvent(draft, signed, pubkey);
+    if (signerProblem) return failWith("blocked", signerProblem);
+    const postflight = validateSoftwareEvent(signed, { receivedAtSec: nowSec });
+    if (!postflight.ok) return failWith("blocked", "signer-invalid-record");
+    coordinate = postflight.record.coordinate;
+    signedEvent = signed;
+    const outcomes = await sendEvent(relayCtx, signedEvent, relays, publishTimeoutMs);
     const perRelay = relays.map((url) => ({
       url,
       outcome: outcomes[url]?.outcome ?? "connection-failed",
@@ -9564,6 +9609,7 @@ async function publishSoftwareRecord(opts) {
         event: signedEvent,
         relays: perRelay,
         readback: null,
+        clock,
         attempts: 0,
         asOf: Date.now()
       };
@@ -9574,7 +9620,7 @@ async function publishSoftwareRecord(opts) {
       const wait = Number.isFinite(backoff2[i]) ? backoff2[i] : 0;
       if (wait > 0) await delay2(wait);
       used = i + 1;
-      readback = await readBackOnce(ctx, signedEvent, d);
+      readback = await readBackOnce(relayCtx, signedEvent, d);
       if (readback.state === "returned" || readback.state === "superseded-during-publish" || readback.state === "readback-quarantined") break;
     }
     let state;
@@ -9596,6 +9642,7 @@ async function publishSoftwareRecord(opts) {
       relays: perRelay,
       accepted,
       readback: readback ? { state: readback.state, tIndex: readback.tIndex, winnerId: readback.winnerId ?? null } : null,
+      clock,
       attempts: used,
       asOf: Date.now()
     };
@@ -9603,11 +9650,12 @@ async function publishSoftwareRecord(opts) {
     return {
       state: "failed",
       reason: "publish-error",
-      eventId: signedEvent.id ?? null,
+      eventId: signedEvent?.id ?? null,
       coordinate,
       event: signedEvent,
       relays: relays.map((url) => ({ url, outcome: "connection-failed", notice: "" })),
       readback: null,
+      clock,
       attempts: 0,
       asOf: Date.now()
     };
@@ -9910,6 +9958,11 @@ var dictionaries = {
         publishing: "\u6295\u7A3F\u4E2D\u2026",
         eventId: "\u7F72\u540D\u3057\u305F\u30A4\u30D9\u30F3\u30C8ID",
         partialConsequence: "\u53D7\u3051\u4ED8\u3051\u306A\u304B\u3063\u305F\u30EA\u30EC\u30FC\u3060\u3051\u3092\u8AAD\u3093\u3067\u3044\u308B\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306B\u306F\u3001\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u306F\u898B\u3048\u307E\u305B\u3093\u3002",
+        /* §W3.4 / W-I4: created_at を1秒進めたことは隠さない。進めた理由と、進める前に
+           実際に観測した値を並べて出す。「勝手に時刻を作った」と「同じ秒で負けないように
+           1秒だけ足した」は別のことなので、後者だと分かる形で書く。 */
+        clockBumped: "\u540C\u3058\u5EA7\u6A19\u306B created_at {prior} \u306E\u30EC\u30B3\u30FC\u30C9\u3092\u89B3\u6E2C\u3057\u305F\u306E\u3067\u3001\u540C\u3058\u79D2\u3067\u8CA0\u3051\u306A\u3044\u3088\u3046\u306B created_at \u3092 {createdAt} \u306B\u3057\u307E\u3057\u305F\uFF08+1\u79D2\uFF09\u3002",
+        clockConflictDetail: "\u89B3\u6E2C\u3057\u305F created_at \u306F {prior} \u3067\u3001\u3053\u306E\u7AEF\u672B\u306E\u6642\u8A08\uFF08{now}\uFF09\u3088\u308A\u5148\u3067\u3059\u3002\u4F55\u3082\u7F72\u540D\u3057\u3066\u3044\u307E\u305B\u3093\u3002",
         headlines: {
           published: "{total}\u53F0\u4E2D{accepted}\u53F0\u306B\u516C\u958B\u3057\u3001\u8AAD\u307F\u623B\u305B\u307E\u3057\u305F\u3002",
           partial: "{total}\u53F0\u4E2D{accepted}\u53F0\u306B\u516C\u958B\u3057\u3001\u8AAD\u307F\u623B\u305B\u307E\u3057\u305F\u3002",
@@ -9950,6 +10003,7 @@ var dictionaries = {
           "signer-invalid-record": "\u7F72\u540D\u5F8C\u306E\u30A4\u30D9\u30F3\u30C8\u304C\u691C\u8A3C\u3092\u901A\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u4F55\u3082\u9001\u3063\u3066\u3044\u307E\u305B\u3093\u3002",
           "nip07-key-unparsable": "NIP-07\u62E1\u5F35\u304C\u516C\u958B\u9375\u3068\u3057\u3066\u8AAD\u3081\u306A\u3044\u5024\u3092\u8FD4\u3057\u307E\u3057\u305F\u3002",
           "pubkey-mismatch": "\u30B5\u30A4\u30F3\u30A4\u30F3\u6642\u3068\u5225\u306E\u516C\u958B\u9375\u304C\u8FD4\u308A\u307E\u3057\u305F\u3002\u4F55\u3082\u9001\u3063\u3066\u3044\u307E\u305B\u3093\u3002",
+          "clock-conflict": "\u3053\u306E\u5EA7\u6A19\u306E\u30EC\u30B3\u30FC\u30C9\u304C\u3001\u3053\u306E\u7AEF\u672B\u306E\u6642\u8A08\u3088\u308A\u5148\u306E\u6642\u523B\u3067\u8A18\u9332\u3055\u308C\u3066\u3044\u307E\u3059\u3002\u7AEF\u672B\u306E\u6642\u8A08\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
           "relay-unavailable": "\u30EA\u30EC\u30FC\u5C64\u3092\u521D\u671F\u5316\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002",
           "all-relays-rejected": "\u3059\u3079\u3066\u306E\u30EA\u30EC\u30FC\u304C\u62D2\u5426\u3057\u307E\u3057\u305F\u3002",
           "publish-error": "\u6295\u7A3F\u306E\u9014\u4E2D\u3067\u30A8\u30E9\u30FC\u304C\u8D77\u304D\u307E\u3057\u305F\u3002\u516C\u958B\u3055\u308C\u305F\u304B\u3069\u3046\u304B\u306F\u5206\u304B\u308A\u307E\u305B\u3093\u3002",
@@ -10312,6 +10366,8 @@ var dictionaries = {
         publishing: "Publishing\u2026",
         eventId: "Signed event id",
         partialConsequence: "Clients that read only the relays which did not accept it will not see this record.",
+        clockBumped: "A record at this address was observed with created_at {prior}, so created_at was set to {createdAt} (+1 second) rather than risk losing a same-second tie.",
+        clockConflictDetail: "The observed created_at is {prior}, which is ahead of this device clock ({now}). Nothing was signed.",
         headlines: {
           published: "Published to {accepted} of {total} relays and read back.",
           partial: "Published to {accepted} of {total} relays and read back.",
@@ -10352,6 +10408,7 @@ var dictionaries = {
           "signer-invalid-record": "The signed event did not pass validation. Nothing was sent.",
           "nip07-key-unparsable": "The extension returned a value that is not a readable public key.",
           "pubkey-mismatch": "A different public key came back than the one you signed in with. Nothing was sent.",
+          "clock-conflict": "A record at this address is already timestamped ahead of this device\u2019s clock. Check your system time.",
           "relay-unavailable": "The relay layer could not be initialised.",
           "all-relays-rejected": "Every relay refused it.",
           "publish-error": "Publishing errored part way through. Whether it was stored is unknown.",
@@ -11051,7 +11108,7 @@ function readExplorerParams(search) {
     readbackAttempts: positiveNumber(params.get("readbackattempts"), 3),
     readbackBackoff: backoff(params.get("readbackbackoff")),
     publishTimeoutMs: positiveNumber(params.get("publishtimeout"), 15e3),
-    nip07TimeoutMs: positiveNumber(params.get("nip07timeout"), 2e4),
+    nip07TimeoutMs: positiveNumber(params.get("nip07timeout"), WRITE.SIGNER_TIMEOUT_MS),
     relayRequested: params.get("relay") === "1",
     viewerPubkey: (params.get("viewer") ?? "").trim(),
     relays: list(params.get("relays")),
@@ -12046,9 +12103,15 @@ function mountExplorer(data) {
     else if (result.state === "blocked") headline = t("explorer.publish.headlines.blocked");
     else headline = t("explorer.publish.headlines.other", { state: result.state });
     const consequence = result.state === "published-partial" ? `<p class="publish-consequence">${esc3(t("explorer.publish.partialConsequence"))}</p>` : "";
+    let clockNote = "";
+    if (result.clock && result.clock.bumped && result.clock.createdAt !== null && result.clock.priorCreatedAt !== null) {
+      clockNote = `<p class="publish-clock" data-publish-clock="bumped">${esc3(t("explorer.publish.clockBumped", { prior: result.clock.priorCreatedAt, createdAt: result.clock.createdAt }))}</p>`;
+    } else if (result.reason === "clock-conflict" && result.clock && result.clock.priorCreatedAt !== null) {
+      clockNote = `<p class="publish-clock" data-publish-clock="conflict">${esc3(t("explorer.publish.clockConflictDetail", { prior: result.clock.priorCreatedAt, now: Math.floor(result.asOf / 1e3) }))}</p>`;
+    }
     const reason = result.reason && result.state !== "published" && result.state !== "published-partial" ? `<p class="publish-reason" data-publish-reason="${esc3(result.reason)}">${esc3(publishReasonText(result.reason))}</p>` : "";
     const id = result.eventId ? `<p class="publish-event-id">${esc3(t("explorer.publish.eventId"))} <code data-publish-event-id>${esc3(result.eventId)}</code></p>` : "";
-    return `<div class="publish-result" data-publish-state="${esc3(result.state)}"><p class="publish-headline" data-publish-headline>${esc3(headline)}</p>${consequence}${reason}${id}<ul class="publish-relays">${rows}</ul></div>`;
+    return `<div class="publish-result" data-publish-state="${esc3(result.state)}"><p class="publish-headline" data-publish-headline>${esc3(headline)}</p>${consequence}${reason}${clockNote}${id}<ul class="publish-relays">${rows}</ul></div>`;
   }
   function publishMarkup() {
     if (!signerCanSign()) return `<p class="publish-unavailable" data-publish-unavailable>${esc3(t("explorer.publish.noSigner"))}</p>`;
@@ -12111,6 +12174,7 @@ function mountExplorer(data) {
         event: null,
         relays: relays.map((url) => ({ url, outcome: "connection-failed", notice: "" })),
         readback: null,
+        clock: null,
         attempts: 0,
         asOf: Date.now()
       };
