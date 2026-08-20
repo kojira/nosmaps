@@ -207,6 +207,20 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
           unknownReason: '理由: {reason}'
         }
       },
+      /* issue #12: 自分が出したレコードの一覧。「観測できなかった」と「問い合わせが完了しなかった」を
+         別の文言にしてあるのは、利用者が次に取る行動が違うから —— 後者を「0件」と書くと、
+         もう出してあるレコードをもう一度出しに行かせることになる。 */
+      manage: {
+        title: '自分が出したレコード',
+        loading: 'リレーに問い合わせています…',
+        empty: 'このリレーでは、あなたの署名したレコードは観測されませんでした。存在しないという意味ではありません。',
+        queryFailed: '問い合わせが完了しなかったので、件数は0ではなく不明です。何も観測できていません。',
+        unavailable: 'リレーに1台も接続できませんでした。観測できたことは何もありません。',
+        truncated: '上限 {limit} 件まで読みました。これより多くのレコードがある可能性があります。',
+        count: '{count} 件',
+        coordinate: '識別子 d',
+        updatedAt: '最終更新'
+      },
       /* NIP-07 サインイン。失敗の原因は原因ごとに別の文言で出す —— 「拡張が無い」「断られた」
          「エラーが返った」「応答が無い」は利用者が次に取る行動が違う。 */
       viewer: {
@@ -366,6 +380,17 @@ const dictionaries: {readonly [K in Language]: I18nNode} = {
           unavailable: 'The data layer is not loaded.',
           unknownReason: 'Reason: {reason}'
         }
+      },
+      manage: {
+        title: 'Records you published',
+        loading: 'Asking the relays…',
+        empty: 'No record signed by you was observed on these relays. That is not a claim that none exists.',
+        queryFailed: 'The query did not complete, so the number of records is unknown, not zero. Nothing was observed.',
+        unavailable: 'Not one relay could be reached, so nothing was observed at all.',
+        truncated: 'Read up to the ceiling of {limit} records. There may be more than this list shows.',
+        count: '{count} records',
+        coordinate: 'Identifier d',
+        updatedAt: 'Last updated'
       },
       viewer: {
         label: 'Viewer sign-in state', signedIn: 'Signed in', signedOut: 'Not signed in',

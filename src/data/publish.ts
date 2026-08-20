@@ -9,7 +9,7 @@ import {bytesEqual, canonicalize} from '../domain/json.ts';
 import {compareCodePoints, isLowercaseHex64, type NostrEvent, type NostrTag} from '../domain/event.ts';
 import {decodeNpub} from '../domain/npub.ts';
 import {DISCOVERY_TOPIC, POLICY, SOFTWARE_D_PREFIX, SOFTWARE_SCHEMA, WRITE} from '../domain/policy.ts';
-import {validateSoftwareEvent} from '../domain/records.ts';
+import {validateSoftwareEvent, type SoftwareRecord} from '../domain/records.ts';
 import {selectAddressableWinner, selectSoftwareWinners} from '../domain/winners.ts';
 import {createRelayContext, fetchRound, type RelayContext, type Round} from './relay.ts';
 
@@ -576,6 +576,150 @@ export async function publishSoftwareRecord(opts?: PublishOptions): Promise<Publ
       relays: relays.map(url => ({url, outcome: 'connection-failed' as const, notice: ''})),
       readback: null, clock, attempts: 0, asOf: Date.now()
     };
+  } finally {
+    const rx = ctx?.rxNostr;
+    if (rx && typeof rx.dispose === 'function') {
+      try {
+        rx.dispose();
+      } catch { /* noop */ }
+    }
+  }
+}
+
+/* ---- The publisher's own records (issue #12) ------------------------------
+
+   One logical REQ, one author, one purpose: showing a signed-in user what this
+   app can actually observe of what they signed. Nothing here writes. */
+
+/** How many raw events one manage round asks for. A ceiling, not a count: what
+    comes back is whatever the relays hold, and reaching it is reported rather
+    than hidden (`truncated`). */
+export const MANAGE_LIMIT = 64;
+
+export interface MyRecordsOptions {
+  readonly relays?: readonly string[];
+  readonly timeoutMs?: number;
+  /** The viewer's key, supplied by the caller. This function never asks an
+      extension for it: the signed-in key is the UI's fact, not ours. */
+  readonly pubkey: string;
+}
+
+export type MyRecordsState = 'ok' | 'empty' | 'query-failed' | 'unavailable';
+
+/** Why events were not listed. Diagnostics only — none of these is an error the
+    user has to act on, and `foreignD` is not one at all (see below). */
+export interface MyRecordsDiagnostics {
+  /** Raw events the round delivered, before anything was dropped. */
+  readonly received: number;
+  /** Events by someone else. Relays may answer with more than was asked for. */
+  readonly foreignAuthor: number;
+  /** NIP-78 shares kind 30078 across applications, so another app's record
+      (`d` outside `nosmaps:`) coming back is the normal case, not a fault. It
+      is neither listed nor counted as one of the user's records. */
+  readonly foreignD: number;
+  /** Ours by address, but the read path would not display it. */
+  readonly invalid: number;
+}
+
+export interface MyRecordsResult {
+  readonly state: MyRecordsState;
+  /** One row per coordinate, newest first. SoftwareRecord already carries the
+      coordinate, the event id and created_at, so nothing is wrapped around it. */
+  readonly records: readonly SoftwareRecord[];
+  /** The round returned at least MANAGE_LIMIT raw events, so there may be more
+      than this list shows. Reported because "64 rows" and "the first 64 of an
+      unknown number" are different facts. */
+  readonly truncated: boolean;
+  readonly asOf: number;
+  readonly diagnostics: MyRecordsDiagnostics;
+}
+
+/** §5.2: single-author filter, one logical REQ. Returns a closed set of states
+    because the interesting distinction is not "rows or no rows":
+
+    `query-failed` (no relay reached EOSE) and `empty` (every relay answered and
+    held nothing of ours) are never merged. Merging them would let a page that
+    learned nothing tell a publisher their records are gone — the one sentence
+    this app must never say by accident, since the user's next move after "you
+    have no records" is to publish them again. */
+export async function fetchMyRecords(opts?: MyRecordsOptions): Promise<MyRecordsResult> {
+  const relays = (Array.isArray(opts?.relays) && opts.relays.length
+    ? opts.relays : POLICY.DEFAULT_RELAYS).slice();
+  const timeoutMs = Number.isFinite(opts?.timeoutMs)
+    ? (opts?.timeoutMs as number) : POLICY.REQ_TIMEOUT_MS;
+  const pubkey = typeof opts?.pubkey === 'string' ? opts.pubkey : '';
+
+  const diagnostics = {received: 0, foreignAuthor: 0, foreignD: 0, invalid: 0};
+  const nothing = (state: MyRecordsState): MyRecordsResult =>
+    ({state, records: [], truncated: false, asOf: Date.now(), diagnostics});
+
+  /* No usable key means no REQ was ever sent, which is ignorance about the
+     relays and not an observation of zero. */
+  if (!isLowercaseHex64(pubkey)) return nothing('query-failed');
+
+  let ctx: RelayContext | null = null;
+  try {
+    ctx = await createRelayContext(relays, timeoutMs);
+    if (!ctx.ok) return nothing('unavailable');
+    const round = await fetchRound(
+      ctx,
+      [{kinds: [POLICY.SOFTWARE_KIND], authors: [pubkey], limit: MANAGE_LIMIT}],
+      'my-records'
+    );
+    const statuses = Object.keys(round.coverage).map(url => round.coverage[url]?.status);
+    if (statuses.indexOf('eose') === -1) return nothing('query-failed');
+
+    const events = round.events.map(item => item.event);
+    diagnostics.received = events.length;
+    const truncated = events.length >= MANAGE_LIMIT;
+
+    /* Validity is decided by the read path's own validator (§W0.1), so the list
+       shows what a reader would see and not what we hoped we wrote. */
+    const receivedAtSec = Math.floor(Date.now() / 1000);
+    const byCoordinate = new Map<string, {event: NostrEvent; record: SoftwareRecord}[]>();
+    for (const event of events) {
+      if (!event) continue;
+      if (event.pubkey !== pubkey) {
+        diagnostics.foreignAuthor += 1;
+        continue;
+      }
+      const check = validateSoftwareEvent(event, {receivedAtSec});
+      if (!check.ok) {
+        if (check.reason === 'foreign-d') diagnostics.foreignD += 1;
+        else diagnostics.invalid += 1;
+        continue;
+      }
+      const coordinate = check.record.coordinate;
+      let group = byCoordinate.get(coordinate);
+      if (!group) {
+        group = [];
+        byCoordinate.set(coordinate, group);
+      }
+      group.push({event, record: check.record});
+    }
+
+    /* One row per address, chosen by the same NIP-01 rule the read path uses.
+       Several versions of one record are one record, not several. */
+    const records: SoftwareRecord[] = [];
+    for (const group of byCoordinate.values()) {
+      const winnerEvent = selectAddressableWinner(group.map(entry => entry.event));
+      const winner = winnerEvent ? group.find(entry => entry.event === winnerEvent) : undefined;
+      if (winner) records.push(winner.record);
+    }
+    // Newest first; ties broken by coordinate so the order is not luck.
+    records.sort((a, b) => (b.createdAt - a.createdAt)
+      || compareCodePoints(a.coordinate, b.coordinate));
+
+    return {
+      state: records.length ? 'ok' : 'empty',
+      records,
+      truncated,
+      asOf: Date.now(),
+      diagnostics
+    };
+  } catch {
+    // An exception is not an answer either, so it stays out of `empty`.
+    return nothing('query-failed');
   } finally {
     const rx = ctx?.rxNostr;
     if (rx && typeof rx.dispose === 'function') {

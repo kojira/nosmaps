@@ -397,3 +397,59 @@ test('a coordinate timestamped beyond the skew bound stops before the signer rat
   expect(await page.locator('body').innerText()).not.toContain('undefined');
   expect(errors, 'console/page errors').toEqual([]);
 });
+
+/* Puts a *foreign* 30078 of the same publisher into the pool: NIP-78 shares the
+   kind across applications, so another app's settings record living under the
+   same author is the normal case, not a fault. Really signed for the same reason
+   seedPrior is -- rx-nostr's verifier drops anything else, and a dropped event
+   would make this seed prove nothing. */
+async function seedForeignApp(page, seckey, {d, content}) {
+  return page.evaluate(async ({seckey, d, content}) => {
+    const module = await import(new URL('dist/rx-nostr-crypto.js', location.href).href);
+    const signer = module.seckeySigner(seckey);
+    const event = await signer.signEvent({
+      kind: 30078,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [['d', d]],
+      content: JSON.stringify(content)
+    });
+    window.__MOCK_RELAY__.events.push(event);
+    return event.id;
+  }, {seckey, d, content});
+}
+
+/* issue #12: the signed-in publisher sees what this app can actually observe of
+   what they signed -- and only that. The foreign record is the load-bearing half
+   of the test: kind 30078 is shared (NIP-78), so a list that counted everything
+   the author signed under that kind would tell the user they published records
+   they never published, in an app they may not even use. */
+test('the signed-in publisher sees their own records, and another app’s 30078 is not one of them', async ({page}) => {
+  const errors = collectErrors(page);
+  await openExplorer(page);
+
+  // Seeded before signing in, because the list is fetched as soon as the key is
+  // known: seeding afterwards would race the round it is supposed to be in.
+  const mine = await seedPrior(page, PUBLISHER_SECKEY, {
+    dLocal: 'com.example.mine', name: 'My Own Record', offsetSec: -60
+  });
+  const foreignId = await seedForeignApp(page, PUBLISHER_SECKEY, {
+    d: 'AmethystSettings', content: {theme: 'dark', lastRead: 1712345678}
+  });
+
+  await signIn(page);
+
+  const list = page.locator('[data-my-records]');
+  await expect(list).toHaveAttribute('data-my-records', 'ok', {timeout: 20_000});
+
+  // Exactly one row: the foreign record is neither listed nor counted.
+  const rows = page.locator('[data-my-record]');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveAttribute('data-event-id', mine.id);
+  await expect(rows.first()).toContainText('My Own Record');
+  await expect(rows.first()).toContainText('nosmaps:com.example.mine');
+  expect(await page.locator('.my-records').innerText()).not.toContain('AmethystSettings');
+  expect(await page.locator('[data-my-record]').first().getAttribute('data-event-id')).not.toBe(foreignId);
+
+  expect(await page.locator('body').innerText()).not.toContain('undefined');
+  expect(errors, 'console/page errors').toEqual([]);
+});

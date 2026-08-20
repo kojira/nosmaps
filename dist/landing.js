@@ -358,6 +358,20 @@ var dictionaries = {
           unknownReason: "\u7406\u7531: {reason}"
         }
       },
+      /* issue #12: 自分が出したレコードの一覧。「観測できなかった」と「問い合わせが完了しなかった」を
+         別の文言にしてあるのは、利用者が次に取る行動が違うから —— 後者を「0件」と書くと、
+         もう出してあるレコードをもう一度出しに行かせることになる。 */
+      manage: {
+        title: "\u81EA\u5206\u304C\u51FA\u3057\u305F\u30EC\u30B3\u30FC\u30C9",
+        loading: "\u30EA\u30EC\u30FC\u306B\u554F\u3044\u5408\u308F\u305B\u3066\u3044\u307E\u3059\u2026",
+        empty: "\u3053\u306E\u30EA\u30EC\u30FC\u3067\u306F\u3001\u3042\u306A\u305F\u306E\u7F72\u540D\u3057\u305F\u30EC\u30B3\u30FC\u30C9\u306F\u89B3\u6E2C\u3055\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u5B58\u5728\u3057\u306A\u3044\u3068\u3044\u3046\u610F\u5473\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
+        queryFailed: "\u554F\u3044\u5408\u308F\u305B\u304C\u5B8C\u4E86\u3057\u306A\u304B\u3063\u305F\u306E\u3067\u3001\u4EF6\u6570\u306F0\u3067\u306F\u306A\u304F\u4E0D\u660E\u3067\u3059\u3002\u4F55\u3082\u89B3\u6E2C\u3067\u304D\u3066\u3044\u307E\u305B\u3093\u3002",
+        unavailable: "\u30EA\u30EC\u30FC\u306B1\u53F0\u3082\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u89B3\u6E2C\u3067\u304D\u305F\u3053\u3068\u306F\u4F55\u3082\u3042\u308A\u307E\u305B\u3093\u3002",
+        truncated: "\u4E0A\u9650 {limit} \u4EF6\u307E\u3067\u8AAD\u307F\u307E\u3057\u305F\u3002\u3053\u308C\u3088\u308A\u591A\u304F\u306E\u30EC\u30B3\u30FC\u30C9\u304C\u3042\u308B\u53EF\u80FD\u6027\u304C\u3042\u308A\u307E\u3059\u3002",
+        count: "{count} \u4EF6",
+        coordinate: "\u8B58\u5225\u5B50 d",
+        updatedAt: "\u6700\u7D42\u66F4\u65B0"
+      },
       /* NIP-07 サインイン。失敗の原因は原因ごとに別の文言で出す —— 「拡張が無い」「断られた」
          「エラーが返った」「応答が無い」は利用者が次に取る行動が違う。 */
       viewer: {
@@ -762,6 +776,17 @@ var dictionaries = {
           unavailable: "The data layer is not loaded.",
           unknownReason: "Reason: {reason}"
         }
+      },
+      manage: {
+        title: "Records you published",
+        loading: "Asking the relays\u2026",
+        empty: "No record signed by you was observed on these relays. That is not a claim that none exists.",
+        queryFailed: "The query did not complete, so the number of records is unknown, not zero. Nothing was observed.",
+        unavailable: "Not one relay could be reached, so nothing was observed at all.",
+        truncated: "Read up to the ceiling of {limit} records. There may be more than this list shows.",
+        count: "{count} records",
+        coordinate: "Identifier d",
+        updatedAt: "Last updated"
       },
       viewer: {
         label: "Viewer sign-in state",

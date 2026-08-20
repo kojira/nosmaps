@@ -9669,6 +9669,76 @@ async function publishSoftwareRecord(opts) {
     }
   }
 }
+var MANAGE_LIMIT = 64;
+async function fetchMyRecords(opts) {
+  const relays = (Array.isArray(opts?.relays) && opts.relays.length ? opts.relays : POLICY.DEFAULT_RELAYS).slice();
+  const timeoutMs = Number.isFinite(opts?.timeoutMs) ? opts?.timeoutMs : POLICY.REQ_TIMEOUT_MS;
+  const pubkey = typeof opts?.pubkey === "string" ? opts.pubkey : "";
+  const diagnostics = { received: 0, foreignAuthor: 0, foreignD: 0, invalid: 0 };
+  const nothing = (state) => ({ state, records: [], truncated: false, asOf: Date.now(), diagnostics });
+  if (!isLowercaseHex64(pubkey)) return nothing("query-failed");
+  let ctx = null;
+  try {
+    ctx = await createRelayContext(relays, timeoutMs);
+    if (!ctx.ok) return nothing("unavailable");
+    const round = await fetchRound(
+      ctx,
+      [{ kinds: [POLICY.SOFTWARE_KIND], authors: [pubkey], limit: MANAGE_LIMIT }],
+      "my-records"
+    );
+    const statuses = Object.keys(round.coverage).map((url) => round.coverage[url]?.status);
+    if (statuses.indexOf("eose") === -1) return nothing("query-failed");
+    const events = round.events.map((item) => item.event);
+    diagnostics.received = events.length;
+    const truncated = events.length >= MANAGE_LIMIT;
+    const receivedAtSec = Math.floor(Date.now() / 1e3);
+    const byCoordinate = /* @__PURE__ */ new Map();
+    for (const event of events) {
+      if (!event) continue;
+      if (event.pubkey !== pubkey) {
+        diagnostics.foreignAuthor += 1;
+        continue;
+      }
+      const check = validateSoftwareEvent(event, { receivedAtSec });
+      if (!check.ok) {
+        if (check.reason === "foreign-d") diagnostics.foreignD += 1;
+        else diagnostics.invalid += 1;
+        continue;
+      }
+      const coordinate = check.record.coordinate;
+      let group = byCoordinate.get(coordinate);
+      if (!group) {
+        group = [];
+        byCoordinate.set(coordinate, group);
+      }
+      group.push({ event, record: check.record });
+    }
+    const records = [];
+    for (const group of byCoordinate.values()) {
+      const winnerEvent = selectAddressableWinner(group.map((entry) => entry.event));
+      const winner = winnerEvent ? group.find((entry) => entry.event === winnerEvent) : void 0;
+      if (winner) records.push(winner.record);
+    }
+    records.sort((a, b) => b.createdAt - a.createdAt || compareCodePoints(a.coordinate, b.coordinate));
+    return {
+      state: records.length ? "ok" : "empty",
+      records,
+      truncated,
+      asOf: Date.now(),
+      diagnostics
+    };
+  } catch {
+    return nothing("query-failed");
+  } finally {
+    const rx = ctx?.rxNostr;
+    if (rx && typeof rx.dispose === "function") {
+      try {
+        rx.dispose();
+      } catch {
+      }
+    }
+  }
+}
 
 // src/ui/i18n.ts
 var dictionaries = {
@@ -10015,6 +10085,20 @@ var dictionaries = {
           unavailable: "\u30C7\u30FC\u30BF\u5C64\u3092\u8AAD\u307F\u8FBC\u3081\u3066\u3044\u307E\u305B\u3093\u3002",
           unknownReason: "\u7406\u7531: {reason}"
         }
+      },
+      /* issue #12: 自分が出したレコードの一覧。「観測できなかった」と「問い合わせが完了しなかった」を
+         別の文言にしてあるのは、利用者が次に取る行動が違うから —— 後者を「0件」と書くと、
+         もう出してあるレコードをもう一度出しに行かせることになる。 */
+      manage: {
+        title: "\u81EA\u5206\u304C\u51FA\u3057\u305F\u30EC\u30B3\u30FC\u30C9",
+        loading: "\u30EA\u30EC\u30FC\u306B\u554F\u3044\u5408\u308F\u305B\u3066\u3044\u307E\u3059\u2026",
+        empty: "\u3053\u306E\u30EA\u30EC\u30FC\u3067\u306F\u3001\u3042\u306A\u305F\u306E\u7F72\u540D\u3057\u305F\u30EC\u30B3\u30FC\u30C9\u306F\u89B3\u6E2C\u3055\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u5B58\u5728\u3057\u306A\u3044\u3068\u3044\u3046\u610F\u5473\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002",
+        queryFailed: "\u554F\u3044\u5408\u308F\u305B\u304C\u5B8C\u4E86\u3057\u306A\u304B\u3063\u305F\u306E\u3067\u3001\u4EF6\u6570\u306F0\u3067\u306F\u306A\u304F\u4E0D\u660E\u3067\u3059\u3002\u4F55\u3082\u89B3\u6E2C\u3067\u304D\u3066\u3044\u307E\u305B\u3093\u3002",
+        unavailable: "\u30EA\u30EC\u30FC\u306B1\u53F0\u3082\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u89B3\u6E2C\u3067\u304D\u305F\u3053\u3068\u306F\u4F55\u3082\u3042\u308A\u307E\u305B\u3093\u3002",
+        truncated: "\u4E0A\u9650 {limit} \u4EF6\u307E\u3067\u8AAD\u307F\u307E\u3057\u305F\u3002\u3053\u308C\u3088\u308A\u591A\u304F\u306E\u30EC\u30B3\u30FC\u30C9\u304C\u3042\u308B\u53EF\u80FD\u6027\u304C\u3042\u308A\u307E\u3059\u3002",
+        count: "{count} \u4EF6",
+        coordinate: "\u8B58\u5225\u5B50 d",
+        updatedAt: "\u6700\u7D42\u66F4\u65B0"
       },
       /* NIP-07 サインイン。失敗の原因は原因ごとに別の文言で出す —— 「拡張が無い」「断られた」
          「エラーが返った」「応答が無い」は利用者が次に取る行動が違う。 */
@@ -10420,6 +10504,17 @@ var dictionaries = {
           unavailable: "The data layer is not loaded.",
           unknownReason: "Reason: {reason}"
         }
+      },
+      manage: {
+        title: "Records you published",
+        loading: "Asking the relays\u2026",
+        empty: "No record signed by you was observed on these relays. That is not a claim that none exists.",
+        queryFailed: "The query did not complete, so the number of records is unknown, not zero. Nothing was observed.",
+        unavailable: "Not one relay could be reached, so nothing was observed at all.",
+        truncated: "Read up to the ceiling of {limit} records. There may be more than this list shows.",
+        count: "{count} records",
+        coordinate: "Identifier d",
+        updatedAt: "Last updated"
       },
       viewer: {
         label: "Viewer sign-in state",
@@ -12120,11 +12215,66 @@ function mountExplorer(data) {
     const bytes = publishDBytes();
     const canPublish = validation.ok && !publish.busy;
     const hint = validation.ok ? "" : publishReasonText(validation.reason);
-    return `<h2 class="publish-title">${esc3(t("explorer.publish.title"))}</h2><p class="publish-lead">${esc3(t("explorer.publish.lead"))}</p><form class="publish-form" data-publish-form novalidate><label class="field">${esc3(t("explorer.publish.dLocal"))}<input id="publish-d" type="text" autocomplete="off" value="${esc3(publish.dLocal)}" placeholder="com.example.tool"><small class="publish-bytes" data-publish-bytes>${esc3(t("explorer.publish.dBytes", { bytes, max: PUBLISH_D_MAX_BYTES }))}</small></label><label class="field">${esc3(t("explorer.publish.name"))}<input id="publish-name" type="text" autocomplete="off" value="${esc3(publish.name)}"></label><label class="field">${esc3(t("explorer.publish.summary"))}<textarea id="publish-summary" rows="3">${esc3(publish.summary)}</textarea><small>${esc3(t("explorer.publish.summaryHelp"))}</small></label><label class="field">${esc3(t("explorer.publish.homepage"))}<input id="publish-homepage" type="text" autocomplete="off" inputmode="url" value="${esc3(publish.homepage)}" placeholder="https://"></label><label class="field">${esc3(t("explorer.publish.topics"))}<input id="publish-topics" type="text" autocomplete="off" value="${esc3(publish.topics)}" placeholder="clients, relay"><small>${esc3(t("explorer.publish.topicsHelp"))}</small></label><p class="publish-hint" data-publish-hint>${esc3(hint)}</p><button class="primary" type="submit" data-publish-submit ${canPublish ? "" : "disabled"}>${esc3(publish.busy ? t("explorer.publish.publishing") : t("explorer.publish.submit"))}</button></form>${publishResultMarkup()}`;
+    return `<h2 class="publish-title">${esc3(t("explorer.publish.title"))}</h2><p class="publish-lead">${esc3(t("explorer.publish.lead"))}</p><form class="publish-form" data-publish-form novalidate><label class="field">${esc3(t("explorer.publish.dLocal"))}<input id="publish-d" type="text" autocomplete="off" value="${esc3(publish.dLocal)}" placeholder="com.example.tool"><small class="publish-bytes" data-publish-bytes>${esc3(t("explorer.publish.dBytes", { bytes, max: PUBLISH_D_MAX_BYTES }))}</small></label><label class="field">${esc3(t("explorer.publish.name"))}<input id="publish-name" type="text" autocomplete="off" value="${esc3(publish.name)}"></label><label class="field">${esc3(t("explorer.publish.summary"))}<textarea id="publish-summary" rows="3">${esc3(publish.summary)}</textarea><small>${esc3(t("explorer.publish.summaryHelp"))}</small></label><label class="field">${esc3(t("explorer.publish.homepage"))}<input id="publish-homepage" type="text" autocomplete="off" inputmode="url" value="${esc3(publish.homepage)}" placeholder="https://"></label><label class="field">${esc3(t("explorer.publish.topics"))}<input id="publish-topics" type="text" autocomplete="off" value="${esc3(publish.topics)}" placeholder="clients, relay"><small>${esc3(t("explorer.publish.topicsHelp"))}</small></label><p class="publish-hint" data-publish-hint>${esc3(hint)}</p><button class="primary" type="submit" data-publish-submit ${canPublish ? "" : "disabled"}>${esc3(publish.busy ? t("explorer.publish.publishing") : t("explorer.publish.submit"))}</button></form>${publishResultMarkup()}${myRecordsMarkup()}`;
+  }
+  const myRecords = { state: "signed-out", result: null, loadedFor: "" };
+  function myRecordRowMarkup(record) {
+    return `<li class="my-record" data-my-record data-coordinate="${esc3(record.coordinate)}" data-event-id="${esc3(record.eventId ?? "")}"><strong class="my-record-name">${esc3(record.name)}</strong><span class="my-record-field"><span class="my-record-label">${esc3(t("explorer.manage.coordinate"))}</span> <code class="my-record-d">${esc3(record.d)}</code></span><span class="my-record-field"><span class="my-record-label">${esc3(t("explorer.manage.updatedAt"))}</span> <time>${esc3(formatObserved(record.createdAt * 1e3))}</time></span></li>`;
+  }
+  function myRecordsMarkup() {
+    if (viewer.status !== "signedIn" || myRecords.state === "signed-out") return "";
+    const state2 = myRecords.state;
+    const note = (key) => `<p class="my-records-note">${esc3(t(`explorer.manage.${key}`))}</p>`;
+    let body;
+    if (state2 === "loading") body = note("loading");
+    else if (state2 === "unavailable") body = note("unavailable");
+    else if (state2 === "query-failed") body = note("queryFailed");
+    else if (state2 === "empty" || !myRecords.result) body = note("empty");
+    else {
+      const result = myRecords.result;
+      body = `<p class="my-records-count">${esc3(t("explorer.manage.count", { count: result.records.length }))}</p><ul class="my-records-list">${result.records.map(myRecordRowMarkup).join("")}</ul>` + (result.truncated ? `<p class="my-records-note">${esc3(t("explorer.manage.truncated", { limit: MANAGE_LIMIT }))}</p>` : "");
+    }
+    return `<section class="my-records" data-my-records="${esc3(state2)}"><h3 class="my-records-title">${esc3(t("explorer.manage.title"))}</h3>${body}</section>`;
+  }
+  function renderMyRecords() {
+    const host = $("#publish-panel");
+    const section = host ? host.querySelector("[data-my-records]") : null;
+    if (!section) return;
+    section.outerHTML = myRecordsMarkup();
+  }
+  async function loadMyRecords(force) {
+    const pubkey = signedInPubkey();
+    if (!pubkey) {
+      myRecords.state = "signed-out";
+      myRecords.result = null;
+      myRecords.loadedFor = "";
+      return;
+    }
+    if (!force && myRecords.loadedFor === pubkey) return;
+    myRecords.loadedFor = pubkey;
+    myRecords.state = "loading";
+    myRecords.result = null;
+    renderMyRecords();
+    const relays = explorerParams.relays.length ? [...explorerParams.relays] : [...POLICY.DEFAULT_RELAYS];
+    let result;
+    try {
+      result = await fetchMyRecords({ relays, pubkey });
+    } catch (error) {
+      console.error("[nosmaps] my records load failed", error);
+      myRecords.state = "query-failed";
+      myRecords.result = null;
+      renderMyRecords();
+      return;
+    }
+    if (signedInPubkey() !== pubkey) return;
+    myRecords.state = result.state;
+    myRecords.result = result;
+    renderMyRecords();
   }
   function renderPublish() {
     const host = $("#publish-panel");
     if (!host) return;
+    void loadMyRecords();
     host.innerHTML = publishMarkup();
   }
   function refreshPublishState() {
@@ -12183,8 +12333,10 @@ function mountExplorer(data) {
     publish.result = result;
     if (result.state === "published" || result.state === "published-partial") clearStoredDraft();
     renderPublish();
-    if (result.state === "published") await loadRelayCatalog();
-    else if (result.state === "published-partial") await loadRelayCatalog();
+    if (result.state === "published" || result.state === "published-partial") {
+      void loadMyRecords(true);
+      await loadRelayCatalog();
+    }
   }
   const reactionBusy = /* @__PURE__ */ new Set();
   function applyObservation(observation) {

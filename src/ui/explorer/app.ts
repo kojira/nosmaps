@@ -30,12 +30,12 @@ import {isSortKey, sortDimension, sortRows, SORT_KEYS, type SortKey} from '../..
 import {stackRecords, STACK_DRAWN_LIMIT, type RecordStack} from '../../domain/stacks.ts';
 import {decodeNpub, encodeNpub} from '../../domain/npub.ts';
 import {POLICY, SOFTWARE_D_PREFIX} from '../../domain/policy.ts';
-import {validateSoftwareEvent} from '../../domain/records.ts';
+import {validateSoftwareEvent, type SoftwareRecord} from '../../domain/records.ts';
 import type {NostrEvent} from '../../domain/event.ts';
 import {loadCatalog, type LoadCatalogOptions, type LoadedCatalog} from '../../data/load.ts';
 import {
-  buildSoftwareDraft, publishSoftwareRecord,
-  type Nip07Signer, type PublishResult, type RelayReport
+  buildSoftwareDraft, fetchMyRecords, MANAGE_LIMIT, publishSoftwareRecord,
+  type MyRecordsResult, type MyRecordsState, type Nip07Signer, type PublishResult, type RelayReport
 } from '../../data/publish.ts';
 import {
   observeReactions, publishReaction, retractReaction,
@@ -1345,11 +1345,94 @@ export function mountExplorer(data: Data): ExplorerHandles {
       + `<label class="field">${esc(t('explorer.publish.topics'))}<input id="publish-topics" type="text" autocomplete="off" value="${esc(publish.topics)}" placeholder="clients, relay"><small>${esc(t('explorer.publish.topicsHelp'))}</small></label>`
       + `<p class="publish-hint" data-publish-hint>${esc(hint)}</p>`
       + `<button class="primary" type="submit" data-publish-submit ${canPublish ? '' : 'disabled'}>${esc(publish.busy ? t('explorer.publish.publishing') : t('explorer.publish.submit'))}</button>`
-      + `</form>${publishResultMarkup()}`;
+      + `</form>${publishResultMarkup()}${myRecordsMarkup()}`;
   }
+
+  /* ---- 自分が出したレコードの一覧 (issue #12) --------------------------------
+     出せるのは「このリレーで観測できたもの」だけ。observed でないものを一覧に足さないのは
+     公開経路と同じ規則 (§W5.6) で、逆に「問い合わせが完了しなかった」を 0 件と書かないのも
+     同じ理由からくる —— 見ていないことを見た結果として出さない。 */
+  const myRecords: {
+    /** 'signed-out' は「一覧そのものを描かない」状態。属性には出ない（枠ごと出さない）。 */
+    state: 'signed-out' | 'loading' | MyRecordsState;
+    result: MyRecordsResult | null;
+    /** 取得を始めた鍵。多重発行のガードであり、鍵が変われば取り直すという規則でもある。 */
+    loadedFor: string;
+  } = {state: 'signed-out', result: null, loadedFor: ''};
+
+  function myRecordRowMarkup(record: SoftwareRecord): string {
+    return `<li class="my-record" data-my-record data-coordinate="${esc(record.coordinate)}" data-event-id="${esc(record.eventId ?? '')}">`
+      + `<strong class="my-record-name">${esc(record.name)}</strong>`
+      + `<span class="my-record-field"><span class="my-record-label">${esc(t('explorer.manage.coordinate'))}</span> <code class="my-record-d">${esc(record.d)}</code></span>`
+      + `<span class="my-record-field"><span class="my-record-label">${esc(t('explorer.manage.updatedAt'))}</span> <time>${esc(formatObserved(record.createdAt * 1000))}</time></span>`
+      + `</li>`;
+  }
+  function myRecordsMarkup(): string {
+    // 未サインインなら一覧は無い。空の一覧を出すと「0件だった」と読めてしまう。
+    if (viewer.status !== 'signedIn' || myRecords.state === 'signed-out') return '';
+    const state = myRecords.state;
+    const note = (key: string): string => `<p class="my-records-note">${esc(t(`explorer.manage.${key}`))}</p>`;
+    let body: string;
+    if (state === 'loading') body = note('loading');
+    else if (state === 'unavailable') body = note('unavailable');
+    else if (state === 'query-failed') body = note('queryFailed');
+    else if (state === 'empty' || !myRecords.result) body = note('empty');
+    else {
+      const result = myRecords.result;
+      body = `<p class="my-records-count">${esc(t('explorer.manage.count', {count: result.records.length}))}</p>`
+        + `<ul class="my-records-list">${result.records.map(myRecordRowMarkup).join('')}</ul>`
+        // 上限まで読んだなら、その先を見ていないことを書く。
+        + (result.truncated ? `<p class="my-records-note">${esc(t('explorer.manage.truncated', {limit: MANAGE_LIMIT}))}</p>` : '');
+    }
+    return `<section class="my-records" data-my-records="${esc(state)}">`
+      + `<h3 class="my-records-title">${esc(t('explorer.manage.title'))}</h3>${body}</section>`;
+  }
+  function renderMyRecords(): void {
+    const host = $('#publish-panel');
+    const section = host ? host.querySelector('[data-my-records]') : null;
+    // 枠がまだ無いなら出す場所も無い。renderPublish が描いたときに一緒に出る。
+    if (!section) return;
+    section.outerHTML = myRecordsMarkup();
+  }
+  async function loadMyRecords(force?: boolean): Promise<void> {
+    const pubkey = signedInPubkey();
+    if (!pubkey) {
+      myRecords.state = 'signed-out';
+      myRecords.result = null;
+      myRecords.loadedFor = '';
+      return;
+    }
+    // 同じ鍵で既に取りに行ったなら二重に発行しない。鍵が変わったときだけ取り直す。
+    if (!force && myRecords.loadedFor === pubkey) return;
+    myRecords.loadedFor = pubkey;
+    myRecords.state = 'loading';
+    myRecords.result = null;
+    renderMyRecords();
+    const relays = explorerParams.relays.length ? [...explorerParams.relays] : [...POLICY.DEFAULT_RELAYS];
+    let result: MyRecordsResult;
+    try {
+      result = await fetchMyRecords({relays, pubkey});
+    } catch (error) {
+      /* 例外は「0件」ではない。問い合わせが完了していないのだから query-failed と書く。 */
+      console.error('[nosmaps] my records load failed', error);
+      myRecords.state = 'query-failed';
+      myRecords.result = null;
+      renderMyRecords();
+      return;
+    }
+    // 途中で鍵が変わっていたら、前の鍵の答えを今の鍵の一覧として出さない。
+    if (signedInPubkey() !== pubkey) return;
+    myRecords.state = result.state;
+    myRecords.result = result;
+    renderMyRecords();
+  }
+
   function renderPublish(): void {
     const host = $('#publish-panel');
     if (!host) return;
+    /* 描く前に発火する。loadMyRecords は最初の await より前に 'loading' を立てるので、
+       ここで描く枠は「まだ取りに行っていない」ではなく「取得中」から始まる。 */
+    void loadMyRecords();
     host.innerHTML = publishMarkup();
   }
   /* 打鍵のたびにフォームごと描き直すとキャレットが飛ぶので、判定に連動する部分だけ差し替える。 */
@@ -1403,8 +1486,11 @@ export function mountExplorer(data: Data): ExplorerHandles {
     if (result.state === 'published' || result.state === 'published-partial') clearStoredDraft();
     renderPublish();
     // §W5.6: 一覧に出るのは観測できたレコードだけ。読み戻せたときにだけ読み直す。
-    if (result.state === 'published') await loadRelayCatalog();
-    else if (result.state === 'published-partial') await loadRelayCatalog();
+    if (result.state === 'published' || result.state === 'published-partial') {
+      // 自分のレコード一覧も同じ規則で、読み戻せたときにだけ取り直す。
+      void loadMyRecords(true);
+      await loadRelayCatalog();
+    }
   }
 
   /* issue #20: いいね = 対象エントリの座標への kind 7、取り消し = その kind 7 への kind 5。
