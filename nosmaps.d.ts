@@ -201,8 +201,29 @@ interface NosmapsTool {
   readonly claim: NosmapsToolClaim;
   /** Empty for the 35 entries with no recorded liveness observation. */
   readonly liveness: readonly NosmapsLivenessObservation[];
+  /** issue #10: what was found when someone actually looked at whether this entry
+      lets a person switch between several accounts. Null for an entry nobody has
+      looked at — **null means unobserved and is read as `unknown`, never as
+      `not_supported`**. The `accounts` feature is decided by this field alone and
+      is deliberately not inferred from the NIP list. */
+  readonly accountSwitching: NosmapsAccountSwitchingObservation | null;
   /** Numbered findings from the collection report. */
   readonly findings: readonly number[];
+}
+
+/** issue #10. `unknown` is one of the three results because "I looked and the
+    source states neither" is a finding in its own right — it is not the same as
+    never having looked, which is expressed by the field being null. */
+interface NosmapsAccountSwitchingObservation {
+  readonly result: 'supported' | 'not_supported' | 'unknown';
+  /** `publisher-readme` = a line read in the project's own README;
+      `issue-tracker` = the state of the publisher's own issue about it. */
+  readonly method: 'publisher-readme' | 'issue-tracker';
+  /** What the source actually said, quoted. */
+  readonly detail: string;
+  /** The URL that was fetched. */
+  readonly subject: string;
+  readonly observedAt: string;
 }
 
 interface NosmapsDataMeta {

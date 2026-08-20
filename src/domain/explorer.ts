@@ -5,7 +5,7 @@
 
    §21.7 R7 / issue #7 semantics are unchanged; only the location moved. */
 
-import type {CapabilityClaim, CapabilityResult, Tool} from './entry.ts';
+import type {AccountSwitchingObservation, CapabilityClaim, CapabilityResult, Tool} from './entry.ts';
 
 /** What a row can show for a feature: one of the seven stated results, or one of
     the two shapes of *no stated result*. `unknown` is deliberately absent from the
@@ -33,6 +33,16 @@ const FEATURE_SOURCE: ReadonlyArray<readonly [string, string, readonly string[]]
   ['notifications', 'notifications', ['25', '57']], ['accounts', 'account', ['19', '46']], ['signing', 'key', ['46']], ['wallet', 'wallet', ['47', '57']],
   ['longform', 'article', ['23']], ['community', 'groups', ['01', '42', '78']]
 ];
+
+/** issue #10 — the one feature that is NOT decided by the NIP list. `accounts`
+    asks "can a person switch between several accounts", and no NIP answers that:
+    NIP-19 is bech32 encoding, which is why Damus, YakiHonne Web App and
+    Nostrcheck server were shown as supporting multiple accounts on the strength
+    of NIP-19 alone. The answer now comes from `tool.accountSwitching`, which is
+    what someone found when they went and looked. The NIP ids above stay in the
+    definition because they are still what the NIP reference cards and the NIP
+    query are about; they are simply no longer the answer to this question. */
+export const OBSERVED_FEATURE_ID = 'accounts';
 
 export const featureDefinitions: readonly FeatureDefinition[] =
   FEATURE_SOURCE.map(([id, icon, nips]) => ({id, icon, nips}));
@@ -81,27 +91,32 @@ export function precedenceOf(result: string, precedence: readonly string[]): num
   return index === -1 ? -1 : precedence.length - index;
 }
 
-export function featureSupportRecord(
-  tool: Tool, feature: FeatureDefinition, family: string, precedence: readonly string[]
-): CapabilityClaim | null {
-  const records = supportRecords(tool, feature, family).filter(record => precedenceOf(record.result, precedence) > 0);
-  const first = records[0];
-  if (!first) return null;
-  return records.reduce<CapabilityClaim>(
-    (best, record) => precedenceOf(record.result, precedence) > precedenceOf(best.result, precedence) ? record : best,
-    first
-  );
-}
-
 /** §21.3 R3 case 2: no claim at all is `unknown`, never "not supported" and never
     an empty checklist that reads as a set of negatives. It is a value, so it
     always has a badge. */
-export function featureSupport(
-  tool: Tool, feature: FeatureDefinition, family: string, precedence: readonly string[]
+/** The account-switching observation a row carries, or null when nobody has
+    looked. A relay row carries no such field at all, which is also null: a live
+    record has not been asked the question either. */
+export function accountSwitchingOf(
+  tool: {readonly accountSwitching?: AccountSwitchingObservation | null}
+): AccountSwitchingObservation | null {
+  return tool.accountSwitching ?? null;
+}
+
+/** issue #10 — the `accounts` answer, read off the observation instead of the
+    NIP list.
+
+    Unobserved (no record at all) is `unknown`, and so is an observation whose own
+    result is `unknown` — the two are the same answer on screen ("nothing states
+    this"), and neither may be read as "does not support it" (§21.3 R3 case 2 /
+    invariant I8). `out_of_family` has no meaning here: there is no family to be
+    outside of, because the question is not asked of a NIP registry at all. */
+export function accountSwitchingSupport(
+  tool: {readonly accountSwitching?: AccountSwitchingObservation | null}
 ): DisplayResult {
-  const record = featureSupportRecord(tool, feature, family, precedence);
-  if (record) return record.result;
-  return outOfFamily(tool, family) ? 'out_of_family' : 'unknown';
+  const observation = accountSwitchingOf(tool);
+  if (!observation) return 'unknown';
+  return observation.result === 'unknown' ? 'unknown' : observation.result;
 }
 
 export interface ClaimSummary {

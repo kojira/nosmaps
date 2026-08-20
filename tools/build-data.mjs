@@ -362,6 +362,11 @@ function buildTool(signedRecord) {
       nonClaims
     },
     liveness: LIVENESS[d] || [],
+    /* issue #10 — whether a person can switch between several accounts, as something that was
+       actually looked at, not as something inferred from the NIP list. The draft carries the key
+       only for the entries that were looked at; an entry with no key comes through as `null`, which
+       the explorer reads as `unknown` and never as "does not support it". */
+    accountSwitching: entry.account_switching_observation || null,
     findings: entry.findings || []
   };
 }

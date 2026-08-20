@@ -939,6 +939,13 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": {
+    "result": "unknown",
+    "method": "issue-tracker",
+    "detail": "GET https://api.github.com/repos/damus-io/damus/issues/403 returned HTTP 200 with {\"number\":403,\"title\":\"Multiple Profiles (multiple accounts)\",\"state\":\"open\",\"created_at\":\"2023-01-26T17:48:34Z\"}. The publisher's own request for the capability is still open, and the README's NIP list does not name NIP-46; no primary source states that the capability exists and none states that it does not.",
+    "subject": "https://github.com/damus-io/damus/issues/403",
+    "observedAt": "2026-08-20"
+   },
    "findings": [
     1,
     2,
@@ -2423,6 +2430,13 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": {
+    "result": "supported",
+    "method": "publisher-readme",
+    "detail": "GET returned HTTP 200; the README's \"Supported Features\" checklist carries the ticked line \"- [x] Multiple Accounts\".",
+    "subject": "https://raw.githubusercontent.com/vitorpamplona/amethyst/main/README.md",
+    "observedAt": "2026-08-20"
+   },
    "findings": [
     1,
     2,
@@ -2498,6 +2512,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -2805,6 +2820,13 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": {
+    "result": "supported",
+    "method": "publisher-readme",
+    "detail": "GET returned HTTP 200; the README's \"Features\" checklist carries the ticked line \"- [x] Multi-account support\".",
+    "subject": "https://raw.githubusercontent.com/coracle-social/coracle/master/README.md",
+    "observedAt": "2026-08-20"
+   },
    "findings": [
     1,
     2,
@@ -3608,6 +3630,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -3689,6 +3712,7 @@ window.NOSMAPS_DATA={
      "observedAt": "2026-08-18"
     }
    ],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -3753,6 +3777,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -3868,6 +3893,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -3941,6 +3967,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -4004,6 +4031,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -4069,6 +4097,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -4319,6 +4348,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -4392,6 +4422,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -4457,6 +4488,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -4540,6 +4572,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -4621,6 +4654,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -5119,6 +5153,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -5219,6 +5254,13 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": {
+    "result": "supported",
+    "method": "publisher-readme",
+    "detail": "GET returned HTTP 200; the README checklist carries the ticked line \"- [x] Support for multiple accounts\".",
+    "subject": "https://raw.githubusercontent.com/greenart7c3/Amber/master/README.md",
+    "observedAt": "2026-08-20"
+   },
    "findings": [
     1,
     2,
@@ -5302,6 +5344,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -5385,6 +5428,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -5450,6 +5494,13 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": {
+    "result": "unknown",
+    "method": "publisher-readme",
+    "detail": "GET returned HTTP 200; the README states \"- **Multiple Accounts** - Supports different Lightning node backends (e.g., LND, CLN, custodial options).\" That names Lightning node backends, not switching between Nostr keys or profiles, and the README states nothing about the latter.",
+    "subject": "https://raw.githubusercontent.com/getAlby/lightning-browser-extension/master/README.md",
+    "observedAt": "2026-08-20"
+   },
    "findings": [
     1,
     2,
@@ -5517,6 +5568,13 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": {
+    "result": "supported",
+    "method": "publisher-readme",
+    "detail": "GET returned HTTP 200; the README's \"Features\" checklist carries the ticked line \"- [x] Multi-account\".",
+    "subject": "https://raw.githubusercontent.com/KoalaSat/pokey/main/README.md",
+    "observedAt": "2026-08-20"
+   },
    "findings": [
     1,
     2,
@@ -5760,6 +5818,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -6112,6 +6171,7 @@ window.NOSMAPS_DATA={
      "observedAt": "2026-08-18"
     }
    ],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -6196,6 +6256,7 @@ window.NOSMAPS_DATA={
      "observedAt": "2026-08-18"
     }
    ],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -6634,6 +6695,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -7091,6 +7153,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -7158,6 +7221,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -7354,6 +7418,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -7420,6 +7485,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -7498,6 +7564,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -7579,6 +7646,7 @@ window.NOSMAPS_DATA={
      "observedAt": "2026-08-18"
     }
    ],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -7651,6 +7719,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -7734,6 +7803,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -7819,6 +7889,7 @@ window.NOSMAPS_DATA={
      "observedAt": "2026-08-18"
     }
    ],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -7899,6 +7970,7 @@ window.NOSMAPS_DATA={
     ]
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -8313,6 +8385,13 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": {
+    "result": "supported",
+    "method": "publisher-readme",
+    "detail": "GET returned HTTP 200; the README has a section headed \"### 👤 Multi-Account Sessions\" whose example calls \"ndk.sessions.switch(otherPubkey);\" under the comment \"// Switch between accounts\".",
+    "subject": "https://raw.githubusercontent.com/nostr-dev-kit/ndk/main/README.md",
+    "observedAt": "2026-08-20"
+   },
    "findings": [
     1,
     2,
@@ -8396,6 +8475,7 @@ window.NOSMAPS_DATA={
      "observedAt": "2026-08-18"
     }
    ],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -8463,6 +8543,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -8544,6 +8625,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,
@@ -8614,6 +8696,7 @@ window.NOSMAPS_DATA={
     "nonClaims": []
    },
    "liveness": [],
+   "accountSwitching": null,
    "findings": [
     1,
     2,

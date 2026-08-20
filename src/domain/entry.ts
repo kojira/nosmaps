@@ -91,6 +91,31 @@ export interface LivenessObservation {
   readonly observedAt: string;
 }
 
+/** issue #10: what was found when someone actually went and looked at whether an
+    entry lets a person switch between several accounts. `unknown` is one of the
+    three, because "I looked and the source states neither" is itself a finding
+    that is worth recording — it is not the same as never having looked. */
+export type AccountSwitchingResult = 'supported' | 'not_supported' | 'unknown';
+
+/** How the observation was made. `publisher-readme` is a line read in the
+    project's own README; `issue-tracker` is the state of the publisher's own
+    issue about the capability. */
+export type AccountSwitchingMethod = 'publisher-readme' | 'issue-tracker';
+
+/** issue #10: an observation about account switching, in the same shape as a
+    liveness observation — a result, what was actually done to reach it, the
+    verbatim detail, what was looked at, and when. Never inferred from a NIP
+    list: NIP-19 is bech32 encoding and states nothing about accounts. */
+export interface AccountSwitchingObservation {
+  readonly result: AccountSwitchingResult;
+  readonly method: AccountSwitchingMethod;
+  /** What the source actually said, quoted. */
+  readonly detail: string;
+  /** The URL that was fetched. */
+  readonly subject: string;
+  readonly observedAt: string;
+}
+
 /** Names the primary source is quoted for. */
 export type SourceField = 'name' | 'summary' | 'homepage';
 
@@ -189,6 +214,14 @@ export interface Tool {
   readonly claim: ToolClaim;
   /** Empty for the 35 entries with no recorded liveness observation. */
   readonly liveness: readonly LivenessObservation[];
+  /** issue #10: the observation about switching between several accounts, or
+      null for an entry nobody has looked at yet. **Null means unobserved and
+      must be read as `unknown`, never as `not_supported`** (§21.3 R3 case 2):
+      not having looked is not evidence of absence. The `accounts` feature is
+      decided by this field alone; it is deliberately NOT derived from the NIP
+      list, because NIP-19 is bech32 encoding and claims nothing about accounts,
+      which is exactly the defect issue #10 exists for. */
+  readonly accountSwitching: AccountSwitchingObservation | null;
   /** Numbered findings from the collection report. */
   readonly findings: readonly number[];
 }

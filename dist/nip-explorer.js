@@ -10701,6 +10701,7 @@ var FEATURE_SOURCE = [
   ["longform", "article", ["23"]],
   ["community", "groups", ["01", "42", "78"]]
 ];
+var OBSERVED_FEATURE_ID = "accounts";
 var featureDefinitions = FEATURE_SOURCE.map(([id, icon, nips]) => ({ id, icon, nips }));
 var featureById = Object.fromEntries(featureDefinitions.map((feature) => [feature.id, feature]));
 var validStates = [
@@ -10720,6 +10721,14 @@ function isUiState(value) {
 function precedenceOf(result, precedence) {
   const index = precedence.indexOf(result);
   return index === -1 ? -1 : precedence.length - index;
+}
+function accountSwitchingOf(tool) {
+  return tool.accountSwitching ?? null;
+}
+function accountSwitchingSupport(tool) {
+  const observation = accountSwitchingOf(tool);
+  if (!observation) return "unknown";
+  return observation.result === "unknown" ? "unknown" : observation.result;
 }
 function supportPasses(value, mode) {
   if (mode === "all") return true;
@@ -11141,6 +11150,9 @@ function restoreDraft(draft) {
 function rowCapabilities(row) {
   return row.provenance === "relay" ? [] : row.capabilities;
 }
+function rowAccountSwitching(row) {
+  return row.provenance === "relay" ? null : row.accountSwitching;
+}
 function rowTopics(row) {
   if (row.provenance !== "relay") return row.topics;
   return row.categoryObserved ? [row.category] : [];
@@ -11418,6 +11430,7 @@ function mountExplorer(data) {
     );
   }
   function featureSupport(tool, feature) {
+    if (feature.id === OBSERVED_FEATURE_ID) return accountSwitchingSupport({ accountSwitching: rowAccountSwitching(tool) });
     const record = featureSupportRecord(tool, feature);
     if (record) return record.result;
     return outOfFamily(tool) ? "out_of_family" : "unknown";
