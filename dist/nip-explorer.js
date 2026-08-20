@@ -10021,6 +10021,8 @@ var dictionaries = {
         signInFirst: "\u6295\u7A3F\u3059\u308B\u306B\u306FNIP-07\u3067\u30B5\u30A4\u30F3\u30A4\u30F3\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
         dLocal: "\u8B58\u5225\u5B50\uFF08d \u306E nosmaps: \u3088\u308A\u5F8C\u308D\uFF09",
         dBytes: "d \u5168\u4F53\u3067 {bytes} / {max} \u30D0\u30A4\u30C8\uFF08nosmaps: \u306E8\u30D0\u30A4\u30C8\u3092\u542B\u3080\uFF09",
+        dChangeNote: "\u8B58\u5225\u5B50\u3092\u5909\u3048\u308B\u3068\u3001\u540C\u3058\u30EC\u30B3\u30FC\u30C9\u306E\u66F4\u65B0\u3067\u306F\u306A\u304F\u5225\u306E\u30EC\u30B3\u30FC\u30C9\u306B\u306A\u308A\u307E\u3059\u3002",
+        dLockedNote: "\u3053\u306E\u30EC\u30B3\u30FC\u30C9\u306F\u516C\u958B\u6E08\u307F\u3067\u3059\u3002\u8B58\u5225\u5B50\u3092\u5909\u3048\u308B\u3068\u5225\u306E\u30EC\u30B3\u30FC\u30C9\u306B\u306A\u308B\u305F\u3081\u3001\u5909\u66F4\u3067\u304D\u307E\u305B\u3093\u3002",
         name: "\u540D\u524D",
         summary: "\u6982\u8981",
         summaryHelp: "\u7A7A\u6B04\u306E\u307E\u307E\u3067\u3082\u6295\u7A3F\u3067\u304D\u307E\u3059\u3002\u767A\u884C\u8005\u304C\u66F8\u3044\u305F\u6982\u8981\u304C\u7121\u3044\u3053\u3068\u306F\u3001\u7121\u3044\u3068\u66F8\u304F\u306E\u304C\u6B63\u78BA\u3067\u3059\u3002",
@@ -10463,6 +10465,8 @@ var dictionaries = {
         signInFirst: "Sign in with NIP-07 to publish.",
         dLocal: "Identifier (the part of d after nosmaps:)",
         dBytes: "{bytes} / {max} bytes for the whole d (the 8 bytes of nosmaps: included)",
+        dChangeNote: "Changing the identifier does not update this record; it creates a different one.",
+        dLockedNote: "This record is published. The identifier is locked, because changing it would create a different record rather than update this one.",
         name: "Name",
         summary: "Summary",
         summaryHelp: "Leaving this empty is allowed. If the publisher wrote no summary, an empty one is the accurate answer.",
@@ -12214,6 +12218,11 @@ function mountExplorer(data) {
     const result = validateSoftwareEvent(publishDraft(), { receivedAtSec: Math.floor(Date.now() / 1e3) });
     return result.ok ? { ok: true } : { ok: false, reason: result.reason };
   }
+  function publishDLocked() {
+    const result = publish.result;
+    if (!result) return false;
+    return result.state === "published" || result.state === "published-partial";
+  }
   function publishDBytes() {
     const encoder = new TextEncoder();
     return encoder.encode(`${SOFTWARE_D_PREFIX}${publish.dLocal.normalize("NFC").trim()}`).length;
@@ -12271,7 +12280,7 @@ function mountExplorer(data) {
     const bytes = publishDBytes();
     const canPublish = validation.ok && !publish.busy;
     const hint = validation.ok ? "" : publishReasonText(validation.reason);
-    return `<h2 class="publish-title">${esc3(t("explorer.publish.title"))}</h2><p class="publish-lead">${esc3(t("explorer.publish.lead"))}</p><form class="publish-form" data-publish-form novalidate><label class="field">${esc3(t("explorer.publish.dLocal"))}<input id="publish-d" type="text" autocomplete="off" value="${esc3(publish.dLocal)}" placeholder="com.example.tool"><small class="publish-bytes" data-publish-bytes>${esc3(t("explorer.publish.dBytes", { bytes, max: PUBLISH_D_MAX_BYTES }))}</small></label><label class="field">${esc3(t("explorer.publish.name"))}<input id="publish-name" type="text" autocomplete="off" value="${esc3(publish.name)}"></label><label class="field">${esc3(t("explorer.publish.summary"))}<textarea id="publish-summary" rows="3">${esc3(publish.summary)}</textarea><small>${esc3(t("explorer.publish.summaryHelp"))}</small></label><label class="field">${esc3(t("explorer.publish.homepage"))}<input id="publish-homepage" type="text" autocomplete="off" inputmode="url" value="${esc3(publish.homepage)}" placeholder="https://"></label><label class="field">${esc3(t("explorer.publish.topics"))}<input id="publish-topics" type="text" autocomplete="off" value="${esc3(publish.topics)}" placeholder="clients, relay"><small>${esc3(t("explorer.publish.topicsHelp"))}</small></label><p class="publish-hint" data-publish-hint>${esc3(hint)}</p><button class="primary" type="submit" data-publish-submit ${canPublish ? "" : "disabled"}>${esc3(publish.busy ? t("explorer.publish.publishing") : t("explorer.publish.submit"))}</button></form>${publishResultMarkup()}${myRecordsMarkup()}`;
+    return `<h2 class="publish-title">${esc3(t("explorer.publish.title"))}</h2><p class="publish-lead">${esc3(t("explorer.publish.lead"))}</p><form class="publish-form" data-publish-form novalidate><label class="field">${esc3(t("explorer.publish.dLocal"))}<input id="publish-d" type="text" autocomplete="off" value="${esc3(publish.dLocal)}" placeholder="com.example.tool"${publishDLocked() ? " readonly" : ""}><small class="publish-bytes" data-publish-bytes>${esc3(t("explorer.publish.dBytes", { bytes, max: PUBLISH_D_MAX_BYTES }))}</small><small class="publish-d-note" data-publish-d-note>${esc3(publishDLocked() ? t("explorer.publish.dLockedNote") : t("explorer.publish.dChangeNote"))}</small></label><label class="field">${esc3(t("explorer.publish.name"))}<input id="publish-name" type="text" autocomplete="off" value="${esc3(publish.name)}"></label><label class="field">${esc3(t("explorer.publish.summary"))}<textarea id="publish-summary" rows="3">${esc3(publish.summary)}</textarea><small>${esc3(t("explorer.publish.summaryHelp"))}</small></label><label class="field">${esc3(t("explorer.publish.homepage"))}<input id="publish-homepage" type="text" autocomplete="off" inputmode="url" value="${esc3(publish.homepage)}" placeholder="https://"></label><label class="field">${esc3(t("explorer.publish.topics"))}<input id="publish-topics" type="text" autocomplete="off" value="${esc3(publish.topics)}" placeholder="clients, relay"><small>${esc3(t("explorer.publish.topicsHelp"))}</small></label><p class="publish-hint" data-publish-hint>${esc3(hint)}</p><button class="primary" type="submit" data-publish-submit ${canPublish ? "" : "disabled"}>${esc3(publish.busy ? t("explorer.publish.publishing") : t("explorer.publish.submit"))}</button></form>${publishResultMarkup()}${myRecordsMarkup()}`;
   }
   const myRecords = { state: "signed-out", result: null, loadedFor: "" };
   function myRecordActionsMarkup(record) {
@@ -13152,6 +13161,10 @@ function mountExplorer(data) {
     if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
     const field = PUBLISH_FIELDS[target.id];
     if (!field) return;
+    if (field === "dLocal" && publishDLocked()) {
+      target.value = publish.dLocal;
+      return;
+    }
     publish[field] = target.value;
     saveDraft2();
     refreshPublishState();

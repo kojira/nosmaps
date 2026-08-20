@@ -1289,6 +1289,15 @@ export function mountExplorer(data: Data): ExplorerHandles {
     const result = validateSoftwareEvent(publishDraft(), {receivedAtSec: Math.floor(Date.now() / 1000)});
     return result.ok ? {ok: true} : {ok: false, reason: result.reason};
   }
+  /* issue #12 段1: 一度この座標で公開できたレコードの d は、もう触らせない。
+     d を打ち替えると NIP-33 の座標そのものが変わる ＝ 同じレコードの更新ではなく
+     別のレコードが増える。「更新したつもりが増えていた」を UI が作らないよう、
+     公開を観測できた状態では欄を readonly にし、入力イベントが来ても状態を動かさない。 */
+  function publishDLocked(): boolean {
+    const result = publish.result;
+    if (!result) return false;
+    return result.state === 'published' || result.state === 'published-partial';
+  }
   function publishDBytes(): number {
     const encoder = new TextEncoder();
     return encoder.encode(`${SOFTWARE_D_PREFIX}${publish.dLocal.normalize('NFC').trim()}`).length;
@@ -1368,7 +1377,7 @@ export function mountExplorer(data: Data): ExplorerHandles {
     return `<h2 class="publish-title">${esc(t('explorer.publish.title'))}</h2>`
       + `<p class="publish-lead">${esc(t('explorer.publish.lead'))}</p>`
       + `<form class="publish-form" data-publish-form novalidate>`
-      + `<label class="field">${esc(t('explorer.publish.dLocal'))}<input id="publish-d" type="text" autocomplete="off" value="${esc(publish.dLocal)}" placeholder="com.example.tool"><small class="publish-bytes" data-publish-bytes>${esc(t('explorer.publish.dBytes', {bytes, max: PUBLISH_D_MAX_BYTES}))}</small></label>`
+      + `<label class="field">${esc(t('explorer.publish.dLocal'))}<input id="publish-d" type="text" autocomplete="off" value="${esc(publish.dLocal)}" placeholder="com.example.tool"${publishDLocked() ? ' readonly' : ''}><small class="publish-bytes" data-publish-bytes>${esc(t('explorer.publish.dBytes', {bytes, max: PUBLISH_D_MAX_BYTES}))}</small><small class="publish-d-note" data-publish-d-note>${esc(publishDLocked() ? t('explorer.publish.dLockedNote') : t('explorer.publish.dChangeNote'))}</small></label>`
       + `<label class="field">${esc(t('explorer.publish.name'))}<input id="publish-name" type="text" autocomplete="off" value="${esc(publish.name)}"></label>`
       + `<label class="field">${esc(t('explorer.publish.summary'))}<textarea id="publish-summary" rows="3">${esc(publish.summary)}</textarea><small>${esc(t('explorer.publish.summaryHelp'))}</small></label>`
       + `<label class="field">${esc(t('explorer.publish.homepage'))}<input id="publish-homepage" type="text" autocomplete="off" inputmode="url" value="${esc(publish.homepage)}" placeholder="https://"></label>`
@@ -2156,6 +2165,13 @@ export function mountExplorer(data: Data): ExplorerHandles {
     if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
     const field = PUBLISH_FIELDS[target.id];
     if (!field) return;
+    /* issue #12 段1: 公開を観測できた後の d は状態遷移レベルで固定する。readonly 属性は
+       画面の話でしかなく、外された入力イベントが届いても座標は動かさない。打たれた文字は
+       捨てて、欄の表示も保持している値へ戻す。 */
+    if (field === 'dLocal' && publishDLocked()) {
+      target.value = publish.dLocal;
+      return;
+    }
     publish[field] = target.value;
     saveDraft();
     refreshPublishState();

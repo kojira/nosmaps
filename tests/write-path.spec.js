@@ -260,6 +260,43 @@ test('a signed-in publisher submits one entry and it comes back as a row carryin
   expect(errors, 'console/page errors').toEqual([]);
 });
 
+/* issue #12 slice 1: `d` is the coordinate. Editing it after a record is out there does not
+   update that record -- it publishes a second, different one (NIP-33). So once publication has
+   actually been observed, the field is locked. The attribute is checked first, and then the
+   input event is dispatched directly on the element: `readonly` only stops a human, and the
+   thing worth guarding is the state transition behind it. */
+test('the identifier is locked once the record has been published', async ({page}) => {
+  const errors = collectErrors(page);
+  await openExplorer(page);
+  await signIn(page);
+
+  await fillForm(page, {
+    dLocal: 'com.example.locked',
+    name: 'Locked Identifier Tool',
+    summary: 'Published once, so its coordinate is fixed.',
+    homepage: '',
+    topics: ''
+  });
+  await page.locator('[data-publish-submit]').click();
+  await expect(page.locator('[data-publish-state]')).toHaveAttribute('data-publish-state', 'published', {timeout: 20_000});
+
+  const field = page.locator('#publish-d');
+  await expect(field).toHaveAttribute('readonly', /.*/);
+  // The note is rendered through i18n, not hardcoded, so it must be a real string.
+  const note = (await page.locator('[data-publish-d-note]').innerText()).trim();
+  expect(note).not.toBe('');
+  expect(note).not.toContain('undefined');
+
+  // Bypass the attribute the way a script (or a devtools-edited DOM) would.
+  await page.evaluate(() => {
+    const input = document.querySelector('#publish-d');
+    input.value = 'com.example.hijacked';
+    input.dispatchEvent(new Event('input', {bubbles: true}));
+  });
+  await expect(field).toHaveValue('com.example.locked');
+  expect(errors, 'console/page errors').toEqual([]);
+});
+
 /* The regression that the whole design is arranged around (§W5.5, W-I3): a relay
    that acknowledges the event and then never serves it must not produce success.
    Same chain, one link cut at the relay rather than in the app. */
