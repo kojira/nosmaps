@@ -25,6 +25,7 @@ import {decodeNpub, encodeNpub} from '../domain/npub.ts';
 import {POLICY, SOFTWARE_D_PREFIX, SOFTWARE_SCHEMA} from '../domain/policy.ts';
 import {isSortKey, sortRows, SORT_KEYS} from '../domain/sorting.ts';
 import {drawnRecords, stackRecords, STACK_DRAWN_LIMIT} from '../domain/stacks.ts';
+import {buildCorrectionDraft, buildDeletionDraft, normaliseSourceUri} from '../domain/corrections.ts';
 import {
   validateCurationSetEvent, validateDeletionEvent,
   validateFollowListEvent, validateSoftwareEvent
@@ -69,6 +70,12 @@ const catalog = {
   stackRecords,
   drawnRecords,
   STACK_DRAWN_LIMIT,
+  /* issue #18 phase 2: 訂正を出す側。d の正規化（D2/D6, N1-N6）と、その d を
+     バイトのまま載せる下書きの組み立て。署名も送信もしない純関数なので、
+     spec から直接叩ける形で出しておく。 */
+  normaliseSourceUri,
+  buildCorrectionDraft,
+  buildDeletionDraft,
   /* buildCatalog is re-typed at the boundary only so a caller in a plain .js test
      hands it a value this signature accepts; the function itself is untouched. */
   buildCatalog: (input?: CatalogInput): CatalogResult => buildCatalog(input),
