@@ -12574,7 +12574,7 @@ function mountExplorer(data) {
   }
   function openDialog(dialog, context, opener = lastInteractive ?? document.activeElement) {
     dialogContexts.set(dialog, context);
-    if (opener instanceof HTMLElement) dialogOpeners.set(dialog, opener);
+    if (opener instanceof HTMLElement && !dialog.open && !dialog.contains(opener)) dialogOpeners.set(dialog, opener);
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => {
       dialogFocusables(dialog)[0]?.focus();

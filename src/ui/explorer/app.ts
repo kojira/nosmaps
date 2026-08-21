@@ -1716,7 +1716,11 @@ export function mountExplorer(data: Data): ExplorerHandles {
     opener: Element | null = lastInteractive ?? document.activeElement
   ): void {
     dialogContexts.set(dialog, context);
-    if (opener instanceof HTMLElement) dialogOpeners.set(dialog, opener);
+    /* opener は「そのダイアログを外から開いた要素」。リンク詳細や NIP 根拠のように、既に開いて
+       いるダイアログの中身だけを差し替える再呼び出しでは、押された要素はそのダイアログの中に
+       あって innerHTML の差し替えで即座に DOM から外れる。それで opener を上書きすると close
+       時の isConnected 判定で復帰先を失うので、最初に記録した外側の opener を保つ。 */
+    if (opener instanceof HTMLElement && !dialog.open && !dialog.contains(opener)) dialogOpeners.set(dialog, opener);
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => { dialogFocusables(dialog)[0]?.focus(); });
   }

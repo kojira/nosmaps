@@ -40,20 +40,64 @@ test('the headline and lead are shown in both languages', async ({page}) => {
 test('the carousel only shows fields that exist in the dataset and never invents ranking data', async ({page}) => {
   const errors = collectErrors(page);
   await page.goto('index.html');
+  /* Every expectation is read back out of the dataset the page itself loaded: the record
+     publishes `summary`/`summaryAbsent`/`platformText`, and a summary the record never
+     published is the translated "absent" line, not an invented sentence. */
   const expected = await page.evaluate(() => {
-    const tool = window.NOSMAPS_DATA.tools[0];
-    return {name: tool.name, description: tool.description, platform: tool.platform, total: window.NOSMAPS_DATA.tools.length};
+    const i18n = window.NOSMAPS_I18N;
+    const entries = window.NOSMAPS_DATA.tools.filter(tool => tool && tool.name);
+    return {
+      platformLabel: i18n.t('landing.platform'),
+      total: entries.length,
+      /* Every string the records themselves published. Whatever is left over once these are
+         removed is the carousel's own vocabulary, and that is what the scan below is about.
+         Longest first, so a short value ("Android") cannot cut a hole in a longer line that
+         contains it ("... Android apps.") and leave the rest of that line behind. */
+      published: entries
+        .flatMap(tool => [tool.name, tool.summary, tool.platformText, ...(tool.topics ?? [])])
+        .filter(Boolean)
+        .sort((left, right) => right.length - left.length),
+      entries: entries.map(tool => ({
+        name: tool.name,
+        description: tool.summaryAbsent ? i18n.t('explorer.summaryAbsent') : tool.summary,
+        /* Only an entry whose primary source stated its platforms carries one; the others
+           must not grow a platform row at all. */
+        platform: tool.platformText ?? null
+      }))
+    };
   });
+  const first = expected.entries[0];
   const slide = activeSlide(page);
   await expect(slide).toHaveCount(1);
-  await expect(slide).toHaveAttribute('aria-label', `${expected.name} (1 of ${expected.total})`);
-  await expect(slide.locator('.slide-name')).toHaveText(expected.name);
-  await expect(slide.locator('.slide-description')).toHaveText(expected.description);
-  await expect(slide.locator('.slide-facts')).toContainText(expected.platform);
+  await expect(slide).toHaveAttribute('aria-label', `${first.name} (1 of ${expected.total})`);
+  await expect(slide.locator('.slide-name')).toHaveText(first.name);
+  await expect(slide.locator('.slide-description')).toHaveText(first.description);
   await expect(page.locator('#carousel-position')).toHaveText(`1 / ${expected.total}`);
+  /* Read every real slide once and compare it to the record, so both branches are covered by
+     the data: the one entry with no published summary, and the entries with no platform. */
+  const rendered = await page.evaluate(label => Array.from(
+    document.querySelectorAll('.carousel-slide:not([data-clone])'),
+    slide => {
+      const facts = Array.from(slide.querySelectorAll('.slide-fact'));
+      const platform = facts.find(
+        fact => fact.querySelector('.slide-fact-label')?.textContent === label
+      );
+      return {
+        name: slide.querySelector('.slide-name')?.textContent,
+        description: slide.querySelector('.slide-description')?.textContent,
+        platform: platform?.querySelector('.slide-fact-value')?.textContent ?? null
+      };
+    }
+  ), expected.platformLabel);
+  expect(rendered).toEqual(expected.entries);
+  /* The ranking and date scans are about what the carousel adds, so the published wording is
+     taken out first: a record whose own summary says it is "Curated by communities" is quoting
+     its source, while a ranking word or an observation date in the remaining chrome would be
+     the page inventing data it was never given. */
   const slideText = await page.locator('#carousel-viewport').innerText();
-  expect(slideText).not.toMatch(/popular|trending|ranking|rated|人気|話題|ランキング|評価/i);
-  expect(slideText).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  const uiText = expected.published.reduce((text, value) => text.split(value).join(' '), slideText);
+  expect(uiText).not.toMatch(/popular|trending|ranking|rated|人気|話題|ランキング|評価/i);
+  expect(uiText).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   expect(await page.locator('.carousel-slide:not([data-clone])').count()).toBe(expected.total);
   expect(errors).toEqual([]);
 });

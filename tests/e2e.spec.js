@@ -125,6 +125,46 @@ async function chooseComparisons(page, count) {
   for (let index = 0; index < count; index += 1) await boxes.nth(index).check();
 }
 
+/* 1x1 の本物の PNG。ファイル選択 -> FileReader -> data: URL の経路をそのまま通す
+   (tests/review-local-image.spec.js と同じもの)。 */
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+
+/* issue #6 / c15fafd: 折りたたんだカードは「見て回る行」になり、評価まわりの導線 -- いいね、
+   ブックマーク、レビュー、レビュー画像のサムネイル -- はカードから詳細ダイアログ
+   (#evidence-dialog) へ移った。カードの上で [data-review-tool] や .card-review-thumbnail を
+   待っていたのは、その移動より前のページ。導線は消えていないので、今ある入口から同じものを
+   検査する。 */
+async function openDetail(page, id) {
+  await page.locator(`[data-tool-id="${id}"] [data-feature-detail]`).click();
+  await expect(page.locator('#evidence-dialog')).toBeVisible();
+}
+
+async function openReviews(page, id) {
+  await openDetail(page, id);
+  await page.locator('#evidence-dialog [data-review-tool]').click();
+  await expect(page.locator('#review-dialog')).toBeVisible();
+}
+
+/* レビューは観測物で、収集した41件は一件も持っていない。実在のプロジェクトに架空のレビューを
+   付けるのは捏造なので、seedReviews はサンプル入口に閉じられた (app.ts の allReviews)。だから
+   レビューの件数を伴う保証は、すべてこの関数を呼んだ回数から出す -- 4 や 5 や 6 のような、
+   サンプル時代の seed が偶然作っていた数を書き写さない。 */
+async function addReview(page, {body = '', image = false} = {}) {
+  const form = page.locator('#review-dialog [data-review-form]');
+  await expect(form).toHaveCount(1);
+  if (body) await form.locator('textarea[name="body"]').fill(body);
+  if (image) {
+    await form.locator('input[name="deviceImage"]').setInputFiles({name: `${body || 'attached'}.png`, mimeType: 'image/png', buffer: PNG});
+    await expect(form.locator('.local-image-preview img')).toBeVisible();
+  }
+  await form.getByRole('button', {name: 'Add review'}).click();
+}
+
+async function closeAllDialogs(page) {
+  for (let attempt = 0; attempt < 8 && await page.locator('dialog[open]').count(); attempt += 1) await page.keyboard.press('Escape');
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+}
+
 async function expectNoOverflow(page) {
   const metrics = await page.evaluate(() => ({
     document: [document.documentElement.scrollWidth, document.documentElement.clientWidth],
@@ -400,14 +440,23 @@ test('language rerender preserves selected features, comparison, and open dialog
   await page.goto('nip-explorer.html');
   await page.locator('[data-select-feature="media"]').click();
   await chooseComparisons(page, 2);
-  await page.locator('[data-review-tool]').first().click();
-  await expect(page.locator('#review-dialog')).toBeVisible();
+  /* 開くのは画面に出ている先頭の行の詳細。id を書き写すと、テストはカタログではなく写し
+     間違いを検査することになる。 */
+  const subject = await page.locator('.feature-tool-card').first().getAttribute('data-tool-id');
+  await openReviews(page, subject);
+  /* 言語を切り替えて生き残るものが「0件」では、生き残りを何も検査していない。カタログは
+     レビューを一件も持たないので、切り替える前にこの場で書く。期待する件数は書いた回数から
+     出す -- 4 は seedReviews がサンプル入口に作っていた数で、収集レコードには無い。 */
+  const written = ['Survives the language switch'];
+  for (const body of written) await addReview(page, {body});
+  await expect(page.locator('#review-dialog .review-item')).toHaveCount(written.length);
   await page.locator('#compact-identity [data-language="ja"]').dispatchEvent('click');
   await expect(page.locator('#review-dialog')).toBeVisible();
   await expect(page.locator('#review-dialog')).toContainText('レビューを追加');
   await expect(page.locator('[data-select-feature="media"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#compare-summary')).toContainText('2件');
-  await expect(page.locator('#review-dialog .review-item')).toHaveCount(4);
+  await expect(page.locator('#review-dialog .review-item')).toHaveCount(written.length);
+  for (const body of written) await expect(page.locator('#review-dialog .review-item').filter({hasText: body})).toHaveCount(1);
   expect(errors).toEqual([]);
 });
 
@@ -563,28 +612,66 @@ test('three-way compare supports remove/add/replace and NIP evidence returns to 
   expect(errors).toEqual([]);
 });
 
+/* 比較表が一つの機能行の上に並べる三つの答えを、カタログから引いた三つのエントリで作る
+   (§21.3 R3)。`tool-2` / `tool-4` / `tool-5` はサンプル入口の id で、収集した41件には無い。
+     - 主張を一つも持たない行           -> unknown。記録が無いこと自体が答えで、空欄でも否定でもない
+     - 主張はあるが NIP ファミリに無い行 -> out_of_family (case 1)。unknown とも否定とも別の第三の答え
+     - その NIP について結果を名乗る行   -> 名乗った結果そのもの
+   証拠ボタンが出るのは三つめだけ。記録の無い欄に証拠は無い。 */
+function comparisonSubjects(data) {
+  const nipClaims = tool => (tool.capabilities || []).filter(record => record.family === data.registry.family);
+  const claimless = data.tools.find(tool => !(tool.capabilities || []).length);
+  const otherFamily = data.tools.find(tool => (tool.capabilities || []).length && !nipClaims(tool).length);
+  const stated = data.tools.find(tool => nipClaims(tool).some(record => data.resultPrecedence.includes(record.result)));
+  expect(claimless, 'catalogue has an entry that claims nothing').toBeTruthy();
+  expect(otherFamily, 'catalogue has an entry whose claims are all outside the NIP family').toBeTruthy();
+  expect(stated, 'catalogue has an entry stating a result against a NIP').toBeTruthy();
+  const claim = nipClaims(stated).find(record => data.resultPrecedence.includes(record.result));
+  return {claimless, otherFamily, stated, claim};
+}
+
 test('comparison distinguishes no record from explicit unknown and evidence follows the aggregate record', async ({page}) => {
   const errors = collectErrors(page);
+  const data = catalogueData();
+  const {claimless, otherFamily, stated, claim} = comparisonSubjects(data);
+  const supportLabel = value => page.evaluate(name => window.NOSMAPS_I18N.t(`support.${name}`), value);
   await page.goto('nip-explorer.html');
-  await page.locator('[data-compare-tool="tool-2"]').check();
-  await page.locator('[data-compare-tool="tool-4"]').check();
+  /* 選んだ順が候補の並び順になる。 */
+  const candidates = [[claimless, 'unknown'], [otherFamily, 'out_of_family'], [stated, claim.result]];
+  for (const [tool] of candidates) await page.locator(`[data-compare-tool="${tool.id}"]`).check();
   await page.getByRole('button', {name: 'Compare features'}).click();
-  const longform = page.locator('.comparison-item').filter({has: page.locator('.comparison-label', {hasText: 'Long-form'})});
-  await expect(longform.locator('.comparison-value').nth(0).locator('.no-support-record')).toHaveText('—');
-  await expect(longform.locator('.comparison-value').nth(0).locator('.comparison-evidence')).toHaveCount(0);
-  await expect(longform.locator('.comparison-value').nth(1).locator('.support-badge')).toHaveText('Unknown');
-  await expect(longform.locator('.comparison-value').nth(1).locator('.comparison-evidence')).toBeVisible();
 
-  await page.keyboard.press('Escape');
-  await page.getByRole('button', {name: 'Clear selection'}).click();
-  await page.locator('[data-compare-tool="tool-4"]').check();
-  await page.locator('[data-compare-tool="tool-5"]').check();
-  await page.getByRole('button', {name: 'Compare features'}).click();
-  const notifications = page.locator('.comparison-item').filter({has: page.locator('.comparison-label', {hasText: 'Notifications'})});
-  await expect(notifications.locator('.comparison-value').first().locator('.support-badge')).toHaveText('Supported');
-  await notifications.locator('.comparison-value').first().locator('.comparison-evidence').click();
-  await expect(page.locator('#evidence-dialog')).toContainText('NIP-57');
-  await expect(page.locator('#evidence-dialog')).toContainText('Supported');
+  /* 機能の名前も行の位置も書かない。集約した主張は証拠ボタンが data-evidence-nip として
+     名乗り、その値は data.js の claim.key そのものなので、それで行を引く。 */
+  const statedValues = page.locator('.comparison-value').filter({has: page.locator(`[data-evidence-nip="${claim.key}"]`)});
+  expect(await statedValues.count(), `${claim.key} is aggregated into at least one feature row`).toBeGreaterThan(0);
+  /* その主張で答えた行は、どれも data.js が言うその結果を出している。 */
+  expect([...new Set(await statedValues.evaluateAll(nodes => nodes.map(node => node.dataset.support)))]).toEqual([claim.result]);
+
+  const row = page.locator('.comparison-item').filter({has: page.locator(`[data-evidence-nip="${claim.key}"]`)}).first();
+  const values = row.locator('.comparison-value');
+  await expect(values).toHaveCount(candidates.length);
+  const badges = [];
+  for (const [index, [tool, support]] of candidates.entries()) {
+    const value = values.nth(index);
+    await expect(value, tool.id).toHaveAttribute('data-support', support);
+    const badge = await supportLabel(support);
+    expect(badge, `${support} is a real label`).toBeTruthy();
+    await expect(value.locator('.support-badge'), tool.id).toHaveText(badge);
+    await expect(value.locator('.comparison-evidence'), tool.id).toHaveCount(support === claim.result ? 1 : 0);
+    badges.push(badge);
+  }
+  /* 三つとも別の答えだと名乗っている。 */
+  expect(new Set(badges).size, 'the three answers read differently').toBe(candidates.length);
+
+  /* 証拠は集約した主張そのものに従う: NIP 番号、名乗った結果、そして出典の一行。 */
+  await values.nth(2).locator('.comparison-evidence').click();
+  const dialog = page.locator('#evidence-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('#compare-dialog')).toBeVisible();
+  await expect(dialog).toContainText(`${claim.family.toUpperCase()}-${claim.id}`);
+  await expect(dialog.locator('.support-badge')).toHaveText(await supportLabel(claim.result));
+  await expect(dialog.locator('.source-text')).toHaveText(claim.sourceText);
   expect(errors).toEqual([]);
 });
 
@@ -593,51 +680,79 @@ test('comparison distinguishes no record from explicit unknown and evidence foll
    残る保証 -- 下書きの各欄と端末からの添付画像が言語切り替えを越えて生き残ること、そして
    選択盤がどこにも無いこと -- は tests/review-local-image.spec.js へ移した。 */
 
+/* 表示上限そのものはここに書かない -- 観測する。カタログの末尾から一件ずつレビューを書き、
+   そのたびに履歴を読む。上限に届くまでは「今書いた行」が必ず履歴に居る (= 収集はカタログの
+   端まで届いている)。増えなくなったところが上限で、そのとき残っているのは「全部集めてから
+   切った」もの -- カタログ順の先頭から count 件 -- でなければならない。tool ごとに切って
+   いたら、最初に書いた末尾のエントリの一件が最初から見えない。
+
+   `NsecVault` / `tool-9` はサンプル入口の名前と id で、41件の収集レコードには無い。 */
 test('reviewer history gathers reviews from every tool before applying its display limit', async ({page}) => {
   const errors = collectErrors(page);
+  const data = catalogueData();
   await page.goto('nip-explorer.html');
-  await page.locator('#feature-query').fill('NsecVault');
-  await page.locator('[data-tool-id="tool-9"] [data-review-tool]').click();
-  const form = page.locator('[data-review-form="tool-9"]');
-  await form.locator('textarea[name="body"]').fill('Late tool history entry');
-  await form.getByRole('button', {name: 'Add review'}).click();
-  const added = page.locator('.review-item').filter({hasText: 'Late tool history entry'});
-  await added.locator('[data-reviewer="local"]').click();
-  await expect(page.locator('#profile-dialog .profile-history')).toContainText('NsecVault');
-  await expect(page.locator('#profile-dialog .profile-history')).toContainText('Late tool history entry');
+  const written = [];
+  let limited = 0;
+  for (const tool of [...data.tools].reverse()) {
+    const body = `History probe ${written.length + 1}`;
+    await openReviews(page, tool.id);
+    await addReview(page, {body});
+    await page.locator('#review-dialog .review-item').filter({hasText: body}).locator('[data-reviewer="local"]').click();
+    await expect(page.locator('#profile-dialog')).toBeVisible();
+    written.push({tool, body});
+    const gathered = data.tools.flatMap(candidate => written.filter(item => item.tool === candidate));
+    const names = await page.locator('#profile-dialog .profile-history article strong').allTextContents();
+    const bodies = await page.locator('#profile-dialog .profile-history article p').allTextContents();
+    const where = `history after ${written.length} reviews`;
+    expect(names, where).toEqual(gathered.slice(0, names.length).map(item => item.tool.name));
+    expect(bodies, where).toEqual(gathered.slice(0, names.length).map(item => item.body));
+    if (names.length < written.length) { limited = names.length; break; }
+    expect(names, where).toEqual(gathered.map(item => item.tool.name));
+    await closeAllDialogs(page);
+  }
+  expect(limited, 'the history applies a display limit to what it gathered').toBeGreaterThan(0);
+  expect(limited).toBeLessThan(written.length);
+  await expect(page.locator('#profile-dialog .profile-history article')).toHaveCount(limited);
   expect(errors).toEqual([]);
 });
 
 test('likes, bookmarks, text/image reviews, profiles, history, gallery, and image return work', async ({page}) => {
   const errors = collectErrors(page);
+  const data = catalogueData();
   await page.goto('nip-explorer.html');
-  const card = page.locator('[data-tool-id="tool-1"]');
-  const like = card.locator('[data-like-tool]');
-  const before = await like.textContent();
-  await like.click();
-  expect(await card.locator('[data-like-tool]').textContent()).not.toBe(before);
-  await card.locator('[data-bookmark-tool]').click();
-  await expect(card).toContainText('Bookmarked');
-  await card.locator('[data-review-tool]').click();
-  const form = page.locator('[data-review-form]');
-  await form.locator('textarea[name="body"]').fill('Text-only review');
-  await form.getByRole('button', {name: 'Add review'}).click();
-  await expect(page.locator('.review-item')).toHaveCount(5);
+  const dialog = page.locator('#evidence-dialog');
+  await openDetail(page, data.tools[0].id);
+  /* issue #20: いいねの数は「観測できた kind 7 の件数」そのもので、押したことでは動かないし、
+     署名できない読み手は押せないと名乗る。押せば数字が変わることを期待していたのは、数を id の
+     連番から作っていたサンプル時代の版。数え方そのものの保証は tests/reactions.spec.js が持つ。 */
+  const like = dialog.locator('[data-like-tool]');
+  await expect(like).toBeDisabled();
+  await expect(like).toHaveAttribute('data-like-blocked', 'blocked');
+  await dialog.locator('[data-bookmark-tool]').click();
+  await expect(dialog.locator('[data-bookmark-tool]')).toHaveAttribute('aria-pressed', 'true');
+  await dialog.locator('[data-review-tool]').click();
+  await expect(page.locator('#review-dialog')).toBeVisible();
+  /* 件数は書いた回数から出す。5 / 6 / 5 はサンプル入口の seedReviews が作っていた数。 */
+  const reviews = page.locator('#review-dialog .review-item');
+  await expect(reviews).toHaveCount(0);
+  await addReview(page, {body: 'Text-only review'});
+  await expect(reviews).toHaveCount(1);
   /* issue #8: 画像付きレビューの画像は、プリセットではなく自分で添付したものだけになった。 */
-  await page.locator('[data-review-form] input[name="deviceImage"]').setInputFiles({name: 'attached.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')});
-  await expect(page.locator('[data-review-form] .local-image-preview img')).toBeVisible();
-  await page.locator('[data-review-form]').getByRole('button', {name: 'Add review'}).click();
-  await expect(page.locator('.review-item')).toHaveCount(6);
-  await page.locator('.review-item').first().locator('[data-review-vote="helpful"]').click();
-  await page.locator('.review-item').first().locator('[data-reviewer]').click();
+  const attached = ['Review with an attached image'];
+  for (const body of attached) await addReview(page, {body, image: true});
+  await expect(reviews).toHaveCount(1 + attached.length);
+  await reviews.first().locator('[data-review-vote="helpful"]').click();
+  await reviews.first().locator('[data-reviewer]').click();
   await expect(page.locator('#profile-dialog')).toContainText('Review and vote history');
   await expect(page.locator('#profile-dialog [data-review-jump]').first()).toBeVisible();
   await page.keyboard.press('Escape');
-  await page.keyboard.press('Escape');
-  await card.locator('.card-review-more').click();
-  await expect(page.locator('.gallery-card')).toHaveCount(5);
+  await expect(page.locator('#profile-dialog')).toBeHidden();
+  /* ギャラリーの入口はレビューダイアログの道具立て。並ぶのは添付した画像の数だけ。 */
+  await page.locator('#review-dialog [data-gallery-tool]').click();
+  await expect(page.locator('.gallery-card')).toHaveCount(attached.length);
   const galleryScroll = await page.locator('#gallery-content').evaluate(element => element.scrollTop);
   await page.locator('.gallery-card').first().getByRole('button', {name: 'Enlarge'}).click();
+  await expect(page.locator('#image-dialog')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('#gallery-dialog')).toBeVisible();
   expect(await page.locator('#gallery-content').evaluate(element => element.scrollTop)).toBe(galleryScroll);
@@ -689,13 +804,26 @@ test.describe('375x812 responsive presentation', () => {
       return element.textContent.trim().length > 0 && style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0 && box.width > 0 && box.height > 0 && element.scrollWidth <= element.clientWidth && element.scrollHeight <= element.clientHeight;
     }))).toBe(true);
     await expectNoOverflow(page);
-    const thumbs = page.locator('[data-tool-id="tool-1"] .card-review-thumbnail');
+    /* issue #6 / c15fafd: サムネイルの帯もカードから詳細ダイアログへ移った。占有率の保証も
+       一緒に移る -- 帯は詳細のごく一部で、一枚一枚は 4:3 のまま、3枚を超えた分は「+N」に
+       畳まれる。カタログはレビュー画像を一枚も持たない（観測していない）ので、枚数はこの場で
+       添付した数から出す。 */
+    const subject = await page.locator('.feature-tool-card').first().getAttribute('data-tool-id');
+    const attached = ['first', 'second', 'third', 'fourth'];
+    await openReviews(page, subject);
+    for (const name of attached) await addReview(page, {body: `Attached ${name}`, image: true});
+    /* 書いたあとの詳細を開き直して読む。レビューの投稿は開いているレビューダイアログだけを
+       描き直すので、その後ろに残っている詳細は投稿前のままになっている。 */
+    await closeAllDialogs(page);
+    await openDetail(page, subject);
+    const thumbs = page.locator('#evidence-dialog .card-review-thumbnail');
     await expect(thumbs).toHaveCount(3);
-    await expect(page.locator('[data-tool-id="tool-1"] .card-review-more')).toHaveText('+1');
+    await expect(page.locator('#evidence-dialog .card-review-more')).toHaveText(`+${attached.length - 3}`);
     const dimensions = await thumbs.evaluateAll(nodes => nodes.map(node => { const box = node.getBoundingClientRect(); return [box.width, box.height]; }));
     for (const [width, height] of dimensions) expect(width / height).toBeCloseTo(4 / 3, 1);
-    const occupancy = await page.locator('[data-tool-id="tool-1"]').evaluate(card => card.querySelector('.card-review-thumbnails').getBoundingClientRect().height / card.getBoundingClientRect().height);
+    const occupancy = await page.locator('#evidence-content').evaluate(content => content.querySelector('.card-review-thumbnails').getBoundingClientRect().height / content.getBoundingClientRect().height);
     expect(occupancy).toBeLessThan(0.2);
+    await expectNoOverflow(page);
     expect(errors).toEqual([]);
   });
 
@@ -708,10 +836,14 @@ test.describe('375x812 responsive presentation', () => {
     const widths = await page.locator('.comparison-candidate').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().width));
     expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(1.5);
     await page.keyboard.press('Escape');
-    await page.locator('[data-tool-id="tool-1"] [data-review-tool]').click();
+    const subject = await page.locator('.feature-tool-card').first().getAttribute('data-tool-id');
+    await openReviews(page, subject);
     await expectNoOverflow(page);
-    await page.keyboard.press('Escape');
-    await page.locator('[data-tool-id="tool-1"] .card-review-more').click();
+    /* ギャラリーは画像が並んで初めて幅を試せる。カタログは観測したレビュー画像を持たないので、
+       一枚添付してから開く。入口はレビューダイアログの道具立て（カードの「+N」ではない）。 */
+    await addReview(page, {body: 'Attached for the gallery', image: true});
+    await page.locator('#review-dialog [data-gallery-tool]').click();
+    await expect(page.locator('.gallery-card')).toHaveCount(1);
     await expectNoOverflow(page);
     expect(errors).toEqual([]);
   });
